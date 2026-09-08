@@ -46,7 +46,3 @@ Chỉ đưa Cloud name và unsigned preset vào frontend. Không thêm Cloudinar
 npm run build
 npm start
 ```
-
-Server Express phục vụ luôn bản build React. Sao chép `server/.env.example` thành `server/.env`, cấu hình PostgreSQL và thay JWT secret trước khi deploy.
-
-> Đổi ngay `ADMIN_PASSWORD` và `JWT_SECRET` trước khi đưa lên môi trường public. `DATA_FILE` chỉ là nguồn nhập dữ liệu JSON cũ cho `db:init`.
