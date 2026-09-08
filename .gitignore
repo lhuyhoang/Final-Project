@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build and test output
+dist/
+coverage/
+.vite/
+
+# Local environment files (keep safe templates)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Logs and local runtime data
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+server/data/*.json
+server/data/*.json.*
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.backup
+
+# Credentials and private keys
+.npmrc
+.netrc
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
