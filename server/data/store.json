@@ -1,0 +1,258 @@
+{
+  "users": [
+    {
+      "id": "usr-admin",
+      "name": "QuadPro Admin",
+      "email": "admin@quadpro.vn",
+      "phone": "0900000001",
+      "password": "$2a$12$pMieEzNk8BG0MMmSkjmdWOiYH7ppC9Xuv1gRxkrub472hyG6.iOYq",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2026-08-01T08:00:00.000Z"
+    },
+    {
+      "id": "usr-demo",
+      "name": "Khách hàng Demo",
+      "email": "demo@quadpro.vn",
+      "phone": "0900000002",
+      "password": "$2a$12$KhQ700tSRDnTsJ02D0mjd.9cZZjlvxxBYs0Rzzbw42Z0xW6WeWhqi",
+      "role": "customer",
+      "status": "active",
+      "createdAt": "2026-08-01T08:00:00.000Z"
+    }
+  ],
+  "products": [
+    {
+      "id": 1,
+      "name": "PC QUADPRO Phantom i5 14400F / RTX 4060 8GB",
+      "category": "PC Gaming",
+      "brand": "QUADPRO",
+      "price": 20990000,
+      "oldPrice": 23990000,
+      "stock": 18,
+      "rating": 4.9,
+      "reviews": 126,
+      "discount": 13,
+      "badge": "Bán chạy",
+      "image": "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 2,
+      "name": "Card màn hình ASUS Dual GeForce RTX 4060 OC 8GB",
+      "category": "VGA - Card đồ họa",
+      "brand": "ASUS",
+      "price": 8290000,
+      "oldPrice": 9490000,
+      "stock": 11,
+      "rating": 4.8,
+      "reviews": 84,
+      "discount": 13,
+      "badge": "Giá sốc",
+      "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 3,
+      "name": "Màn hình MSI MAG 274QRF QD E2 27 inch 2K 180Hz",
+      "category": "Màn hình",
+      "brand": "MSI",
+      "price": 7990000,
+      "oldPrice": 8990000,
+      "stock": 24,
+      "rating": 4.7,
+      "reviews": 42,
+      "discount": 11,
+      "badge": "Mới",
+      "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 4,
+      "name": "CPU AMD Ryzen 7 7800X3D 8C/16T",
+      "category": "CPU - Bộ vi xử lý",
+      "brand": "AMD",
+      "price": 9490000,
+      "oldPrice": 10890000,
+      "stock": 8,
+      "rating": 5,
+      "reviews": 73,
+      "discount": 13,
+      "badge": "Top gaming",
+      "image": "https://images.unsplash.com/photo-1555617981-dac3880eac6e?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 5,
+      "name": "Laptop ASUS TUF Gaming A15 R7 / RTX 4050",
+      "category": "Laptop",
+      "brand": "ASUS",
+      "price": 23990000,
+      "oldPrice": 26990000,
+      "stock": 7,
+      "rating": 4.8,
+      "reviews": 98,
+      "discount": 11,
+      "badge": "Quà 1.5 triệu",
+      "image": "https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 6,
+      "name": "Bàn phím cơ Akko 5075B Plus Dracula Castle",
+      "category": "Bàn phím",
+      "brand": "AKKO",
+      "price": 1890000,
+      "oldPrice": 2290000,
+      "stock": 31,
+      "rating": 4.9,
+      "reviews": 164,
+      "discount": 17,
+      "badge": "Deal hot",
+      "image": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 7,
+      "name": "SSD Samsung 990 PRO 2TB PCIe Gen 4.0",
+      "category": "SSD - HDD",
+      "brand": "SAMSUNG",
+      "price": 4290000,
+      "oldPrice": 5190000,
+      "stock": 42,
+      "rating": 4.9,
+      "reviews": 55,
+      "discount": 17,
+      "badge": "Freeship",
+      "image": "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?auto=format&fit=crop&w=600&q=85"
+    },
+    {
+      "id": 8,
+      "name": "Chuột không dây Logitech G Pro X Superlight 2",
+      "category": "Chuột gaming",
+      "brand": "LOGITECH",
+      "price": 3290000,
+      "oldPrice": 3790000,
+      "stock": 26,
+      "rating": 4.8,
+      "reviews": 112,
+      "discount": 13,
+      "badge": "Bán chạy",
+      "image": "https://images.unsplash.com/photo-1527814050087-3793815479db?auto=format&fit=crop&w=600&q=85"
+    }
+  ],
+  "orders": [
+    {
+      "id": "QP26081001",
+      "userId": "usr-demo",
+      "customer": {
+        "name": "Khách hàng Demo",
+        "email": "demo@quadpro.vn",
+        "phone": "0900000002"
+      },
+      "shipping": {
+        "address": "Nhận tại showroom QuadPro"
+      },
+      "items": [
+        {
+          "productId": 6,
+          "name": "Bàn phím cơ Akko 5075B Plus Dracula Castle",
+          "image": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=85",
+          "price": 1890000,
+          "quantity": 1
+        },
+        {
+          "productId": 8,
+          "name": "Chuột không dây Logitech G Pro X Superlight 2",
+          "image": "https://images.unsplash.com/photo-1527814050087-3793815479db?auto=format&fit=crop&w=600&q=85",
+          "price": 3290000,
+          "quantity": 1
+        }
+      ],
+      "total": 5180000,
+      "paymentMethod": "sandbox",
+      "status": "delivered",
+      "createdAt": "2026-08-10T09:20:00.000Z",
+      "updatedAt": "2026-08-10T09:20:00.000Z"
+    },
+    {
+      "id": "QP26081102",
+      "userId": "usr-demo",
+      "customer": {
+        "name": "Khách hàng Demo",
+        "email": "demo@quadpro.vn",
+        "phone": "0900000002"
+      },
+      "shipping": {
+        "address": "Nhận tại showroom QuadPro"
+      },
+      "items": [
+        {
+          "productId": 1,
+          "name": "PC QUADPRO Phantom i5 14400F / RTX 4060 8GB",
+          "image": "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=85",
+          "price": 20990000,
+          "quantity": 1
+        }
+      ],
+      "total": 20990000,
+      "paymentMethod": "sandbox",
+      "status": "processing",
+      "createdAt": "2026-08-11T14:45:00.000Z",
+      "updatedAt": "2026-08-11T14:45:00.000Z"
+    },
+    {
+      "id": "QP26081203",
+      "userId": "usr-demo",
+      "customer": {
+        "name": "Khách hàng Demo",
+        "email": "demo@quadpro.vn",
+        "phone": "0900000002"
+      },
+      "shipping": {
+        "address": "Nhận tại showroom QuadPro"
+      },
+      "items": [
+        {
+          "productId": 3,
+          "name": "Màn hình MSI MAG 274QRF QD E2 27 inch 2K 180Hz",
+          "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=600&q=85",
+          "price": 7990000,
+          "quantity": 2
+        }
+      ],
+      "total": 15980000,
+      "paymentMethod": "sandbox",
+      "status": "delivered",
+      "createdAt": "2026-08-12T03:15:00.000Z",
+      "updatedAt": "2026-08-13T05:56:54.798Z"
+    },
+    {
+      "id": "QP7379444982",
+      "userId": "usr-demo",
+      "customer": {
+        "name": "Khách hàng Demo",
+        "email": "demo@quadpro.vn",
+        "phone": "0900000002"
+      },
+      "shipping": {
+        "address": "Nhận tại showroom QuadPro"
+      },
+      "items": [
+        {
+          "productId": 4,
+          "name": "CPU AMD Ryzen 7 7800X3D 8C/16T",
+          "image": "https://images.unsplash.com/photo-1555617981-dac3880eac6e?auto=format&fit=crop&w=600&q=85",
+          "price": 9490000,
+          "quantity": 1
+        },
+        {
+          "productId": 2,
+          "name": "Card màn hình ASUS Dual GeForce RTX 4060 OC 8GB",
+          "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=600&q=85",
+          "price": 8290000,
+          "quantity": 1
+        }
+      ],
+      "total": 17780000,
+      "paymentMethod": "sandbox",
+      "status": "pending",
+      "createdAt": "2026-08-22T06:17:24.982Z",
+      "updatedAt": "2026-08-22T06:17:24.982Z"
+    }
+  ]
+}

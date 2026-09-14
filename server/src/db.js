@@ -34,6 +34,11 @@ function connectionStringForDatabase(connectionString, database) {
   return url.toString()
 }
 
+function checksumSql(sql, lineEnding = '\n') {
+  const normalized = sql.replace(/\r\n?|\n/g, lineEnding)
+  return crypto.createHash('sha256').update(normalized).digest('hex')
+}
+
 export function getPoolConfig({ database } = {}) {
   const max = parseInteger(process.env.DB_POOL_MAX, 10, 'DB_POOL_MAX', 1, 100)
   const ssl = parseSsl(process.env.DB_SSL)
@@ -97,7 +102,13 @@ export async function runMigrations({ directory = defaultMigrationsDirectory } =
 
   const migrations = await Promise.all(filenames.map(async name => {
     const sql = await fs.readFile(path.join(directory, name), 'utf8')
-    return { name, sql, checksum: crypto.createHash('sha256').update(sql).digest('hex') }
+    const checksum = checksumSql(sql)
+    return {
+      name,
+      sql,
+      checksum,
+      compatibleChecksums: new Set([checksum, checksumSql(sql, '\r\n')])
+    }
   }))
 
   return withTransaction(async client => {
@@ -118,8 +129,14 @@ export async function runMigrations({ directory = defaultMigrationsDirectory } =
     for (const migration of migrations) {
       const previousChecksum = appliedChecksums.get(migration.name)
       if (previousChecksum) {
-        if (previousChecksum !== migration.checksum) {
+        if (!migration.compatibleChecksums.has(previousChecksum)) {
           throw new Error(`Applied migration ${migration.name} has been modified`)
+        }
+        if (previousChecksum !== migration.checksum) {
+          await client.query(
+            'UPDATE schema_migrations SET checksum = $1 WHERE name = $2',
+            [migration.checksum, migration.name]
+          )
         }
         skipped.push(migration.name)
         continue
