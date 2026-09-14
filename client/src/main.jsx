@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useEffectEvent,
   useId,
   useLayoutEffect,
   useRef,
@@ -43,6 +44,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
+  SlidersHorizontal,
   Star,
   Trash2,
   Truck,
@@ -52,7 +54,7 @@ import {
   Youtube,
   Zap,
 } from "lucide-react";
-import { categories, fallbackProducts } from "./data";
+import { categories, categoryMenus, fallbackProducts } from "./data";
 import { api, clearSession, getSession, saveSession } from "./api";
 import AccountSettings from "./components/AccountSettings";
 import AdminDashboard from "./components/AdminDashboard";
@@ -64,12 +66,8 @@ import "./admin.css";
 const formatPrice = (value) =>
   new Intl.NumberFormat("vi-VN").format(value) + "₫";
 const defaultPolicyText = "Trả góp 0% • Bảo hành 36 tháng";
-const productIdFromPath = (pathname = window.location.pathname) => {
-  const match = pathname.match(/^\/products\/(\d+)(?:-[^/]*)?\/?$/);
-  return match ? Number(match[1]) : null;
-};
-const productPath = (product) => {
-  const slug = product.name
+const toSlug = (value) =>
+  value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
@@ -77,7 +75,40 @@ const productPath = (product) => {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-  return `/products/${product.id}-${slug}`;
+const productIdFromPath = (pathname = window.location.pathname) => {
+  const match = pathname.match(/^\/products\/(\d+)(?:-[^/]*)?\/?$/);
+  return match ? Number(match[1]) : null;
+};
+const productPath = (product) => `/products/${product.id}-${toSlug(product.name)}`;
+const catalogSelectionFromLocation = (
+  pathname = window.location.pathname,
+  search = window.location.search,
+) => {
+  const match = pathname.match(/^\/categories\/([^/]+)(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+
+  const category = categories.find((item) => toSlug(item.name) === match[1]);
+  if (!category) return null;
+
+  const option = match[2]
+    ? (categoryMenus[category.name]?.options || []).find(
+        (item) => toSlug(item) === match[2],
+      )
+    : "";
+  if (match[2] && !option) return null;
+
+  return {
+    category: category.name,
+    option,
+    brand: new URLSearchParams(search).get("brand") || "",
+  };
+};
+const catalogPath = (category, option = "", brand = "") => {
+  const pathname = `/categories/${toSlug(category)}${option ? `/${toSlug(option)}` : ""}`;
+  const params = new URLSearchParams();
+  if (brand) params.set("brand", brand);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 };
 const categoryIcons = {
   Armchair,
@@ -297,13 +328,14 @@ function ProductQuickView({ anchorRef, id, open, product }) {
   );
 }
 
-function ProductCard({ product, onAdd, onOpen }) {
+function ProductCard({ product, onAdd, onOpen, carousel = false }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const mediaRef = useRef(null);
   const quickViewId = useId();
+  const available = product.stock !== 0;
 
   return (
-    <article className="product-card">
+    <article className={`product-card${carousel ? " carousel-product-card" : ""}`}>
       <div
         aria-describedby={quickViewOpen ? quickViewId : undefined}
         aria-label={`Xem chi tiết ${product.name}`}
@@ -380,10 +412,17 @@ function ProductCard({ product, onAdd, onOpen }) {
           <button
             className="add-button"
             onClick={() => onAdd(product)}
+            disabled={!available}
             aria-label={`Thêm ${product.name} vào giỏ`}
           >
             <ShoppingCart size={18} />
+            {carousel && <span>Thêm vào giỏ</span>}
           </button>
+          {carousel && (
+            <span className={`product-stock ${available ? "in-stock" : "sold-out"}`}>
+              {available ? "Còn hàng" : "Hết hàng"}
+            </span>
+          )}
         </div>
       </div>
       <ProductQuickView
@@ -396,6 +435,394 @@ function ProductCard({ product, onAdd, onOpen }) {
   );
 }
 
+function CategoryProductCarousel({
+  category,
+  products,
+  onAdd,
+  onOpen,
+  onSelectOption,
+  onViewAll,
+}) {
+  const sectionRef = useRef(null);
+  const trackRef = useRef(null);
+  const titleId = useId();
+  const [inView, setInView] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [canScroll, setCanScroll] = useState(false);
+  const menuOptions = (categoryMenus[category.name]?.options || []).slice(0, 5);
+
+  function scrollProducts(direction) {
+    const track = trackRef.current;
+    const firstCard = track?.querySelector(".product-card");
+    if (!track || !firstCard) return;
+
+    const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
+    const step = firstCard.getBoundingClientRect().width + gap;
+    const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+    const atStart = track.scrollLeft <= 4;
+    const atEnd = track.scrollLeft >= maxScroll - 4;
+    const nextPosition =
+      direction > 0
+        ? atEnd
+          ? 0
+          : Math.min(track.scrollLeft + step, maxScroll)
+        : atStart
+          ? maxScroll
+          : Math.max(track.scrollLeft - step, 0);
+
+    track.scrollTo({
+      left: nextPosition,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+  }
+
+  const advanceProducts = useEffectEvent(() => scrollProducts(1));
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting && entry.intersectionRatio >= 0.3),
+      { threshold: [0, 0.3, 0.6] },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return undefined;
+
+    const updateOverflow = () =>
+      setCanScroll(track.scrollWidth > track.clientWidth + 4);
+    const frame = window.requestAnimationFrame(updateOverflow);
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateOverflow);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        window.removeEventListener("resize", updateOverflow);
+      };
+    }
+
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(track);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [products.length]);
+
+  useEffect(() => {
+    if (
+      !inView ||
+      paused ||
+      !canScroll ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(advanceProducts, 3000);
+    return () => window.clearInterval(interval);
+  }, [canScroll, inView, paused, products.length]);
+
+  return (
+    <section
+      className="category-product-carousel"
+      aria-labelledby={titleId}
+      data-in-view={inView || undefined}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+      }}
+      ref={sectionRef}
+    >
+      <div className="category-carousel-header">
+        <h3 id={titleId}>{category.name}</h3>
+        {menuOptions.length > 0 && (
+          <div className="category-carousel-tabs" aria-label={`Nhóm ${category.name}`}>
+            {menuOptions.map((option) => (
+              <button
+                type="button"
+                onClick={() => onSelectOption(option)}
+                key={option}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+        <button type="button" className="category-view-all" onClick={onViewAll}>
+          Xem tất cả <ChevronRight size={15} />
+        </button>
+      </div>
+
+      <div className="category-carousel-shell">
+        {canScroll && (
+          <button
+            type="button"
+            className="category-carousel-arrow previous"
+            onClick={() => scrollProducts(-1)}
+            aria-label={`Xem sản phẩm ${category.name} trước`}
+          >
+            <ChevronRight size={21} />
+          </button>
+        )}
+        <div
+          className="category-product-track"
+          aria-label={`Sản phẩm ${category.name}`}
+          ref={trackRef}
+          role="group"
+          tabIndex={canScroll ? 0 : undefined}
+        >
+          {products.map((product) => (
+            <ProductCard
+              carousel
+              key={product.id}
+              product={product}
+              onAdd={onAdd}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
+        {canScroll && (
+          <button
+            type="button"
+            className="category-carousel-arrow next"
+            onClick={() => scrollProducts(1)}
+            aria-label={`Xem thêm sản phẩm ${category.name}`}
+          >
+            <ChevronRight size={21} />
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+const catalogPriceRanges = [
+  { id: "under-10", label: "Dưới 10 triệu", min: 0, max: 10_000_000 },
+  { id: "10-20", label: "10 triệu - 20 triệu", min: 10_000_000, max: 20_000_000 },
+  { id: "20-30", label: "20 triệu - 30 triệu", min: 20_000_000, max: 30_000_000 },
+  { id: "30-50", label: "30 triệu - 50 triệu", min: 30_000_000, max: 50_000_000 },
+  { id: "over-50", label: "Trên 50 triệu", min: 50_000_000, max: Infinity },
+];
+
+function CategoryCatalog({
+  category,
+  option,
+  initialBrand,
+  products,
+  onBack,
+  onAdd,
+  onOpen,
+}) {
+  const filterId = useId();
+  const availableInitialBrand = products.find(
+    (product) =>
+      initialBrand && product.brand.toLowerCase() === initialBrand.toLowerCase(),
+  )?.brand;
+  const [sortBy, setSortBy] = useState("featured");
+  const [selectedPrices, setSelectedPrices] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState(() =>
+    availableInitialBrand ? [availableInitialBrand] : [],
+  );
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const brands = [...new Set(products.map((product) => product.brand))].sort(
+    (left, right) => left.localeCompare(right, "vi"),
+  );
+
+  const visibleProducts = products
+    .filter((product) => {
+      const matchesPrice =
+        selectedPrices.length === 0 ||
+        selectedPrices.some((rangeId) => {
+          const range = catalogPriceRanges.find((item) => item.id === rangeId);
+          return range && product.price >= range.min && product.price < range.max;
+        });
+      const matchesBrand =
+        selectedBrands.length === 0 || selectedBrands.includes(product.brand);
+      return matchesPrice && matchesBrand;
+    })
+    .sort((left, right) => {
+      if (sortBy === "price-asc") return left.price - right.price;
+      if (sortBy === "price-desc") return right.price - left.price;
+      if (sortBy === "discount") return right.discount - left.discount;
+      if (sortBy === "rating") return right.rating - left.rating;
+      return 0;
+    });
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = `${option || category.name} | QuadPro`;
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [category.name, option]);
+
+  function toggleFilter(setter, value) {
+    setter((current) =>
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    );
+  }
+
+  function resetFilters() {
+    setSelectedPrices([]);
+    setSelectedBrands([]);
+  }
+
+  return (
+    <div className="catalog-page">
+      <div className="container">
+        <nav className="catalog-breadcrumb" aria-label="Điều hướng danh mục">
+          <button type="button" onClick={onBack}>Trang chủ</button>
+          <ChevronRight size={14} aria-hidden="true" />
+          <span>{category.name}</span>
+          {option && (
+            <>
+              <ChevronRight size={14} aria-hidden="true" />
+              <strong>{option}</strong>
+            </>
+          )}
+        </nav>
+
+        <div className="catalog-mobile-tools">
+          <button type="button" onClick={() => setFiltersOpen(true)}>
+            <SlidersHorizontal size={17} /> Bộ lọc
+            {selectedPrices.length + selectedBrands.length > 0 && (
+              <b>{selectedPrices.length + selectedBrands.length}</b>
+            )}
+          </button>
+        </div>
+
+        <div className="catalog-layout">
+          {filtersOpen && (
+            <button
+              type="button"
+              className="catalog-filter-backdrop"
+              onClick={() => setFiltersOpen(false)}
+              aria-label="Đóng bộ lọc"
+            />
+          )}
+          <aside className={`catalog-filters${filtersOpen ? " open" : ""}`}>
+            <div className="catalog-filter-heading">
+              <strong>LỌC SẢN PHẨM</strong>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                aria-label="Đóng bộ lọc"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <fieldset>
+              <legend>KHOẢNG GIÁ</legend>
+              {catalogPriceRanges.map((range) => {
+                const count = products.filter(
+                  (product) => product.price >= range.min && product.price < range.max,
+                ).length;
+                return (
+                  <label key={range.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedPrices.includes(range.id)}
+                      disabled={count === 0}
+                      onChange={() => toggleFilter(setSelectedPrices, range.id)}
+                    />
+                    <span>{range.label} <b>({count})</b></span>
+                  </label>
+                );
+              })}
+            </fieldset>
+
+            <fieldset>
+              <legend>THƯƠNG HIỆU</legend>
+              {brands.map((brand) => {
+                const count = products.filter(
+                  (product) => product.brand === brand,
+                ).length;
+                return (
+                  <label key={brand}>
+                    <input
+                      type="checkbox"
+                      checked={selectedBrands.includes(brand)}
+                      onChange={() => toggleFilter(setSelectedBrands, brand)}
+                    />
+                    <span>{brand} <b>({count})</b></span>
+                  </label>
+                );
+              })}
+            </fieldset>
+
+            <button
+              type="button"
+              className="catalog-reset"
+              disabled={selectedPrices.length + selectedBrands.length === 0}
+              onClick={resetFilters}
+            >
+              <RefreshCcw size={15} /> Xóa bộ lọc
+            </button>
+          </aside>
+
+          <section className="catalog-results" aria-labelledby={`${filterId}-title`}>
+            <div className="catalog-toolbar">
+              <div>
+                <small>{option || category.name}</small>
+                <h1 id={`${filterId}-title`}>
+                  Tìm thấy <strong>{visibleProducts.length}</strong> sản phẩm
+                </h1>
+              </div>
+              <label>
+                <span>Sắp xếp theo</span>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                  <option value="featured">Nổi bật</option>
+                  <option value="price-asc">Giá thấp đến cao</option>
+                  <option value="price-desc">Giá cao đến thấp</option>
+                  <option value="discount">Giảm giá nhiều nhất</option>
+                  <option value="rating">Đánh giá cao nhất</option>
+                </select>
+              </label>
+            </div>
+
+            {visibleProducts.length > 0 ? (
+              <div className="catalog-product-grid">
+                {visibleProducts.map((product) => (
+                  <ProductCard
+                    carousel
+                    key={product.id}
+                    product={product}
+                    onAdd={onAdd}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="empty catalog-empty">
+                <SearchX size={42} />
+                <h2>Không có sản phẩm phù hợp</h2>
+                <p>Hãy bỏ bớt điều kiện lọc để xem thêm sản phẩm.</p>
+                <button type="button" onClick={resetFilters}>Xóa bộ lọc</button>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [query, setQuery] = useState("");
@@ -403,6 +830,7 @@ function App() {
   const [cart, setCart] = useState(loadCart);
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuCategory, setMenuCategory] = useState(null);
   const [toast, setToast] = useState("");
   const [session, setSession] = useState(getSession);
   const [authOpen, setAuthOpen] = useState(false);
@@ -415,8 +843,13 @@ function App() {
     window.location.pathname.startsWith("/admin"),
   );
   const [productId, setProductId] = useState(productIdFromPath);
+  const [catalogSelection, setCatalogSelection] = useState(
+    catalogSelectionFromLocation,
+  );
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const categoryMenuTimerRef = useRef(null);
 
   async function refreshProducts() {
     try {
@@ -470,11 +903,16 @@ function App() {
       setAdminView(isAdminRoute);
       setAccountView(isAccountRoute);
       setProductId(productIdFromPath());
+      setCatalogSelection(catalogSelectionFromLocation());
       if ((isAdminRoute || isAccountRoute) && !getSession()) openAuth("login");
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
   }, []);
+  useEffect(
+    () => () => window.clearTimeout(categoryMenuTimerRef.current),
+    [],
+  );
 
   const filtered = products.filter((product) => {
     const matchesSearch =
@@ -485,11 +923,36 @@ function App() {
       (activeCategory === "Tất cả" || product.category === activeCategory)
     );
   });
+  const productGroups = categories
+    .map((category) => ({
+      category,
+      products: filtered.filter((product) => product.category === category.name),
+    }))
+    .filter((group) => group.products.length > 0);
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const selectedProduct = productId
     ? products.find((product) => product.id === productId)
     : null;
+  const selectedCatalogCategory = catalogSelection
+    ? categories.find((category) => category.name === catalogSelection.category)
+    : null;
+  const catalogProducts = selectedCatalogCategory
+    ? products.filter(
+        (product) => product.category === selectedCatalogCategory.name,
+      )
+    : [];
+  const menuDetails = menuCategory ? categoryMenus[menuCategory] : null;
+  const menuBrands = menuDetails
+    ? [
+        ...new Set([
+          ...menuDetails.brands,
+          ...products
+            .filter((product) => product.category === menuCategory)
+            .map((product) => product.brand),
+        ]),
+      ].slice(0, 8)
+    : [];
 
   function addToCart(product, quantity = 1) {
     const amount = Math.max(1, Math.floor(quantity));
@@ -540,6 +1003,7 @@ function App() {
     setAdminView(true);
     setAccountView(false);
     setProductId(null);
+    setCatalogSelection(null);
     setAccountOpen(false);
   }
 
@@ -548,6 +1012,7 @@ function App() {
     setAdminView(false);
     setAccountView(false);
     setProductId(null);
+    setCatalogSelection(null);
   }
 
   function openAccountSettings() {
@@ -561,6 +1026,7 @@ function App() {
     setAdminView(false);
     setAccountView(true);
     setProductId(null);
+    setCatalogSelection(null);
     setAccountOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -569,11 +1035,13 @@ function App() {
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setAccountView(false);
     setProductId(null);
+    setCatalogSelection(null);
   }
 
   function openProduct(product) {
     window.history.pushState({}, "", productPath(product));
     setProductId(product.id);
+    setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
     setAccountOpen(false);
@@ -586,6 +1054,7 @@ function App() {
       window.history.pushState({}, "", "/");
     }
     setProductId(null);
+    setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
     setAccountOpen(false);
@@ -597,14 +1066,60 @@ function App() {
     if (category) setActiveCategory(category);
     window.history.pushState({}, "", `/${selector}`);
     setProductId(null);
+    setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
     setMenuOpen(false);
+    setCategoryMenuOpen(false);
+    setMenuCategory(null);
     window.requestAnimationFrame(() =>
       window.requestAnimationFrame(() =>
         document.querySelector(selector)?.scrollIntoView({ behavior: "smooth" }),
       ),
     );
+  }
+
+  function clearCategoryMenuTimer() {
+    window.clearTimeout(categoryMenuTimerRef.current);
+    categoryMenuTimerRef.current = null;
+  }
+
+  function queueCategoryMenu() {
+    clearCategoryMenuTimer();
+    categoryMenuTimerRef.current = window.setTimeout(() => {
+      setCategoryMenuOpen(true);
+      categoryMenuTimerRef.current = null;
+    }, 220);
+  }
+
+  function showCategoryMenu() {
+    clearCategoryMenuTimer();
+    setCategoryMenuOpen(true);
+  }
+
+  function hideCategoryMenu() {
+    clearCategoryMenuTimer();
+    setCategoryMenuOpen(false);
+    setMenuCategory(null);
+  }
+
+  function openCatalog(category, option = "", brand = "") {
+    window.history.pushState({}, "", catalogPath(category, option, brand));
+    setCatalogSelection({ category, option, brand });
+    setQuery("");
+    setProductId(null);
+    setAdminView(false);
+    setAccountView(false);
+    setAccountOpen(false);
+    setMenuOpen(false);
+    setCategoryMenuOpen(false);
+    setMenuCategory(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openMenuSelection(event, category, option = "", brand = "") {
+    event.preventDefault();
+    openCatalog(category, option, brand);
   }
 
   function buyNow(product, quantity) {
@@ -715,7 +1230,7 @@ function App() {
           <form
             className="search"
             onSubmit={(event) =>
-              productId
+              productId || catalogSelection
                 ? openStorefrontSection(event, "#products")
                 : event.preventDefault()
             }
@@ -808,9 +1323,111 @@ function App() {
         </div>
         <nav className={menuOpen ? "nav-open" : ""}>
           <div className="container">
-            <button className="category-button">
-              <LayoutGrid size={18} /> DANH MỤC SẢN PHẨM
-            </button>
+            <div
+              className={`category-dropdown${categoryMenuOpen ? " open" : ""}`}
+              onPointerLeave={hideCategoryMenu}
+              onFocusCapture={showCategoryMenu}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  hideCategoryMenu();
+                }
+              }}
+            >
+              <button
+                type="button"
+                className="category-button"
+                aria-haspopup="true"
+                aria-expanded={categoryMenuOpen}
+                aria-controls="category-flyout"
+                onPointerEnter={queueCategoryMenu}
+                onPointerLeave={clearCategoryMenuTimer}
+              >
+                <LayoutGrid size={18} /> DANH MỤC SẢN PHẨM
+              </button>
+              <div
+                className={`category-flyout${menuDetails ? " expanded" : ""}`}
+                id="category-flyout"
+              >
+                <aside className="category-menu" aria-label="Danh mục sản phẩm">
+                  {categories.slice(0, 9).map((category) => {
+                    const Icon = categoryIcons[category.icon] || Box;
+                    const active = category.name === menuCategory;
+                    return (
+                      <button
+                        type="button"
+                        className={active ? "active" : ""}
+                        key={category.name}
+                        onPointerEnter={() => setMenuCategory(category.name)}
+                        onFocus={() => setMenuCategory(category.name)}
+                        onClick={(event) =>
+                          openMenuSelection(event, category.name)
+                        }
+                      >
+                        <Icon size={18} />
+                        <span>{category.name}</span>
+                        <ChevronRight size={15} />
+                      </button>
+                    );
+                  })}
+                </aside>
+
+                {menuDetails && (
+                  <section
+                    className="category-mega-panel"
+                    aria-labelledby="category-mega-title"
+                  >
+                    <div className="category-mega-content" key={menuCategory}>
+                      <div className="category-mega-header">
+                        <div>
+                          <small>KHÁM PHÁ DANH MỤC</small>
+                          <h2 id="category-mega-title">{menuCategory}</h2>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            openMenuSelection(event, menuCategory)
+                          }
+                        >
+                          Xem tất cả <ArrowRight size={16} />
+                        </button>
+                      </div>
+
+                      <div className="category-option-grid">
+                        {menuDetails.options.map((option) => (
+                          <button
+                            type="button"
+                            key={option}
+                            onClick={(event) =>
+                              openMenuSelection(event, menuCategory, option)
+                            }
+                          >
+                            <span>{option}</span>
+                            <ArrowUpRight size={15} />
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="category-brands">
+                        <small>THƯƠNG HIỆU NỔI BẬT</small>
+                        <div>
+                          {menuBrands.map((brand) => (
+                            <button
+                              type="button"
+                              key={brand}
+                              onClick={(event) =>
+                                openMenuSelection(event, menuCategory, "", brand)
+                              }
+                            >
+                              {brand}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </div>
+            </div>
             <a
               href="/#deals"
               onClick={(event) => openStorefrontSection(event, "#deals")}
@@ -874,29 +1491,20 @@ function App() {
             onAdd={addToCart}
             onBuyNow={buyNow}
           />
+        ) : selectedCatalogCategory ? (
+          <CategoryCatalog
+            key={`${catalogSelection.category}-${catalogSelection.option}-${catalogSelection.brand}`}
+            category={selectedCatalogCategory}
+            option={catalogSelection.option}
+            initialBrand={catalogSelection.brand}
+            products={catalogProducts}
+            onBack={openStorefront}
+            onAdd={addToCart}
+            onOpen={openProduct}
+          />
         ) : (
           <>
         <section className="hero container">
-          <aside className="category-menu">
-            {categories.slice(0, 9).map((category) => {
-              const Icon = categoryIcons[category.icon] || Box;
-              return (
-                <button
-                  key={category.name}
-                  onClick={() => {
-                    setActiveCategory(category.name);
-                    document
-                      .querySelector("#products")
-                      .scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  <Icon size={18} />
-                  <span>{category.name}</span>
-                  <ChevronRight size={15} />
-                </button>
-              );
-            })}
-          </aside>
           <div className="hero-banner">
             <div className="hero-grid" aria-hidden="true"></div>
             <div className="hero-glow" aria-hidden="true"></div>
@@ -1005,12 +1613,7 @@ function App() {
               return (
                 <button
                   key={category.name}
-                  onClick={() => {
-                    setActiveCategory(category.name);
-                    document
-                      .querySelector("#products")
-                      .scrollIntoView({ behavior: "smooth" });
-                  }}
+                  onClick={() => openCatalog(category.name)}
                 >
                   <span style={{ background: category.color }}>
                     <Icon size={31} />
@@ -1086,13 +1689,18 @@ function App() {
             </div>
           </div>
           {filtered.length ? (
-            <div className="products-grid wide">
-              {filtered.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
+            <div className="product-category-showcase">
+              {productGroups.map((group) => (
+                <CategoryProductCarousel
+                  key={group.category.name}
+                  category={group.category}
+                  products={group.products}
                   onAdd={addToCart}
                   onOpen={openProduct}
+                  onSelectOption={(option) =>
+                    openCatalog(group.category.name, option)
+                  }
+                  onViewAll={() => openCatalog(group.category.name)}
                 />
               ))}
             </div>
