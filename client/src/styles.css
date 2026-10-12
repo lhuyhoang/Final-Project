@@ -1593,6 +1593,70 @@ html[data-theme="dark"] .category-carousel-arrow {
   font-size: 10px;
 }
 
+html[data-theme="dark"] .product-quick-view {
+  background: #1b1d22;
+  border-color: #454852;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .55), 0 3px 12px rgba(0, 0, 0, .32);
+  color: #f5f6f8;
+}
+
+html[data-theme="dark"] .quick-view-header {
+  background: linear-gradient(135deg, #bd2e28, #d13a30);
+}
+
+html[data-theme="dark"] :where(
+  .quick-view-price > span,
+  .quick-view-meta dt
+) {
+  color: #c2c7d0;
+}
+
+html[data-theme="dark"] :where(
+  .quick-view-meta dd,
+  .quick-view-highlights li
+) {
+  color: #e7e9ed;
+}
+
+html[data-theme="dark"] .quick-view-price strong,
+html[data-theme="dark"] .quick-view-promotion {
+  color: #ff746c;
+}
+
+html[data-theme="dark"] .quick-view-price small {
+  background: #3b2020;
+  color: #ffb0aa;
+}
+
+html[data-theme="dark"] .quick-view-meta .in-stock {
+  color: #70dda9;
+}
+
+html[data-theme="dark"] .quick-view-meta .sold-out {
+  color: #ff817a;
+}
+
+html[data-theme="dark"] .quick-view-label {
+  background: #c9352e;
+}
+
+html[data-theme="dark"] .quick-view-highlights svg {
+  color: #69d9d5;
+  fill: #173b3d;
+}
+
+html[data-theme="dark"] .quick-view-promotion span {
+  color: #d7dae0;
+}
+
+html[data-theme="dark"] .quick-view-rating {
+  border-top-color: #454852;
+}
+
+html[data-theme="dark"] .quick-view-rating small {
+  color: #b2b7c1;
+}
+
 @keyframes quick-view-enter {
   from {
     opacity: 0;
