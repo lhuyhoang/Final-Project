@@ -905,6 +905,68 @@ html[data-theme="dark"] .products-search button:hover {
   }
 }
 
+/* Dark theme for the home category carousels. These selectors intentionally
+   follow the carousel rules so their light backgrounds cannot win the cascade. */
+html[data-theme="dark"] .category-product-carousel,
+html[data-theme="dark"] .category-product-carousel[data-in-view="true"] {
+  color: #eef0f4;
+  background: #1b1d22;
+  border-color: #34363d;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+}
+
+html[data-theme="dark"] .category-carousel-header,
+html[data-theme="dark"] .category-carousel-tabs {
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] .category-carousel-tabs button {
+  color: #d9dce2;
+  background: #282b32;
+}
+
+html[data-theme="dark"] .category-carousel-tabs button:hover {
+  color: #ff8b84;
+  background: #3a2022;
+}
+
+html[data-theme="dark"] .category-view-all {
+  color: #79d6d2;
+}
+
+html[data-theme="dark"] .category-product-track .product-card {
+  color: #eef0f4;
+  background: #1b1d22;
+  border-color: #3a3d45;
+}
+
+html[data-theme="dark"] .category-product-track .product-card:hover {
+  border-color: #626874;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .28);
+}
+
+html[data-theme="dark"] .carousel-product-card .product-name-link {
+  color: #f5f6f8;
+}
+
+html[data-theme="dark"] .carousel-product-card .brand {
+  color: #aeb3bd;
+}
+
+html[data-theme="dark"] .carousel-product-card .price-row del {
+  color: #979ca6;
+}
+
+html[data-theme="dark"] .carousel-product-card .card-bottom {
+  border-color: #373a42;
+}
+
+html[data-theme="dark"] .category-carousel-arrow {
+  color: #e7e9ed;
+  background: rgba(36, 39, 46, .96);
+  border-color: #484d58;
+}
+
 /* Category catalog with faceted filters and client-side price sorting. */
 .catalog-page {
   min-height: 72vh;
