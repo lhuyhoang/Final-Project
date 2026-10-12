@@ -55,9 +55,19 @@ NEON_AUTH_BASE_URL=https://...neon.tech/neondb/auth
 VITE_NEON_AUTH_URL=https://...neon.tech/neondb/auth
 VITE_CLOUDINARY_CLOUD_NAME=...
 VITE_CLOUDINARY_UPLOAD_PRESET=...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+VNPAY_TMN_CODE=...
+VNPAY_HASH_SECRET=...
+VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+APP_BASE_URL=https://ten-du-an.vercel.app
 ```
 
 `NEON_AUTH_BASE_URL` và `VITE_NEON_AUTH_URL` cùng dùng **Auth URL**, không dùng JWKS URL. `VITE_NEON_AUTH_URL` là cấu hình frontend công khai; đặt loại **Config** trên Vercel.
+
+`STRIPE_SECRET_KEY` và `STRIPE_WEBHOOK_SECRET` phải đặt loại **Secret** và tuyệt đối không có tiền tố `VITE_`. Trong Stripe Test mode, tạo webhook trỏ đến `https://ten-du-an.vercel.app/api/stripe/webhook` và đăng ký các event: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`. Dùng thẻ test `4242 4242 4242 4242`, ngày hết hạn trong tương lai và CVC bất kỳ.
+
+`VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` lấy từ tài khoản VNPay Sandbox; đặt `VNPAY_HASH_SECRET` loại **Secret**. Trong cấu hình merchant VNPay, đặt Return URL là `https://ten-du-an.vercel.app/api/payments/vnpay/return` và IPN URL là `https://ten-du-an.vercel.app/api/payments/vnpay/ipn`.
 
 4. Trong Neon Auth, thêm chính xác origin `https://ten-du-an.vercel.app` vào **Trusted domains**.
 5. Deploy. Migration và danh mục sản phẩm ban đầu sẽ được tạo khi API nhận request đầu tiên.

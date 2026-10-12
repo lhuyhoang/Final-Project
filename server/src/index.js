@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import crypto from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import cors from 'cors'
@@ -6,9 +7,15 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
+import Stripe from 'stripe'
 import {
   DEFAULT_PRODUCT_POLICY_TEXT,
   ORDER_STATUSES,
+  attachStripeCheckoutSession,
+  cancelUnpaidVnpayOrder,
+  cancelUnpaidStripeOrder,
+  confirmVnpayOrderPayment,
+  confirmStripeOrderPayment,
   createOrder as insertOrder,
   createProduct as insertProduct,
   deleteProduct as removeProduct,
@@ -19,6 +26,7 @@ import {
   listOrders,
   listProducts,
   listUsers,
+  processStripeWebhookEvent,
   syncUserFromAuth,
   updateOrderStatus,
   updateProduct as saveProduct,
@@ -28,6 +36,14 @@ import {
 const app = express()
 const PORT = process.env.PORT || 4000
 const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)
+const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim()
+const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim()
+const stripe = stripeSecretKey
+  ? new Stripe(stripeSecretKey, { appInfo: { name: 'quadpro-ecom', version: '1.0.0' } })
+  : null
+const vnpayTmnCode = String(process.env.VNPAY_TMN_CODE || '').trim()
+const vnpayHashSecret = String(process.env.VNPAY_HASH_SECRET || '').trim()
+const vnpayPaymentUrl = String(process.env.VNPAY_PAYMENT_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html').trim()
 const neonAuthBaseUrl = String(process.env.NEON_AUTH_BASE_URL || '').trim().replace(/\/+$/, '')
 if (isProduction && !neonAuthBaseUrl) throw new Error('NEON_AUTH_BASE_URL must be configured in production')
 let neonAuthIssuer = ''
@@ -41,16 +57,6 @@ if (neonAuthBaseUrl) {
   }
 }
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-// Vercel forwards the visitor IP through one trusted edge proxy.
-// This must be configured before express-rate-limit reads req.ip.
-if (process.env.VERCEL) app.set('trust proxy', 1)
-
-app.use(helmet({ contentSecurityPolicy: false }))
-app.use(cors())
-app.use(express.json({ limit: '100kb' }))
-app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }))
-
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 const httpError = (status, message) => Object.assign(new Error(message), { status })
 let databaseReadyPromise
@@ -64,6 +70,133 @@ const ensureDatabaseReady = () => {
   }
   return databaseReadyPromise
 }
+
+function requireStripe() {
+  if (!stripe || !stripeSecretKey) throw httpError(503, 'Stripe chưa được cấu hình trên máy chủ')
+  return stripe
+}
+
+function requireVnpay() {
+  if (!vnpayTmnCode || !vnpayHashSecret) throw httpError(503, 'VNPay Sandbox chưa được cấu hình trên máy chủ')
+  try {
+    const url = new URL(vnpayPaymentUrl)
+    if (url.protocol !== 'https:') throw new Error()
+  } catch {
+    throw httpError(500, 'VNPAY_PAYMENT_URL không hợp lệ')
+  }
+}
+
+function formatVnpayDate(date = new Date()) {
+  const vietnamTime = new Date(date.getTime() + 7 * 60 * 60 * 1000)
+  return vietnamTime.toISOString().replace(/\D/g, '').slice(0, 14)
+}
+
+function encodeVnpayValue(value) {
+  return encodeURIComponent(String(value)).replace(/%20/g, '+')
+}
+
+function buildVnpayQuery(parameters) {
+  return Object.entries(parameters)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeVnpayValue(value)}`)
+    .join('&')
+}
+
+function signVnpayParameters(parameters) {
+  return crypto.createHmac('sha512', vnpayHashSecret).update(buildVnpayQuery(parameters), 'utf8').digest('hex')
+}
+
+function normalizeVnpayCallback(query) {
+  const parameters = {}
+  for (const [key, rawValue] of Object.entries(query || {})) {
+    if (key === 'vnp_SecureHash' || key === 'vnp_SecureHashType') continue
+    parameters[key] = Array.isArray(rawValue) ? rawValue[0] : rawValue
+  }
+  return parameters
+}
+
+function verifyVnpayCallback(query) {
+  const receivedHash = String(query?.vnp_SecureHash || '').toLowerCase()
+  const parameters = normalizeVnpayCallback(query)
+  const expectedHash = signVnpayParameters(parameters)
+  if (!/^[a-f0-9]{128}$/.test(receivedHash)) return { valid: false, parameters }
+  return {
+    valid: crypto.timingSafeEqual(Buffer.from(receivedHash, 'hex'), Buffer.from(expectedHash, 'hex')),
+    parameters
+  }
+}
+
+function getClientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  return (forwarded || req.ip || req.socket?.remoteAddress || '127.0.0.1').replace(/^::ffff:/, '')
+}
+
+function getAppBaseUrl(req) {
+  const configured = String(process.env.APP_BASE_URL || '').trim()
+  const vercelHost = String(process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || '').trim()
+  const candidate = configured || (vercelHost ? `https://${vercelHost}` : `${req.protocol}://${req.get('host')}`)
+  try {
+    const url = new URL(candidate)
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
+    return url.origin
+  } catch {
+    throw httpError(500, 'APP_BASE_URL không hợp lệ')
+  }
+}
+
+// Vercel forwards the visitor IP through one trusted edge proxy.
+// This must be configured before express-rate-limit reads req.ip.
+if (process.env.VERCEL) app.set('trust proxy', 1)
+
+app.use(helmet({ contentSecurityPolicy: false }))
+app.use(cors())
+
+// Stripe requires the exact raw request bytes to verify the webhook signature.
+// Keep this route before express.json() and outside the public API rate limiter.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncHandler(async (req, res) => {
+  await ensureDatabaseReady()
+  const stripeClient = requireStripe()
+  if (!stripeWebhookSecret) throw httpError(503, 'Stripe webhook chưa được cấu hình trên máy chủ')
+
+  let event
+  try {
+    event = stripeClient.webhooks.constructEvent(req.body, req.get('stripe-signature') || '', stripeWebhookSecret)
+  } catch (error) {
+    console.warn(`Stripe webhook signature rejected: ${error.message}`)
+    return res.status(400).json({ message: 'Chữ ký Stripe webhook không hợp lệ' })
+  }
+
+  const supportedEvents = new Map([
+    ['checkout.session.completed', session => session.payment_status === 'paid' ? 'paid' : 'ignored'],
+    ['checkout.session.async_payment_succeeded', () => 'paid'],
+    ['checkout.session.async_payment_failed', () => 'failed'],
+    ['checkout.session.expired', () => 'expired']
+  ])
+  const actionFor = supportedEvents.get(event.type)
+  if (!actionFor) return res.json({ received: true, handled: false })
+
+  const session = event.data.object
+  const orderId = String(session.metadata?.orderId || session.client_reference_id || '')
+  const userId = String(session.metadata?.userId || '')
+  if (!orderId || !userId) throw httpError(400, 'Stripe webhook thiếu mã đơn hàng hoặc người dùng')
+
+  const result = await processStripeWebhookEvent({
+    eventId: event.id,
+    eventType: event.type,
+    action: actionFor(session),
+    orderId,
+    userId,
+    checkoutSessionId: session.id,
+    paymentIntentId: session.payment_intent,
+    amountTotal: session.amount_total,
+    currency: session.currency
+  })
+  res.json({ received: true, ...result })
+}))
+
+app.use(express.json({ limit: '100kb' }))
+app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }))
 
 app.use('/api', asyncHandler(async (req, res, next) => {
   await ensureDatabaseReady()
@@ -133,6 +266,19 @@ function validateProfile(body = {}, currentEmail = '') {
   if (landline && !/^(?:\+84\d{9,10}|0\d{9,10})$/.test(landline)) throw httpError(400, 'Số điện thoại cố định không hợp lệ')
 
   return { name, address, province, phone, landline }
+}
+
+function validateCheckoutDetails(body = {}, user) {
+  const name = String(body.customer?.name || '').trim().replace(/\s+/g, ' ')
+  const phone = String(body.customer?.phone || '').trim().replace(/[\s.-]/g, '')
+  const address = String(body.shipping?.address || '').trim().replace(/\s+/g, ' ')
+  if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên người nhận phải có từ 2 đến 60 ký tự')
+  if (!/^(?:\+84\d{9}|0\d{9})$/.test(phone)) throw httpError(400, 'Số điện thoại người nhận không hợp lệ')
+  if (address.length < 8 || address.length > 250) throw httpError(400, 'Địa chỉ giao hàng phải có từ 8 đến 250 ký tự')
+  return {
+    customer: { name, email: user.email, phone },
+    shipping: { address }
+  }
 }
 
 function normalizeProduct(body = {}, current = {}) {
@@ -210,13 +356,255 @@ app.get('/api/products/:id', asyncHandler(async (req, res) => {
   product ? res.json(product) : res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
 }))
 
-app.post('/api/orders', authenticate, asyncHandler(async (req, res) => {
+app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req, res) => {
+  const stripeClient = requireStripe()
+  const checkoutDetails = validateCheckoutDetails(req.body, req.user)
   const order = await insertOrder({
     userId: req.user.id,
     items: req.body?.items,
-    shipping: {
-      address: String(req.body?.shipping?.address || 'Nhận tại showroom QuadPro').trim().slice(0, 250)
-    },
+    ...checkoutDetails,
+    paymentMethod: 'stripe'
+  })
+
+  let checkoutSession
+  try {
+    const appBaseUrl = getAppBaseUrl(req)
+    checkoutSession = await stripeClient.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: order.items.map(item => ({
+        quantity: item.quantity,
+        price_data: {
+          currency: 'vnd',
+          unit_amount: item.price,
+          product_data: {
+            name: item.name,
+            metadata: { productId: String(item.productId) }
+          }
+        }
+      })),
+      client_reference_id: order.id,
+      customer_email: req.user.email,
+      metadata: { orderId: order.id, userId: req.user.id },
+      payment_intent_data: {
+        metadata: { orderId: order.id, userId: req.user.id }
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
+      success_url: `${appBaseUrl}/checkout?payment=stripe-success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appBaseUrl}/checkout?payment=stripe-cancelled&order_id=${encodeURIComponent(order.id)}`,
+      submit_type: 'pay'
+    }, { idempotencyKey: `quadpro-checkout-${order.id}` })
+
+    if (!checkoutSession.url) throw new Error('Stripe did not return a Checkout URL')
+    await attachStripeCheckoutSession(order.id, req.user.id, checkoutSession.id)
+    res.status(201).json({ orderId: order.id, checkoutUrl: checkoutSession.url })
+  } catch (error) {
+    if (checkoutSession?.id) {
+      await stripeClient.checkout.sessions.expire(checkoutSession.id).catch(() => {})
+    }
+    await cancelUnpaidStripeOrder({
+      orderId: order.id,
+      checkoutSessionId: checkoutSession?.id || null
+    }).catch(cancelError => console.error('Unable to release Stripe order stock:', cancelError))
+    if (error.status) throw error
+    console.error('Unable to create Stripe Checkout Session:', error)
+    throw httpError(502, 'Không thể mở cổng thanh toán Stripe, vui lòng thử lại')
+  }
+}))
+
+app.post('/api/payments/stripe/orders/:orderId/cancel', authenticate, asyncHandler(async (req, res) => {
+  const stripeClient = requireStripe()
+  const orderId = String(req.params.orderId || '').trim()
+  const order = (await listOrders({ id: orderId, userId: req.user.id, limit: 1 }))[0]
+  if (!order || order.paymentMethod !== 'stripe') throw httpError(404, 'Không tìm thấy đơn thanh toán Stripe')
+  if (order.paymentStatus === 'paid') {
+    return res.status(409).json({ message: 'Đơn hàng đã được thanh toán nên không thể hủy' })
+  }
+
+  if (order.stripeCheckoutSessionId) {
+    let checkoutSession = await stripeClient.checkout.sessions.retrieve(order.stripeCheckoutSessionId)
+    if (checkoutSession.payment_status === 'paid') {
+      const paidOrder = await confirmStripeOrderPayment({
+        orderId,
+        userId: req.user.id,
+        checkoutSessionId: checkoutSession.id,
+        paymentIntentId: checkoutSession.payment_intent,
+        amountTotal: checkoutSession.amount_total,
+        currency: checkoutSession.currency
+      })
+      return res.status(409).json({ message: 'Đơn hàng đã được thanh toán nên không thể hủy', order: paidOrder })
+    }
+
+    if (checkoutSession.status === 'open') {
+      try {
+        checkoutSession = await stripeClient.checkout.sessions.expire(checkoutSession.id)
+      } catch {
+        checkoutSession = await stripeClient.checkout.sessions.retrieve(checkoutSession.id)
+        if (checkoutSession.payment_status === 'paid') {
+          const paidOrder = await confirmStripeOrderPayment({
+            orderId,
+            userId: req.user.id,
+            checkoutSessionId: checkoutSession.id,
+            paymentIntentId: checkoutSession.payment_intent,
+            amountTotal: checkoutSession.amount_total,
+            currency: checkoutSession.currency
+          })
+          return res.status(409).json({ message: 'Đơn hàng đã được thanh toán nên không thể hủy', order: paidOrder })
+        }
+        if (checkoutSession.status === 'open') throw httpError(409, 'Phiên Stripe chưa thể hủy, vui lòng thử lại')
+      }
+    }
+  }
+
+  const cancelledOrder = await cancelUnpaidStripeOrder({
+    orderId,
+    checkoutSessionId: order.stripeCheckoutSessionId
+  })
+  res.json({ cancelled: cancelledOrder?.status === 'cancelled', order: cancelledOrder })
+}))
+
+app.get('/api/payments/stripe/session/:sessionId', authenticate, asyncHandler(async (req, res) => {
+  const stripeClient = requireStripe()
+  const sessionId = String(req.params.sessionId || '')
+  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId) || sessionId.length > 255) throw httpError(400, 'Mã phiên Stripe không hợp lệ')
+
+  const checkoutSession = await stripeClient.checkout.sessions.retrieve(sessionId)
+  const orderId = String(checkoutSession.metadata?.orderId || checkoutSession.client_reference_id || '')
+  const userId = String(checkoutSession.metadata?.userId || '')
+  if (!orderId || userId !== req.user.id) throw httpError(403, 'Phiên thanh toán không thuộc tài khoản này')
+
+  let order
+  if (checkoutSession.payment_status === 'paid') {
+    order = await confirmStripeOrderPayment({
+      orderId,
+      userId,
+      checkoutSessionId: checkoutSession.id,
+      paymentIntentId: checkoutSession.payment_intent,
+      amountTotal: checkoutSession.amount_total,
+      currency: checkoutSession.currency
+    })
+  } else {
+    order = (await listOrders({ id: orderId, userId, limit: 1 }))[0]
+  }
+  if (!order) throw httpError(404, 'Không tìm thấy đơn hàng')
+  res.json({ paymentStatus: checkoutSession.payment_status, order })
+}))
+
+app.post('/api/payments/vnpay/checkout', authenticate, asyncHandler(async (req, res) => {
+  requireVnpay()
+  const checkoutDetails = validateCheckoutDetails(req.body, req.user)
+  const order = await insertOrder({
+    userId: req.user.id,
+    items: req.body?.items,
+    ...checkoutDetails,
+    paymentMethod: 'vnpay'
+  })
+  const appBaseUrl = getAppBaseUrl(req)
+  const createdAt = new Date()
+  const parameters = {
+    vnp_Version: '2.1.0',
+    vnp_Command: 'pay',
+    vnp_TmnCode: vnpayTmnCode,
+    vnp_Amount: order.total * 100,
+    vnp_CurrCode: 'VND',
+    vnp_TxnRef: order.id,
+    vnp_OrderInfo: `Thanh toan don hang ${order.id}`,
+    vnp_OrderType: 'other',
+    vnp_Locale: 'vn',
+    vnp_ReturnUrl: `${appBaseUrl}/api/payments/vnpay/return`,
+    vnp_IpAddr: getClientIp(req),
+    vnp_CreateDate: formatVnpayDate(createdAt),
+    vnp_ExpireDate: formatVnpayDate(new Date(createdAt.getTime() + 15 * 60 * 1000))
+  }
+  const secureHash = signVnpayParameters(parameters)
+  res.status(201).json({
+    orderId: order.id,
+    paymentUrl: `${vnpayPaymentUrl}?${buildVnpayQuery(parameters)}&vnp_SecureHash=${secureHash}`
+  })
+}))
+
+app.get('/api/payments/vnpay/return', asyncHandler(async (req, res) => {
+  requireVnpay()
+  const { valid, parameters } = verifyVnpayCallback(req.query)
+  const orderId = String(parameters.vnp_TxnRef || '')
+  const appBaseUrl = getAppBaseUrl(req)
+  const redirectUrl = new URL('/checkout', appBaseUrl)
+  redirectUrl.searchParams.set('order_id', orderId)
+
+  if (!valid || parameters.vnp_TmnCode !== vnpayTmnCode) {
+    redirectUrl.searchParams.set('payment', 'vnpay-failed')
+    redirectUrl.searchParams.set('code', '97')
+    return res.redirect(303, redirectUrl.toString())
+  }
+
+  const order = (await listOrders({ id: orderId, limit: 1 }))[0]
+  if (!order || order.paymentMethod !== 'vnpay' || Number(parameters.vnp_Amount) / 100 !== order.total) {
+    redirectUrl.searchParams.set('payment', 'vnpay-failed')
+    redirectUrl.searchParams.set('code', order ? '04' : '01')
+    return res.redirect(303, redirectUrl.toString())
+  }
+
+  const isPaid = parameters.vnp_ResponseCode === '00' && parameters.vnp_TransactionStatus === '00'
+  if (isPaid) {
+    await confirmVnpayOrderPayment({
+      orderId,
+      amountTotal: Number(parameters.vnp_Amount) / 100,
+      transactionNo: parameters.vnp_TransactionNo,
+      bankCode: parameters.vnp_BankCode
+    })
+    redirectUrl.searchParams.set('payment', 'vnpay-success')
+  } else {
+    await cancelUnpaidVnpayOrder({ orderId })
+    redirectUrl.searchParams.set('payment', 'vnpay-failed')
+    redirectUrl.searchParams.set('code', String(parameters.vnp_ResponseCode || '99'))
+  }
+  res.redirect(303, redirectUrl.toString())
+}))
+
+app.get('/api/payments/vnpay/ipn', asyncHandler(async (req, res) => {
+  try {
+    requireVnpay()
+    const { valid, parameters } = verifyVnpayCallback(req.query)
+    if (!valid || parameters.vnp_TmnCode !== vnpayTmnCode) return res.json({ RspCode: '97', Message: 'Invalid Checksum' })
+
+    const orderId = String(parameters.vnp_TxnRef || '')
+    const order = (await listOrders({ id: orderId, limit: 1 }))[0]
+    if (!order || order.paymentMethod !== 'vnpay') return res.json({ RspCode: '01', Message: 'Order not Found' })
+    if (Number(parameters.vnp_Amount) / 100 !== order.total) return res.json({ RspCode: '04', Message: 'Invalid Amount' })
+    if (order.paymentStatus === 'paid') return res.json({ RspCode: '02', Message: 'Order already confirmed' })
+
+    if (parameters.vnp_ResponseCode === '00' && parameters.vnp_TransactionStatus === '00') {
+      await confirmVnpayOrderPayment({
+        orderId,
+        amountTotal: order.total,
+        transactionNo: parameters.vnp_TransactionNo,
+        bankCode: parameters.vnp_BankCode
+      })
+    } else {
+      await cancelUnpaidVnpayOrder({ orderId })
+    }
+    return res.json({ RspCode: '00', Message: 'Confirm Success' })
+  } catch (error) {
+    console.error('Unable to process VNPay IPN:', error)
+    return res.json({ RspCode: '99', Message: 'Unknown error' })
+  }
+}))
+
+app.get('/api/payments/vnpay/orders/:orderId', authenticate, asyncHandler(async (req, res) => {
+  const order = (await listOrders({ id: String(req.params.orderId || ''), userId: req.user.id, limit: 1 }))[0]
+  if (!order || order.paymentMethod !== 'vnpay') throw httpError(404, 'Không tìm thấy đơn thanh toán VNPay')
+  res.json({ paymentStatus: order.paymentStatus, order })
+}))
+
+app.post('/api/orders', authenticate, asyncHandler(async (req, res) => {
+  if (req.body?.paymentMethod && req.body.paymentMethod !== 'cod') {
+    throw httpError(400, 'Thanh toán online phải được tạo qua cổng thanh toán tương ứng')
+  }
+  const checkoutDetails = validateCheckoutDetails(req.body, req.user)
+  const order = await insertOrder({
+    userId: req.user.id,
+    items: req.body?.items,
+    ...checkoutDetails,
     paymentMethod: req.body?.paymentMethod
   })
   res.status(201).json(order)
@@ -255,6 +643,10 @@ app.delete('/api/admin/products/:id', asyncHandler(async (req, res) => {
 }))
 
 app.get('/api/admin/orders', asyncHandler(async (req, res) => res.json(await listOrders())))
+
+app.get('/api/admin/payments', asyncHandler(async (req, res) => {
+  res.json(await listOrders({ paymentMethods: ['stripe', 'vnpay'], paymentStatus: 'paid' }))
+}))
 
 app.patch('/api/admin/orders/:id/status', asyncHandler(async (req, res) => {
   const status = String(req.body?.status || '')

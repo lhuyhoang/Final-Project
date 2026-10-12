@@ -24,6 +24,7 @@ export function clearSession() {
 const requiresAuthentication = path => (
   path.startsWith('/api/auth/me')
   || path.startsWith('/api/orders')
+  || path.startsWith('/api/payments')
   || path.startsWith('/api/admin')
 )
 

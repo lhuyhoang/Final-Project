@@ -250,6 +250,12 @@ export function mapOrderRow(row, items = row?.items || []) {
     items: items.map(item => item.productId !== undefined ? item : mapOrderItemRow(item)),
     total: numberValue(row.total),
     paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status || 'unpaid',
+    stripeCheckoutSessionId: row.stripe_checkout_session_id || null,
+    stripePaymentIntentId: row.stripe_payment_intent_id || null,
+    vnpayTransactionNo: row.vnpay_transaction_no || null,
+    vnpayBankCode: row.vnpay_bank_code || null,
+    paidAt: timestampValue(row.paid_at),
     status: row.status,
     createdAt: timestampValue(row.created_at),
     updatedAt: timestampValue(row.updated_at || row.created_at)
@@ -563,7 +569,7 @@ export async function deleteProduct(id) {
   return mapProductRow(result.rows[0])
 }
 
-async function selectOrders(executor, { id, userId, status, limit } = {}) {
+async function selectOrders(executor, { id, userId, status, paymentMethod, paymentMethods, paymentStatus, limit } = {}) {
   const conditions = []
   const values = []
   if (id !== undefined) {
@@ -577,6 +583,19 @@ async function selectOrders(executor, { id, userId, status, limit } = {}) {
   if (status !== undefined) {
     values.push(status)
     conditions.push(`status = $${values.length}`)
+  }
+  if (paymentMethod !== undefined) {
+    values.push(paymentMethod)
+    conditions.push(`payment_method = $${values.length}`)
+  }
+  if (paymentMethods !== undefined) {
+    if (!Array.isArray(paymentMethods) || !paymentMethods.length) throw new Error('paymentMethods must be a non-empty array')
+    values.push(paymentMethods)
+    conditions.push(`payment_method = ANY($${values.length}::varchar[])`)
+  }
+  if (paymentStatus !== undefined) {
+    values.push(paymentStatus)
+    conditions.push(`payment_status = $${values.length}`)
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -657,8 +676,9 @@ async function generateOrderId(client) {
 export async function createOrder(input) {
   const requestedItems = normalizeRequestedItems(input.items)
   const status = input.status || 'pending'
-  const paymentMethod = 'cod'
+  const paymentMethod = input.paymentMethod || 'cod'
   if (!ORDER_STATUSES.includes(status)) throw repositoryError(400, 'Trạng thái đơn hàng không hợp lệ', 'INVALID_ORDER_STATUS')
+  if (!['cod', 'stripe', 'vnpay'].includes(paymentMethod)) throw repositoryError(400, 'Phương thức thanh toán không hợp lệ', 'INVALID_PAYMENT_METHOD')
 
   return withTransaction(async client => {
     const userResult = await client.query('SELECT * FROM users WHERE id = $1', [input.userId])
@@ -709,9 +729,9 @@ export async function createOrder(input) {
     await client.query(`
       INSERT INTO orders (
         id, user_id, customer_name, customer_email, customer_phone,
-        shipping_address, total, payment_method, status, created_at, updated_at
+        shipping_address, total, payment_method, payment_status, status, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unpaid', $9, $10, $11)
     `, [
       orderId,
       input.userId,
@@ -741,15 +761,205 @@ export async function createOrder(input) {
   })
 }
 
+export async function attachStripeCheckoutSession(orderId, userId, checkoutSessionId) {
+  const result = await query(`
+    UPDATE orders
+    SET stripe_checkout_session_id = $1,
+        updated_at = NOW()
+    WHERE id = $2
+      AND user_id = $3
+      AND payment_method = 'stripe'
+      AND payment_status = 'unpaid'
+    RETURNING id
+  `, [checkoutSessionId, orderId, userId])
+  if (!result.rowCount) throw repositoryError(409, 'Không thể liên kết phiên thanh toán với đơn hàng', 'STRIPE_SESSION_LINK_FAILED')
+  return findOrderById(orderId)
+}
+
+function normalizeStripeReference(value) {
+  if (!value) return null
+  return typeof value === 'string' ? value : value.id || null
+}
+
+async function confirmStripeOrderWithClient(client, input) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [input.orderId])
+  const order = orderResult.rows[0]
+  if (!order) throw repositoryError(404, 'Không tìm thấy đơn hàng Stripe', 'ORDER_NOT_FOUND')
+  if (order.payment_method !== 'stripe') throw repositoryError(409, 'Đơn hàng không sử dụng Stripe', 'INVALID_PAYMENT_METHOD')
+  if (order.user_id !== input.userId) throw repositoryError(403, 'Phiên thanh toán không thuộc tài khoản này', 'PAYMENT_OWNER_MISMATCH')
+  if (order.status === 'cancelled') throw repositoryError(409, 'Đơn hàng đã bị hủy', 'ORDER_CANCELLED')
+
+  const expectedAmount = numberValue(order.total)
+  if (input.amountTotal !== null && input.amountTotal !== undefined && Number(input.amountTotal) !== expectedAmount) {
+    throw repositoryError(409, 'Số tiền Stripe không khớp với đơn hàng', 'PAYMENT_AMOUNT_MISMATCH')
+  }
+  if (input.currency && String(input.currency).toLowerCase() !== 'vnd') {
+    throw repositoryError(409, 'Đơn vị tiền tệ Stripe không hợp lệ', 'PAYMENT_CURRENCY_MISMATCH')
+  }
+  if (order.stripe_checkout_session_id && order.stripe_checkout_session_id !== input.checkoutSessionId) {
+    throw repositoryError(409, 'Mã phiên Stripe không khớp với đơn hàng', 'PAYMENT_SESSION_MISMATCH')
+  }
+
+  await client.query(`
+    UPDATE orders
+    SET stripe_checkout_session_id = COALESCE(stripe_checkout_session_id, $1),
+        stripe_payment_intent_id = COALESCE($2, stripe_payment_intent_id),
+        payment_status = 'paid',
+        paid_at = COALESCE(paid_at, NOW()),
+        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+        updated_at = NOW()
+    WHERE id = $3
+  `, [input.checkoutSessionId, normalizeStripeReference(input.paymentIntentId), input.orderId])
+}
+
+async function cancelUnpaidStripeOrderWithClient(client, input) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [input.orderId])
+  const order = orderResult.rows[0]
+  if (!order || order.payment_method !== 'stripe' || order.payment_status === 'paid') return
+
+  if (order.status !== 'cancelled') {
+    const itemResult = await client.query(`
+      SELECT product_id, quantity
+      FROM order_items
+      WHERE order_id = $1 AND product_id IS NOT NULL
+      ORDER BY product_id
+    `, [input.orderId])
+    if (itemResult.rows.length) {
+      await client.query(`
+        UPDATE products AS product
+        SET stock = product.stock + requested.quantity,
+            updated_at = NOW()
+        FROM UNNEST($1::integer[], $2::integer[]) AS requested(id, quantity)
+        WHERE product.id = requested.id
+      `, [
+        itemResult.rows.map(item => numberValue(item.product_id)),
+        itemResult.rows.map(item => numberValue(item.quantity))
+      ])
+    }
+  }
+
+  await client.query(`
+    UPDATE orders
+    SET stripe_checkout_session_id = COALESCE(stripe_checkout_session_id, $1),
+        payment_status = 'failed',
+        status = 'cancelled',
+        updated_at = NOW()
+    WHERE id = $2
+  `, [input.checkoutSessionId || null, input.orderId])
+}
+
+export async function confirmStripeOrderPayment(input) {
+  await withTransaction(client => confirmStripeOrderWithClient(client, input))
+  return findOrderById(input.orderId)
+}
+
+export async function cancelUnpaidStripeOrder(input) {
+  await withTransaction(client => cancelUnpaidStripeOrderWithClient(client, input))
+  return findOrderById(input.orderId)
+}
+
+async function confirmVnpayOrderWithClient(client, input) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [input.orderId])
+  const order = orderResult.rows[0]
+  if (!order) throw repositoryError(404, 'Không tìm thấy đơn hàng VNPay', 'ORDER_NOT_FOUND')
+  if (order.payment_method !== 'vnpay') throw repositoryError(409, 'Đơn hàng không sử dụng VNPay', 'INVALID_PAYMENT_METHOD')
+  if (order.status === 'cancelled') throw repositoryError(409, 'Đơn hàng đã bị hủy', 'ORDER_CANCELLED')
+
+  const expectedAmount = numberValue(order.total)
+  if (Number(input.amountTotal) !== expectedAmount) {
+    throw repositoryError(409, 'Số tiền VNPay không khớp với đơn hàng', 'PAYMENT_AMOUNT_MISMATCH')
+  }
+
+  await client.query(`
+    UPDATE orders
+    SET vnpay_transaction_no = COALESCE(vnpay_transaction_no, $1),
+        vnpay_bank_code = COALESCE(vnpay_bank_code, $2),
+        payment_status = 'paid',
+        paid_at = COALESCE(paid_at, NOW()),
+        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+        updated_at = NOW()
+    WHERE id = $3
+  `, [input.transactionNo || null, input.bankCode || null, input.orderId])
+}
+
+async function cancelUnpaidVnpayOrderWithClient(client, input) {
+  const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [input.orderId])
+  const order = orderResult.rows[0]
+  if (!order || order.payment_method !== 'vnpay' || order.payment_status === 'paid') return
+
+  if (order.status !== 'cancelled') {
+    const itemResult = await client.query(`
+      SELECT product_id, quantity
+      FROM order_items
+      WHERE order_id = $1 AND product_id IS NOT NULL
+      ORDER BY product_id
+    `, [input.orderId])
+    if (itemResult.rows.length) {
+      await client.query(`
+        UPDATE products AS product
+        SET stock = product.stock + requested.quantity,
+            updated_at = NOW()
+        FROM UNNEST($1::integer[], $2::integer[]) AS requested(id, quantity)
+        WHERE product.id = requested.id
+      `, [
+        itemResult.rows.map(item => numberValue(item.product_id)),
+        itemResult.rows.map(item => numberValue(item.quantity))
+      ])
+    }
+  }
+
+  await client.query(`
+    UPDATE orders
+    SET payment_status = 'failed',
+        status = 'cancelled',
+        updated_at = NOW()
+    WHERE id = $1
+  `, [input.orderId])
+}
+
+export async function confirmVnpayOrderPayment(input) {
+  await withTransaction(client => confirmVnpayOrderWithClient(client, input))
+  return findOrderById(input.orderId)
+}
+
+export async function cancelUnpaidVnpayOrder(input) {
+  await withTransaction(client => cancelUnpaidVnpayOrderWithClient(client, input))
+  return findOrderById(input.orderId)
+}
+
+export async function processStripeWebhookEvent(input) {
+  return withTransaction(async client => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:stripe-event:${input.eventId}`])
+    const existing = await client.query('SELECT 1 FROM stripe_webhook_events WHERE id = $1', [input.eventId])
+    if (existing.rowCount) return { processed: false, duplicate: true }
+
+    if (input.action === 'paid') await confirmStripeOrderWithClient(client, input)
+    if (input.action === 'failed' || input.action === 'expired') await cancelUnpaidStripeOrderWithClient(client, input)
+
+    await client.query(
+      'INSERT INTO stripe_webhook_events (id, event_type) VALUES ($1, $2)',
+      [input.eventId, input.eventType]
+    )
+    return { processed: true, duplicate: false }
+  })
+}
+
 export async function updateOrder(id, updates = {}) {
   const status = typeof updates === 'string' ? updates : updates.status
   if (status === undefined) return findOrderById(id)
   if (!ORDER_STATUSES.includes(status)) throw repositoryError(400, 'Trạng thái đơn hàng không hợp lệ', 'INVALID_ORDER_STATUS')
 
   return withTransaction(async client => {
-    const orderResult = await client.query('SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [id])
+    const orderResult = await client.query('SELECT id, status, payment_method, payment_status FROM orders WHERE id = $1 FOR UPDATE', [id])
     const current = orderResult.rows[0]
     if (!current) throw repositoryError(404, 'Không tìm thấy đơn hàng', 'ORDER_NOT_FOUND')
+
+    if (['stripe', 'vnpay'].includes(current.payment_method) && current.payment_status === 'paid' && status === 'cancelled') {
+      throw repositoryError(409, 'Đơn online đã thanh toán chỉ có thể hủy sau khi hoàn tiền qua cổng thanh toán', 'ONLINE_REFUND_REQUIRED')
+    }
+    if (['stripe', 'vnpay'].includes(current.payment_method) && current.payment_status !== 'paid' && status !== current.status) {
+      throw repositoryError(409, 'Trạng thái đơn online chưa thanh toán được cập nhật tự động theo cổng thanh toán', 'ONLINE_PAYMENT_REQUIRED')
+    }
 
     const isCancelling = current.status !== 'cancelled' && status === 'cancelled'
     const isRestoring = current.status === 'cancelled' && status !== 'cancelled'
@@ -796,7 +1006,20 @@ export async function updateOrder(id, updates = {}) {
       }
     }
 
-    await client.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [status, id])
+    await client.query(`
+      UPDATE orders
+      SET status = $1,
+          payment_status = CASE
+            WHEN payment_method = 'cod' AND $1 = 'delivered' THEN 'paid'
+            ELSE payment_status
+          END,
+          paid_at = CASE
+            WHEN payment_method = 'cod' AND $1 = 'delivered' THEN COALESCE(paid_at, NOW())
+            ELSE paid_at
+          END,
+          updated_at = NOW()
+      WHERE id = $2
+    `, [status, id])
     const orders = await selectOrders(client, { id, limit: 1 })
     return orders[0]
   })
@@ -810,7 +1033,16 @@ export async function getAdminStats() {
   const [summaryResult, statusResult, lowStockResult, recentOrders, revenueResult] = await Promise.all([
     query(`
       SELECT
-        (SELECT COALESCE(SUM(total) FILTER (WHERE status <> 'cancelled'), 0) FROM orders)::text AS total_revenue,
+        (SELECT COALESCE(SUM(total) FILTER (
+          WHERE (payment_method IN ('stripe', 'vnpay') AND payment_status = 'paid')
+             OR (payment_method = 'cod' AND status = 'delivered')
+        ), 0) FROM orders)::text AS total_revenue,
+        (SELECT COALESCE(SUM(total) FILTER (
+          WHERE payment_method IN ('stripe', 'vnpay') AND payment_status = 'paid'
+        ), 0) FROM orders)::text AS online_revenue,
+        (SELECT COUNT(*) FILTER (
+          WHERE payment_method IN ('stripe', 'vnpay') AND payment_status = 'paid'
+        ) FROM orders)::text AS paid_online_orders,
         (SELECT COUNT(*) FROM orders)::text AS total_orders,
         (SELECT COUNT(*) FROM users WHERE role = 'customer')::text AS total_customers,
         (SELECT COUNT(*) FROM products)::text AS total_products,
@@ -830,8 +1062,11 @@ export async function getAdminStats() {
       SELECT days.day::text AS day, COALESCE(SUM(orders.total), 0)::text AS value
       FROM days
       LEFT JOIN orders
-        ON (orders.created_at AT TIME ZONE 'UTC')::date = days.day
-       AND orders.status <> 'cancelled'
+        ON (COALESCE(orders.paid_at, orders.updated_at) AT TIME ZONE 'UTC')::date = days.day
+       AND (
+         (orders.payment_method IN ('stripe', 'vnpay') AND orders.payment_status = 'paid')
+         OR (orders.payment_method = 'cod' AND orders.status = 'delivered')
+       )
       GROUP BY days.day
       ORDER BY days.day
     `)
@@ -844,6 +1079,8 @@ export async function getAdminStats() {
 
   return {
     totalRevenue: numberValue(summary.total_revenue),
+    onlineRevenue: numberValue(summary.online_revenue),
+    paidOnlineOrders: numberValue(summary.paid_online_orders),
     totalOrders: numberValue(summary.total_orders),
     totalCustomers: numberValue(summary.total_customers),
     totalProducts: numberValue(summary.total_products),

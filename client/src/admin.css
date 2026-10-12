@@ -2310,3 +2310,61 @@ html[data-theme="dark"] .auth-tabs button.active {
   color: #d92d24;
   background: #fff;
 }
+
+/* Online payment ledger */
+.online-payments-table code {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  color: #525866;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-paid-badge {
+  display: inline-flex;
+  margin-top: 5px;
+  padding: 4px 7px;
+  color: #15754b;
+  font-size: 8px;
+  font-weight: 800;
+  background: #e5f7ee;
+  border-radius: 999px;
+}
+
+.payment-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #eeedff;
+  color: #5147dc;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.payment-provider-badge.vnpay {
+  background: #e9f2ff;
+  color: #0756a4;
+}
+
+.admin-shell.admin-theme-dark .online-payments-table code {
+  color: #b9c0cb;
+}
+
+.admin-shell.admin-theme-dark .payment-paid-badge {
+  color: #83dfb1;
+  background: #174635;
+}
+
+.admin-shell.admin-theme-dark .payment-provider-badge {
+  background: #33305b;
+  color: #c8c6ff;
+}
+
+.admin-shell.admin-theme-dark .payment-provider-badge.vnpay {
+  background: #173753;
+  color: #9bcfff;
+}

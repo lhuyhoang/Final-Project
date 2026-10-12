@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories } from '../data'
 
@@ -18,7 +18,7 @@ const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', ol
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
-const validAdminTabs = new Set(['overview', 'products', 'orders', 'users'])
+const validAdminTabs = new Set(['overview', 'products', 'orders', 'online-payments', 'users'])
 
 function loadAdminTab() {
   try {
@@ -169,6 +169,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
+  const [onlinePayments, setOnlinePayments] = useState([])
   const [users, setUsers] = useState([])
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
@@ -182,15 +183,17 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     silent ? setRefreshing(true) : setLoading(true)
     setError('')
     try {
-      const [statsData, productData, orderData, userData] = await Promise.all([
+      const [statsData, productData, orderData, paymentData, userData] = await Promise.all([
         api('/api/admin/stats'),
         api('/api/admin/products'),
         api('/api/admin/orders'),
+        api('/api/admin/payments'),
         api('/api/admin/users')
       ])
       setStats(statsData)
       setProducts(productData)
       setOrders(orderData)
+      setOnlinePayments(paymentData)
       setUsers(userData)
     } catch (requestError) {
       setError(requestError.message)
@@ -264,6 +267,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const normalizedQuery = query.trim().toLowerCase()
   const visibleProducts = useMemo(() => products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery)), [products, normalizedQuery])
   const visibleOrders = useMemo(() => orders.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email}`.toLowerCase().includes(normalizedQuery)), [orders, normalizedQuery])
+  const visibleOnlinePayments = useMemo(() => onlinePayments.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email} ${order.stripePaymentIntentId || ''} ${order.stripeCheckoutSessionId || ''} ${order.vnpayTransactionNo || ''} ${order.vnpayBankCode || ''}`.toLowerCase().includes(normalizedQuery)), [onlinePayments, normalizedQuery])
   const visibleUsers = useMemo(() => users.filter(account => `${account.name} ${account.email} ${account.phone}`.toLowerCase().includes(normalizedQuery)), [users, normalizedQuery])
   const maxRevenue = Math.max(1, ...(stats?.revenueSeries || []).map(item => item.value))
 
@@ -271,6 +275,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
+    { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
     { id: 'users', label: 'Khách hàng', icon: Users }
   ]
 
@@ -281,7 +286,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     <aside className="admin-sidebar">
       <button className="admin-logo" onClick={onBack}><span>Q</span><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
       <div className="admin-nav-label">QUẢN TRỊ</div>
-      <nav>{navItems.map(item => { const Icon = item.icon; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{item.id === 'orders' && stats?.statusCounts?.pending > 0 && <b>{stats.statusCounts.pending}</b>}</button> })}</nav>
+      <nav>{navItems.map(item => { const Icon = item.icon; const count = item.id === 'orders' ? stats?.statusCounts?.pending : item.id === 'online-payments' ? stats?.paidOnlineOrders : 0; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{count > 0 && <b>{count}</b>}</button> })}</nav>
       <div className="admin-user"><div>{user.name.charAt(0).toUpperCase()}</div><span><b>{user.name}</b><small>Quản trị viên</small></span></div>
       <button className="admin-logout" onClick={onLogout}><LogOut size={18}/> Đăng xuất</button>
     </aside>
@@ -298,7 +303,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       {loading ? <div className="admin-loading"><RefreshCw className="spin"/><span>Đang tải dữ liệu quản trị...</span></div> : <div className="admin-content">
         {tab === 'overview' && stats && <>
           <section className="admin-stats-grid">
-            <StatCard icon={WalletCards} label="Tổng doanh thu" value={formatPrice(stats.totalRevenue)} note="Không tính đơn đã hủy" tone="red"/>
+            <StatCard icon={WalletCards} label="Doanh thu đã thu" value={formatPrice(stats.totalRevenue)} note={`${formatPrice(stats.onlineRevenue)} thanh toán online`} tone="red"/>
             <StatCard icon={ShoppingBag} label="Đơn hàng" value={stats.totalOrders} note={`${stats.statusCounts.pending || 0} đơn chờ xác nhận`} tone="blue"/>
             <StatCard icon={Users} label="Khách hàng" value={stats.totalCustomers} note="Tài khoản đã đăng ký" tone="green"/>
             <StatCard icon={Package} label="Sản phẩm" value={stats.totalProducts} note={`${stats.lowStockCount} sản phẩm sắp hết`} tone="amber"/>
@@ -320,7 +325,12 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
         {tab === 'orders' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>VẬN HÀNH</span><h2>{orders.length} đơn hàng</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng..."/></label></div></header>
-          <div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>{visibleOrders.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><select className={`status-select status-${order.status}`} value={order.status} onChange={event => updateOrderStatus(order.id, event.target.value)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td></tr>)}</tbody></table>{!visibleOrders.length && <div className="table-empty">Không tìm thấy đơn hàng phù hợp.</div>}</div>
+          <div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>{visibleOrders.map(order => { const online = ['stripe', 'vnpay'].includes(order.paymentMethod); return <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><select className={`status-select status-${order.status}`} value={order.status} disabled={online && order.paymentStatus !== 'paid'} title={online && order.paymentStatus !== 'paid' ? 'Cổng thanh toán sẽ tự cập nhật trạng thái' : ''} onChange={event => updateOrderStatus(order.id, event.target.value)}>{Object.entries(statusLabels).filter(([value]) => !(online && order.paymentStatus === 'paid' && value === 'cancelled')).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td></tr> })}</tbody></table>{!visibleOrders.length && <div className="table-empty">Không tìm thấy đơn hàng phù hợp.</div>}</div>
+        </section>}
+
+        {tab === 'online-payments' && <section className="admin-panel admin-list-panel">
+          <header className="list-header"><div><span>THANH TOÁN TRỰC TUYẾN</span><h2>{onlinePayments.length} đơn đã thanh toán</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng, mã giao dịch..."/></label></div></header>
+          <div className="admin-table-wrap"><table className="online-payments-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Cổng thanh toán</th><th>Mã giao dịch</th><th>Thanh toán lúc</th><th>Doanh thu</th><th>Trạng thái đơn</th></tr></thead><tbody>{visibleOnlinePayments.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td><span className={`payment-provider-badge ${order.paymentMethod}`}>{order.paymentMethod === 'vnpay' ? 'VNPay' : 'Stripe'}</span></td><td><code>{order.vnpayTransactionNo || order.stripePaymentIntentId || order.stripeCheckoutSessionId}</code><span className="payment-paid-badge">Đã thanh toán</span></td><td>{formatDate(order.paidAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table>{!visibleOnlinePayments.length && <div className="table-empty">Chưa có đơn thanh toán online phù hợp.</div>}</div>
         </section>}
 
         {tab === 'users' && <section className="admin-panel admin-list-panel">

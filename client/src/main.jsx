@@ -62,6 +62,7 @@ import { requireAuthClient } from "./auth";
 import AccountSettings from "./components/AccountSettings";
 import AdminDashboard from "./components/AdminDashboard";
 import AuthModal from "./components/AuthModal";
+import CheckoutPage from "./components/CheckoutPage";
 import ProductDetail from "./components/ProductDetail";
 import "./styles.css";
 import "./admin.css";
@@ -858,6 +859,9 @@ function App() {
   const [accountView, setAccountView] = useState(() =>
     window.location.pathname.startsWith("/account"),
   );
+  const [checkoutView, setCheckoutView] = useState(() =>
+    window.location.pathname.startsWith("/checkout"),
+  );
   const [adminView, setAdminView] = useState(() =>
     window.location.pathname.startsWith("/admin"),
   );
@@ -866,9 +870,10 @@ function App() {
     catalogSelectionFromLocation,
   );
   const [productsLoaded, setProductsLoaded] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(null);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const categoryMenuTimerRef = useRef(null);
+  const paymentReturnHandledRef = useRef(false);
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -921,6 +926,83 @@ function App() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentResult = params.get("payment");
+    if (!paymentResult || paymentReturnHandledRef.current) return;
+
+    if (paymentResult === "stripe-cancelled" && sessionReady) {
+      paymentReturnHandledRef.current = true;
+      const cancelledOrderId = params.get("order_id");
+      window.history.replaceState({}, "", "/checkout");
+      setCheckoutView(true);
+      if (!session || !cancelledOrderId) {
+        setToast("Bạn đã hủy thanh toán Stripe. Giỏ hàng vẫn được giữ lại.");
+        setTimeout(() => setToast(""), 4000);
+        return;
+      }
+      api(`/api/payments/stripe/orders/${encodeURIComponent(cancelledOrderId)}/cancel`, {
+        method: "POST",
+      })
+        .then(() => {
+          refreshProducts();
+          setToast("Đã hủy thanh toán Stripe và hoàn lại tồn kho. Giỏ hàng vẫn được giữ lại.");
+        })
+        .catch((paymentError) => setToast(paymentError.message))
+        .finally(() => setTimeout(() => setToast(""), 5000));
+      return;
+    }
+
+    if ((paymentResult === "vnpay-success" || paymentResult === "vnpay-failed") && sessionReady) {
+      paymentReturnHandledRef.current = true;
+      const orderId = params.get("order_id");
+      window.history.replaceState({}, "", "/checkout");
+      setCheckoutView(true);
+      if (!session || !orderId) {
+        setToast("Không thể xác minh kết quả thanh toán VNPay.");
+        setTimeout(() => setToast(""), 5000);
+        return;
+      }
+      api(`/api/payments/vnpay/orders/${encodeURIComponent(orderId)}`)
+        .then(({ paymentStatus, order }) => {
+          if (paymentResult !== "vnpay-success" || paymentStatus !== "paid") {
+            throw new Error("Thanh toán VNPay chưa thành công. Bạn có thể chọn lại phương thức thanh toán.");
+          }
+          setCart([]);
+          setCheckoutView(false);
+          window.history.replaceState({}, "", "/");
+          refreshProducts();
+          setToast(`Thanh toán VNPay thành công. Đơn #${order.id} đã được xác nhận.`);
+        })
+        .catch((paymentError) => setToast(paymentError.message))
+        .finally(() => setTimeout(() => setToast(""), 5000));
+      return;
+    }
+
+    if (paymentResult !== "stripe-success" || !sessionReady) return;
+    paymentReturnHandledRef.current = true;
+    const checkoutSessionId = params.get("session_id");
+    window.history.replaceState({}, "", window.location.pathname || "/");
+
+    if (!session || !checkoutSessionId) {
+      setToast("Không thể xác minh phiên thanh toán Stripe.");
+      setTimeout(() => setToast(""), 4000);
+      return;
+    }
+
+    api(`/api/payments/stripe/session/${encodeURIComponent(checkoutSessionId)}`)
+      .then(({ paymentStatus, order }) => {
+        if (paymentStatus !== "paid") throw new Error("Stripe chưa xác nhận thanh toán thành công");
+        setCart([]);
+        setCartOpen(false);
+        setCheckoutView(false);
+        window.history.replaceState({}, "", "/");
+        refreshProducts();
+        setToast(`Thanh toán thành công. Đơn #${order.id} đã được xác nhận.`);
+      })
+      .catch((paymentError) => setToast(paymentError.message))
+      .finally(() => setTimeout(() => setToast(""), 5000));
+  }, [sessionReady, session]);
   useEffect(
     () => localStorage.setItem("quadpro-cart", JSON.stringify(cart)),
     [cart],
@@ -929,7 +1011,8 @@ function App() {
     if (!sessionReady) return;
     const isAdminRoute = window.location.pathname.startsWith("/admin");
     const isAccountRoute = window.location.pathname.startsWith("/account");
-    if (!isAdminRoute && !isAccountRoute) return;
+    const isCheckoutRoute = window.location.pathname.startsWith("/checkout");
+    if (!isAdminRoute && !isAccountRoute && !isCheckoutRoute) return;
     if (!session) openAuth("login");
     else if (isAdminRoute && session.user.role !== "admin") leaveAdmin();
   }, [sessionReady, session]);
@@ -937,11 +1020,13 @@ function App() {
     const syncRoute = () => {
       const isAdminRoute = window.location.pathname.startsWith("/admin");
       const isAccountRoute = window.location.pathname.startsWith("/account");
+      const isCheckoutRoute = window.location.pathname.startsWith("/checkout");
       setAdminView(isAdminRoute);
       setAccountView(isAccountRoute);
+      setCheckoutView(isCheckoutRoute);
       setProductId(productIdFromPath());
       setCatalogSelection(catalogSelectionFromLocation());
-      if (sessionReady && (isAdminRoute || isAccountRoute) && !session) openAuth("login");
+      if (sessionReady && (isAdminRoute || isAccountRoute || isCheckoutRoute) && !session) openAuth("login");
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
@@ -1040,6 +1125,7 @@ function App() {
       window.history.pushState({}, "", "/admin");
     setAdminView(true);
     setAccountView(false);
+    setCheckoutView(false);
     setProductId(null);
     setCatalogSelection(null);
     setAccountOpen(false);
@@ -1049,6 +1135,7 @@ function App() {
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setAdminView(false);
     setAccountView(false);
+    setCheckoutView(false);
     setProductId(null);
     setCatalogSelection(null);
   }
@@ -1063,6 +1150,7 @@ function App() {
     }
     setAdminView(false);
     setAccountView(true);
+    setCheckoutView(false);
     setProductId(null);
     setCatalogSelection(null);
     setAccountOpen(false);
@@ -1072,6 +1160,7 @@ function App() {
   function leaveAccountSettings() {
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setAccountView(false);
+    setCheckoutView(false);
     setProductId(null);
     setCatalogSelection(null);
   }
@@ -1082,6 +1171,7 @@ function App() {
     setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
+    setCheckoutView(false);
     setAccountOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1095,6 +1185,7 @@ function App() {
     setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
+    setCheckoutView(false);
     setAccountOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1107,6 +1198,7 @@ function App() {
     setCatalogSelection(null);
     setAdminView(false);
     setAccountView(false);
+    setCheckoutView(false);
     setMenuOpen(false);
     setCategoryMenuOpen(false);
     setMenuCategory(null);
@@ -1148,6 +1240,7 @@ function App() {
     setProductId(null);
     setAdminView(false);
     setAccountView(false);
+    setCheckoutView(false);
     setAccountOpen(false);
     setMenuOpen(false);
     setCategoryMenuOpen(false);
@@ -1165,6 +1258,29 @@ function App() {
     setCartOpen(true);
   }
 
+  function openCheckout() {
+    if (!session) {
+      setCartOpen(false);
+      openAuth("login");
+      return;
+    }
+    if (!cart.length) return;
+    window.history.pushState({}, "", "/checkout");
+    setCheckoutView(true);
+    setAdminView(false);
+    setAccountView(false);
+    setProductId(null);
+    setCatalogSelection(null);
+    setCartOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function leaveCheckout() {
+    if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
+    setCheckoutView(false);
+    setCartOpen(true);
+  }
+
   function handleUserUpdated(user) {
     const updatedSession = { user };
     setSession(updatedSession);
@@ -1179,9 +1295,11 @@ function App() {
       setSession(null);
       setAccountView(false);
       setAdminView(false);
+      setCheckoutView(false);
       if (
         window.location.pathname.startsWith("/admin") ||
-        window.location.pathname.startsWith("/account")
+        window.location.pathname.startsWith("/account") ||
+        window.location.pathname.startsWith("/checkout")
       )
         window.history.replaceState({}, "", "/");
       setAccountOpen(false);
@@ -1190,27 +1308,44 @@ function App() {
     }
   }
 
-  async function checkout() {
+  async function checkout(paymentMethod = "cod", customer = {}) {
     if (!session) {
       setCartOpen(false);
       openAuth("login");
       return;
     }
-    setCheckoutLoading(true);
+    setCheckoutLoading(paymentMethod);
     try {
-      const order = await api("/api/orders", {
+      const request = {
         method: "POST",
         body: JSON.stringify({
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
           })),
-          shipping: { address: "Nhận tại showroom QuadPro" },
-          paymentMethod: "cod",
+          customer: { name: customer.name, phone: customer.phone },
+          shipping: { address: customer.address },
+          paymentMethod,
         }),
-      });
+      };
+
+      if (paymentMethod === "stripe") {
+        const { checkoutUrl } = await api("/api/payments/stripe/checkout", request);
+        window.location.assign(checkoutUrl);
+        return;
+      }
+
+      if (paymentMethod === "vnpay") {
+        const { paymentUrl } = await api("/api/payments/vnpay/checkout", request);
+        window.location.assign(paymentUrl);
+        return;
+      }
+
+      const order = await api("/api/orders", request);
       setCart([]);
       setCartOpen(false);
+      setCheckoutView(false);
+      window.history.replaceState({}, "", "/");
       await refreshProducts();
       setToast(`Đặt hàng thành công: #${order.id}`);
       setTimeout(() => setToast(""), 3500);
@@ -1218,7 +1353,7 @@ function App() {
       setToast(requestError.message);
       setTimeout(() => setToast(""), 3500);
     } finally {
-      setCheckoutLoading(false);
+      setCheckoutLoading(null);
     }
   }
 
@@ -1245,6 +1380,23 @@ function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
+    );
+  }
+
+  if (checkoutView && session) {
+    return (
+      <>
+        <CheckoutPage
+          user={session.user}
+          cart={cart}
+          loading={checkoutLoading}
+          onBack={leaveCheckout}
+          onSubmit={checkout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+        {toast && <div className="toast"><CheckCircle2 size={20}/>{toast}</div>}
+      </>
     );
   }
 
@@ -1872,7 +2024,7 @@ function App() {
         </div>
         <div className="copyright container">
           © 2026 QUADPRO. Thiết kế và phát triển cho đồ án E-commerce Level 3.
-          <span>Visa • Mastercard • Stripe</span>
+          <span>Visa • Mastercard • Stripe • VNPay</span>
         </div>
       </footer>
 
@@ -1933,18 +2085,9 @@ function App() {
                 <span>Tạm tính</span>
                 <b>{formatPrice(total)}</b>
               </div>
-              <small>
-                {session
-                  ? `Thanh toán với ${session.user.email}`
-                  : "Đăng nhập để tiếp tục thanh toán"}
-              </small>
-              <button onClick={checkout} disabled={checkoutLoading}>
-                {checkoutLoading
-                  ? "ĐANG TẠO ĐƠN..."
-                  : session
-                    ? "ĐẶT HÀNG"
-                    : "ĐĂNG NHẬP ĐỂ THANH TOÁN"}{" "}
-                <ArrowRight size={18} />
+              <small>{session ? `Đặt hàng với ${session.user.email}` : "Đăng nhập để tiếp tục đặt hàng"}</small>
+              <button onClick={openCheckout}>
+                {session ? "TIẾN HÀNH ĐẶT HÀNG" : "ĐĂNG NHẬP ĐỂ ĐẶT HÀNG"} <ArrowRight size={18}/>
               </button>
             </div>
           </>
