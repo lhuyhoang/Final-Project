@@ -91,11 +91,11 @@ const authenticate = asyncHandler(async (req, res, next) => {
   try {
     const verified = await jwtVerify(token, neonJwks, {
       issuer: neonAuthIssuer,
-      audience: neonAuthIssuer,
       algorithms: ['EdDSA']
     })
     payload = verified.payload
-  } catch {
+  } catch (error) {
+    console.warn(`Neon Auth token validation failed: ${error.code || error.message}`)
     return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' })
   }
 
