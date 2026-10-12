@@ -28,13 +28,26 @@ const requiresAuthentication = path => (
 )
 
 async function getAccessToken() {
-  const { data, error } = await requireAuthClient().token()
-  if (error || !data?.token) {
+  const auth = requireAuthClient()
+  const tokenResult = await auth.token()
+  let token = tokenResult.data?.token || tokenResult.data?.session?.token
+  let error = tokenResult.error
+
+  // Immediately after sign-up/sign-in, the Neon adapter can serve its cached
+  // session before /token is fetched. In that response the JWT is stored on
+  // session.token instead of the top-level token field.
+  if (!token) {
+    const sessionResult = await auth.getSession()
+    token = sessionResult.data?.session?.token
+    error ||= sessionResult.error
+  }
+
+  if (!token) {
     const authError = new Error(error?.message || 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn')
     authError.status = 401
     throw authError
   }
-  return data.token
+  return token
 }
 
 export async function api(path, options = {}) {

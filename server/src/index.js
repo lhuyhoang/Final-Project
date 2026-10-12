@@ -34,7 +34,8 @@ let neonAuthIssuer = ''
 let neonJwks
 if (neonAuthBaseUrl) {
   try {
-    neonAuthIssuer = new URL(neonAuthBaseUrl).origin
+    new URL(neonAuthBaseUrl)
+    neonAuthIssuer = neonAuthBaseUrl
     neonJwks = createRemoteJWKSet(new URL(`${neonAuthBaseUrl}/.well-known/jwks.json`))
   } catch {
     throw new Error('NEON_AUTH_BASE_URL must be a valid URL')
