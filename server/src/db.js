@@ -28,9 +28,18 @@ function parseSsl(value) {
   throw new Error('DB_SSL must be true or false')
 }
 
-function connectionStringForDatabase(connectionString, database) {
+function normalizeConnectionString(connectionString, database) {
   const url = new URL(connectionString)
-  url.pathname = `/${database}`
+  if (database) url.pathname = `/${database}`
+
+  // pg-connection-string currently treats these modes as verify-full, but that
+  // compatibility behavior will change in its next major version. Preserve the
+  // current certificate verification explicitly and avoid the runtime warning.
+  const sslMode = url.searchParams.get('sslmode')?.toLowerCase()
+  if (['prefer', 'require', 'verify-ca'].includes(sslMode)) {
+    url.searchParams.set('sslmode', 'verify-full')
+  }
+
   return url.toString()
 }
 
@@ -46,7 +55,7 @@ export function getPoolConfig({ database } = {}) {
 
   if (connectionString) {
     return {
-      connectionString: database ? connectionStringForDatabase(connectionString, database) : connectionString,
+      connectionString: normalizeConnectionString(connectionString, database),
       max,
       ssl,
       application_name: 'quadpro-api'
