@@ -16,6 +16,7 @@ import {
   UserRound
 } from 'lucide-react'
 import { api } from '../api'
+import { authErrorMessage, requireAuthClient } from '../auth'
 import '../account.css'
 
 const provinces = [
@@ -134,6 +135,8 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
     setProfileLoading(true)
     setProfileMessage(null)
     try {
+      const authResult = await requireAuthClient().updateUser({ name: profile.name.trim() })
+      if (authResult.error) throw new Error(authErrorMessage(authResult.error, 'Không thể cập nhật tên tài khoản'))
       const { user } = await api('/api/auth/me', {
         method: 'PUT',
         body: JSON.stringify(profile)
@@ -157,15 +160,14 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
 
     setPasswordLoading(true)
     try {
-      const result = await api('/api/auth/password', {
-        method: 'PUT',
-        body: JSON.stringify({
-          currentPassword: password.currentPassword,
-          newPassword: password.newPassword
-        })
+      const result = await requireAuthClient().changePassword({
+        currentPassword: password.currentPassword,
+        newPassword: password.newPassword,
+        revokeOtherSessions: true
       })
+      if (result.error) throw new Error(authErrorMessage(result.error, 'Không thể đổi mật khẩu'))
       setPassword(emptyPassword)
-      setPasswordMessage({ type: 'success', text: result.message })
+      setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công.' })
     } catch (error) {
       setPasswordMessage({ type: 'error', text: error.message })
     } finally {
@@ -253,7 +255,8 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
                 </label>
                 <label className="account-field">
                   <span>Email</span>
-                  <input type="email" name="email" value={profile.email} onChange={updateProfile} autoComplete="email" required maxLength="254"/>
+                  <input type="email" name="email" value={profile.email} readOnly aria-describedby="managed-email-note"/>
+                  <small id="managed-email-note">Email đăng nhập được quản lý bởi Neon Auth.</small>
                 </label>
                 <label className="account-field">
                   <span>Địa chỉ nhà</span>

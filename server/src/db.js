@@ -180,6 +180,7 @@ export function mapUserRow(row, { includePassword = true } = {}) {
   if (!row) return null
   const user = {
     id: row.id,
+    authUserId: row.auth_user_id || null,
     name: row.name,
     email: row.email,
     phone: row.phone || '',
@@ -262,6 +263,11 @@ export async function findUserById(id, { includePassword = true } = {}) {
   return mapUserRow(result.rows[0], { includePassword })
 }
 
+export async function findUserByAuthId(authUserId, { includePassword = false } = {}) {
+  const result = await query('SELECT * FROM users WHERE auth_user_id = $1', [authUserId])
+  return mapUserRow(result.rows[0], { includePassword })
+}
+
 export async function findUserByEmail(email, { includePassword = true } = {}) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
   const result = await query('SELECT * FROM users WHERE email = $1', [normalizedEmail])
@@ -274,20 +280,21 @@ export async function createUser(input) {
   try {
     const result = await query(`
       INSERT INTO users (
-        id, name, email, phone, landline, address, province,
+        id, auth_user_id, name, email, phone, landline, address, province,
         password_hash, role, status, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `, [
       input.id || crypto.randomUUID(),
+      input.authUserId || null,
       input.name,
       String(input.email || '').trim().toLowerCase(),
       input.phone || '',
       input.landline || '',
       input.address || '',
       input.province || '',
-      passwordHash,
+      passwordHash || null,
       input.role || 'customer',
       input.status || 'active',
       createdAt,
@@ -301,6 +308,7 @@ export async function createUser(input) {
 
 export async function updateUser(id, updates = {}) {
   const columnMap = {
+    authUserId: 'auth_user_id',
     name: 'name',
     email: 'email',
     phone: 'phone',
@@ -342,6 +350,69 @@ export async function updateUser(id, updates = {}) {
   } catch (error) {
     translateUserConstraintError(error, 'Email đã được sử dụng bởi tài khoản khác')
   }
+}
+
+export async function syncUserFromAuth(identity) {
+  const authUserId = String(identity.authUserId || '').trim()
+  const email = String(identity.email || '').trim().toLowerCase()
+  const name = String(identity.name || email.split('@')[0] || 'Thành viên QuadPro').trim().slice(0, 60)
+  const authRole = identity.role === 'admin' ? 'admin' : 'customer'
+
+  if (!authUserId || !email) throw repositoryError(401, 'Token đăng nhập thiếu thông tin người dùng', 'INVALID_AUTH_IDENTITY')
+
+  return withTransaction(async client => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth:${authUserId}`])
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth-email:${email}`])
+
+    let result = await client.query('SELECT * FROM users WHERE auth_user_id = $1 FOR UPDATE', [authUserId])
+    let user = mapUserRow(result.rows[0], { includePassword: false })
+
+    if (user) {
+      if (user.email !== email) {
+        throw repositoryError(409, 'Email Neon Auth không khớp với hồ sơ QuadPro', 'AUTH_EMAIL_MISMATCH')
+      }
+      if (user.role !== authRole) {
+        result = await client.query(
+          'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+          [authRole, user.id]
+        )
+        user = mapUserRow(result.rows[0], { includePassword: false })
+      }
+      return user
+    }
+
+    result = await client.query('SELECT * FROM users WHERE email = $1 FOR UPDATE', [email])
+    const legacyUser = mapUserRow(result.rows[0], { includePassword: false })
+    if (legacyUser) {
+      if (legacyUser.authUserId && legacyUser.authUserId !== authUserId) {
+        throw repositoryError(409, 'Email này đã được liên kết với tài khoản Neon Auth khác', 'AUTH_EMAIL_LINKED')
+      }
+      if (legacyUser.role === 'admin' && authRole !== 'admin') {
+        throw repositoryError(403, 'Hãy cấp quyền admin cho tài khoản này trong Neon trước khi liên kết', 'ADMIN_LINK_REQUIRES_NEON_ROLE')
+      }
+      if (legacyUser.role !== 'admin' && !identity.emailVerified) {
+        throw repositoryError(409, 'Hãy xác minh email trong Neon Auth trước khi liên kết tài khoản cũ', 'EMAIL_VERIFICATION_REQUIRED')
+      }
+
+      result = await client.query(`
+        UPDATE users
+        SET auth_user_id = $1, role = $2, updated_at = NOW()
+        WHERE id = $3
+        RETURNING *
+      `, [authUserId, authRole, legacyUser.id])
+      return mapUserRow(result.rows[0], { includePassword: false })
+    }
+
+    result = await client.query(`
+      INSERT INTO users (
+        id, auth_user_id, name, email, phone, landline, address, province,
+        password_hash, role, status, created_at, updated_at
+      )
+      VALUES ($1, $1, $2, $3, '', '', '', '', NULL, $4, 'active', NOW(), NOW())
+      RETURNING *
+    `, [authUserId, name.length >= 2 ? name : 'Thành viên QuadPro', email, authRole])
+    return mapUserRow(result.rows[0], { includePassword: false })
+  })
 }
 
 export async function listUsers({ role, status } = {}) {

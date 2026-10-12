@@ -16,7 +16,6 @@ const {
   initializeDatabase,
   withTransaction
 } = await import('../src/db.js')
-const { ensureConfiguredAdmin } = await import('../src/admin-bootstrap.js')
 
 const databaseIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/
 
@@ -290,11 +289,6 @@ export async function initializePostgres() {
       console.log(`Imported ${users} users, ${products} products, ${orders} orders, and ${orderItems} order items.`)
     }
   }
-
-  const adminResult = await ensureConfiguredAdmin()
-  if (adminResult.created) console.log('Created the administrator configured through environment variables.')
-  else if (adminResult.reason === 'already-exists') console.log('Configured administrator already exists.')
-  else console.log('Administrator bootstrap skipped because ADMIN_EMAIL and ADMIN_PASSWORD are not configured.')
 }
 
 const invokedAsScript = process.argv[1]

@@ -57,7 +57,8 @@ import {
   Zap,
 } from "lucide-react";
 import { categories, categoryMenus, fallbackProducts } from "./data";
-import { api, clearSession, getSession, saveSession } from "./api";
+import { api, clearSession, saveSession } from "./api";
+import { requireAuthClient } from "./auth";
 import AccountSettings from "./components/AccountSettings";
 import AdminDashboard from "./components/AdminDashboard";
 import AuthModal from "./components/AuthModal";
@@ -849,7 +850,8 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuCategory, setMenuCategory] = useState(null);
   const [toast, setToast] = useState("");
-  const [session, setSession] = useState(getSession);
+  const [session, setSession] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -896,37 +898,41 @@ function App() {
     refreshProducts();
   }, []);
   useEffect(() => {
-    if (!session?.token) return;
-    api("/api/auth/me")
-      .then(({ user }) => {
-        const verified = { token: session.token, user };
-        setSession(verified);
-        saveSession(verified);
-      })
-      .catch(() => {
+    let active = true;
+    async function restoreSession() {
+      try {
+        const { data, error } = await requireAuthClient().getSession();
+        if (error || !data?.user) throw new Error("Không có phiên đăng nhập");
+        const { user } = await api("/api/auth/me");
+        if (!active) return;
+        const restored = { user };
+        setSession(restored);
+        saveSession(restored);
+      } catch {
+        if (!active) return;
         clearSession();
         setSession(null);
-        setAccountView(false);
-        setAdminView(false);
-        if (
-          window.location.pathname.startsWith("/account") ||
-          window.location.pathname.startsWith("/admin")
-        ) {
-          window.history.replaceState({}, "", "/");
-        }
-      });
+      } finally {
+        if (active) setSessionReady(true);
+      }
+    }
+    restoreSession();
+    return () => {
+      active = false;
+    };
   }, []);
   useEffect(
     () => localStorage.setItem("quadpro-cart", JSON.stringify(cart)),
     [cart],
   );
   useEffect(() => {
+    if (!sessionReady) return;
     const isAdminRoute = window.location.pathname.startsWith("/admin");
     const isAccountRoute = window.location.pathname.startsWith("/account");
     if (!isAdminRoute && !isAccountRoute) return;
     if (!session) openAuth("login");
     else if (isAdminRoute && session.user.role !== "admin") leaveAdmin();
-  }, []);
+  }, [sessionReady, session]);
   useEffect(() => {
     const syncRoute = () => {
       const isAdminRoute = window.location.pathname.startsWith("/admin");
@@ -935,11 +941,11 @@ function App() {
       setAccountView(isAccountRoute);
       setProductId(productIdFromPath());
       setCatalogSelection(catalogSelectionFromLocation());
-      if ((isAdminRoute || isAccountRoute) && !getSession()) openAuth("login");
+      if (sessionReady && (isAdminRoute || isAccountRoute) && !session) openAuth("login");
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, []);
+  }, [sessionReady, session]);
   useEffect(
     () => () => window.clearTimeout(categoryMenuTimerRef.current),
     [],
@@ -1160,24 +1166,28 @@ function App() {
   }
 
   function handleUserUpdated(user) {
-    const updatedSession = { token: session.token, user };
+    const updatedSession = { user };
     setSession(updatedSession);
     saveSession(updatedSession);
   }
 
-  function logout() {
-    clearSession();
-    setSession(null);
-    setAccountView(false);
-    setAdminView(false);
-    if (
-      window.location.pathname.startsWith("/admin") ||
-      window.location.pathname.startsWith("/account")
-    )
-      window.history.replaceState({}, "", "/");
-    setAccountOpen(false);
-    setToast("Đã đăng xuất an toàn");
-    setTimeout(() => setToast(""), 2200);
+  async function logout() {
+    try {
+      await requireAuthClient().signOut();
+    } finally {
+      clearSession();
+      setSession(null);
+      setAccountView(false);
+      setAdminView(false);
+      if (
+        window.location.pathname.startsWith("/admin") ||
+        window.location.pathname.startsWith("/account")
+      )
+        window.history.replaceState({}, "", "/");
+      setAccountOpen(false);
+      setToast("Đã đăng xuất an toàn");
+      setTimeout(() => setToast(""), 2200);
+    }
   }
 
   async function checkout() {

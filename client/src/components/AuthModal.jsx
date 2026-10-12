@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound, X } from 'lucide-react'
 import { api, saveSession } from '../api'
+import { authErrorMessage, requireAuthClient } from '../auth'
 
 const emptyForm = { name: '', phone: '', email: '', password: '', confirmPassword: '' }
 
@@ -44,13 +45,38 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
       setError('Mật khẩu xác nhận chưa khớp')
       return
     }
+    if (mode === 'register' && (form.password.length < 8 || !/[a-z]/.test(form.password) || !/[A-Z]/.test(form.password) || !/\d/.test(form.password))) {
+      setError('Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số')
+      return
+    }
+    const normalizedPhone = form.phone.trim().replace(/[\s.-]/g, '')
+    if (mode === 'register' && normalizedPhone && !/^(?:\+84\d{9}|0\d{9})$/.test(normalizedPhone)) {
+      setError('Số điện thoại không hợp lệ')
+      return
+    }
 
     setLoading(true)
     try {
-      const body = mode === 'register'
-        ? { name: form.name, phone: form.phone, email: form.email, password: form.password }
-        : { email: form.email, password: form.password }
-      const session = await api(`/api/auth/${mode}`, { method: 'POST', body: JSON.stringify(body) })
+      const auth = requireAuthClient()
+      const credentials = {
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        ...(mode === 'register' ? { name: form.name.trim() } : {})
+      }
+      const result = mode === 'register'
+        ? await auth.signUp.email(credentials)
+        : await auth.signIn.email(credentials)
+      if (result.error) throw new Error(authErrorMessage(result.error))
+
+      let { user } = await api('/api/auth/me')
+      if (mode === 'register' && normalizedPhone) {
+        const profile = await api('/api/auth/me', {
+          method: 'PUT',
+          body: JSON.stringify({ ...user, phone: normalizedPhone })
+        })
+        user = profile.user
+      }
+      const session = { user }
       saveSession(session)
       setForm(emptyForm)
       onAuthenticated(session)

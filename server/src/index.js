@@ -1,29 +1,25 @@
 import 'dotenv/config'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import bcrypt from 'bcryptjs'
 import cors from 'cors'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
-import jwt from 'jsonwebtoken'
-import { ensureConfiguredAdmin } from './admin-bootstrap.js'
+import { createRemoteJWKSet, jwtVerify } from 'jose'
 import {
   DEFAULT_PRODUCT_POLICY_TEXT,
   ORDER_STATUSES,
   createOrder as insertOrder,
   createProduct as insertProduct,
-  createUser as insertUser,
   deleteProduct as removeProduct,
   findProductById,
-  findUserByEmail,
-  findUserById,
   getAdminStats,
   healthCheck,
   initializeDatabase,
   listOrders,
   listProducts,
   listUsers,
+  syncUserFromAuth,
   updateOrderStatus,
   updateProduct as saveProduct,
   updateUser as saveUser
@@ -32,11 +28,18 @@ import {
 const app = express()
 const PORT = process.env.PORT || 4000
 const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)
-const configuredJwtSecret = String(process.env.JWT_SECRET || '').trim()
-if (isProduction && configuredJwtSecret.length < 32) {
-  throw new Error('JWT_SECRET must contain at least 32 characters in production')
+const neonAuthBaseUrl = String(process.env.NEON_AUTH_BASE_URL || '').trim().replace(/\/+$/, '')
+if (isProduction && !neonAuthBaseUrl) throw new Error('NEON_AUTH_BASE_URL must be configured in production')
+let neonAuthIssuer = ''
+let neonJwks
+if (neonAuthBaseUrl) {
+  try {
+    neonAuthIssuer = new URL(neonAuthBaseUrl).origin
+    neonJwks = createRemoteJWKSet(new URL(`${neonAuthBaseUrl}/.well-known/jwks.json`))
+  } catch {
+    throw new Error('NEON_AUTH_BASE_URL must be a valid URL')
+  }
 }
-const JWT_SECRET = configuredJwtSecret || 'development-only-secret-change-me'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 app.use(helmet({ contentSecurityPolicy: false }))
@@ -44,14 +47,12 @@ app.use(cors())
 app.use(express.json({ limit: '100kb' }))
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }))
 
-const authLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: true, legacyHeaders: false })
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 const httpError = (status, message) => Object.assign(new Error(message), { status })
 let databaseReadyPromise
 const ensureDatabaseReady = () => {
   if (!databaseReadyPromise) {
     databaseReadyPromise = initializeDatabase()
-      .then(() => ensureConfiguredAdmin())
       .catch(error => {
         databaseReadyPromise = null
         throw error
@@ -78,21 +79,34 @@ const safeUser = user => ({
   createdAt: user.createdAt,
   updatedAt: user.updatedAt || user.createdAt
 })
-const issueToken = user => jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '2h', issuer: 'quadpro-api' })
 
 const authenticate = asyncHandler(async (req, res, next) => {
   const authorization = req.headers.authorization || ''
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
   if (!token) return res.status(401).json({ message: 'Vui lòng đăng nhập' })
 
+  if (!neonJwks) return res.status(503).json({ message: 'Neon Auth chưa được cấu hình trên máy chủ' })
+
   let payload
   try {
-    payload = jwt.verify(token, JWT_SECRET, { issuer: 'quadpro-api' })
+    const verified = await jwtVerify(token, neonJwks, {
+      issuer: neonAuthIssuer,
+      audience: neonAuthIssuer,
+      algorithms: ['EdDSA']
+    })
+    payload = verified.payload
   } catch {
     return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' })
   }
 
-  const user = await findUserById(payload.sub, { includePassword: false })
+  if (payload.banned === true) return res.status(403).json({ message: 'Tài khoản đã bị khóa trên Neon Auth' })
+  const user = await syncUserFromAuth({
+    authUserId: payload.sub || payload.id,
+    email: payload.email,
+    name: payload.name,
+    emailVerified: payload.emailVerified === true,
+    role: payload.role
+  })
   if (!user || user.status !== 'active') return res.status(401).json({ message: 'Tài khoản không còn hoạt động' })
   req.user = safeUser(user)
   next()
@@ -103,21 +117,7 @@ function authorizeAdmin(req, res, next) {
   next()
 }
 
-function validateRegistration(body) {
-  const name = String(body.name || '').trim().replace(/\s+/g, ' ')
-  const email = String(body.email || '').trim().toLowerCase()
-  const phone = String(body.phone || '').trim()
-  const password = String(body.password || '')
-  if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên phải có từ 2 đến 60 ký tự')
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, 'Email không hợp lệ')
-  if (phone && !/^(?:\+84|0)\d{9}$/.test(phone.replace(/\s/g, ''))) throw httpError(400, 'Số điện thoại không hợp lệ')
-  if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
-    throw httpError(400, 'Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số')
-  }
-  return { name, email, phone: phone.replace(/\s/g, ''), password }
-}
-
-function validateProfile(body = {}) {
+function validateProfile(body = {}, currentEmail = '') {
   const name = String(body.name || '').trim().replace(/\s+/g, ' ')
   const email = String(body.email || '').trim().toLowerCase()
   const address = String(body.address || '').trim().replace(/\s+/g, ' ')
@@ -127,12 +127,13 @@ function validateProfile(body = {}) {
 
   if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên phải có từ 2 đến 60 ký tự')
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, 'Email không hợp lệ')
+  if (email !== currentEmail) throw httpError(400, 'Email đăng nhập được quản lý trong Neon Auth và không thể đổi tại đây')
   if (address.length > 250) throw httpError(400, 'Địa chỉ không được vượt quá 250 ký tự')
   if (province.length > 80) throw httpError(400, 'Tỉnh/Thành phố không hợp lệ')
   if (phone && !/^(?:\+84\d{9}|0\d{9})$/.test(phone)) throw httpError(400, 'Số điện thoại di động không hợp lệ')
   if (landline && !/^(?:\+84\d{9,10}|0\d{9,10})$/.test(landline)) throw httpError(400, 'Số điện thoại cố định không hợp lệ')
 
-  return { name, email, address, province, phone, landline }
+  return { name, address, province, phone, landline }
 }
 
 function normalizeProduct(body = {}, current = {}) {
@@ -189,52 +190,13 @@ app.get('/api/health', asyncHandler(async (_, res) => {
   res.json({ ...database, service: 'quadpro-api' })
 }))
 
-app.post('/api/auth/register', authLimiter, asyncHandler(async (req, res) => {
-  const input = validateRegistration(req.body || {})
-  const password = await bcrypt.hash(input.password, 12)
-  const user = await insertUser({
-    name: input.name,
-    email: input.email,
-    phone: input.phone,
-    passwordHash: password,
-    role: 'customer',
-    status: 'active'
-  })
-  res.status(201).json({ token: issueToken(user), user: safeUser(user) })
-}))
-
-app.post('/api/auth/login', authLimiter, asyncHandler(async (req, res) => {
-  const email = String(req.body?.email || '').trim().toLowerCase()
-  const user = await findUserByEmail(email)
-  if (!user || !await bcrypt.compare(String(req.body?.password || ''), user.password)) throw httpError(401, 'Email hoặc mật khẩu không đúng')
-  if (user.status !== 'active') throw httpError(403, 'Tài khoản đã bị khóa')
-  res.json({ token: issueToken(user), user: safeUser(user) })
-}))
-
 app.get('/api/auth/me', authenticate, (req, res) => res.json({ user: req.user }))
 
 app.put('/api/auth/me', authenticate, asyncHandler(async (req, res) => {
-  const profile = validateProfile(req.body)
+  const profile = validateProfile(req.body, req.user.email)
   const user = await saveUser(req.user.id, profile)
   if (!user) throw httpError(404, 'Không tìm thấy tài khoản')
   res.json({ user: safeUser(user) })
-}))
-
-app.put('/api/auth/password', authenticate, authLimiter, asyncHandler(async (req, res) => {
-  const currentPassword = String(req.body?.currentPassword || '')
-  const newPassword = String(req.body?.newPassword || '')
-  const user = await findUserById(req.user.id)
-  if (!user) throw httpError(404, 'Không tìm thấy tài khoản')
-  if (!await bcrypt.compare(currentPassword, user.password)) throw httpError(400, 'Mật khẩu hiện tại không đúng')
-  if (newPassword.length < 8 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    throw httpError(400, 'Mật khẩu mới cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số')
-  }
-  if (await bcrypt.compare(newPassword, user.password)) throw httpError(400, 'Mật khẩu mới phải khác mật khẩu hiện tại')
-
-  const password = await bcrypt.hash(newPassword, 12)
-  const updated = await saveUser(req.user.id, { passwordHash: password })
-  if (!updated) throw httpError(404, 'Không tìm thấy tài khoản')
-  res.json({ message: 'Đổi mật khẩu thành công' })
 }))
 
 app.get('/api/products', asyncHandler(async (req, res) => {
@@ -322,7 +284,10 @@ app.use((error, req, res, next) => {
   if (res.headersSent) return next(error)
   if (error instanceof SyntaxError && error.status === 400) return res.status(400).json({ message: 'JSON không hợp lệ' })
   if (!error.status) console.error(error)
-  res.status(error.status || 500).json({ message: error.status ? error.message : 'Lỗi máy chủ, vui lòng thử lại' })
+  res.status(error.status || 500).json({
+    message: error.status ? error.message : 'Lỗi máy chủ, vui lòng thử lại',
+    ...(error.code ? { code: error.code } : {})
+  })
 })
 
 async function startServer() {
