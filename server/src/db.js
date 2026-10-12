@@ -363,13 +363,28 @@ export async function updateUser(id, updates = {}) {
 
 export async function syncUserFromAuth(identity) {
   const authUserId = String(identity.authUserId || '').trim()
-  const email = String(identity.email || '').trim().toLowerCase()
-  const name = String(identity.name || email.split('@')[0] || 'Thành viên QuadPro').trim().slice(0, 60)
-  const authRole = identity.role === 'admin' ? 'admin' : 'customer'
-
-  if (!authUserId || !email) throw repositoryError(401, 'Token đăng nhập thiếu thông tin người dùng', 'INVALID_AUTH_IDENTITY')
+  if (!authUserId) throw repositoryError(401, 'Token đăng nhập thiếu thông tin người dùng', 'INVALID_AUTH_IDENTITY')
 
   return withTransaction(async client => {
+    const authResult = await client.query(`
+      SELECT id, name, email, "emailVerified" AS email_verified, role, COALESCE(banned, false) AS banned
+      FROM neon_auth."user"
+      WHERE id = $1
+    `, [authUserId])
+    const managedIdentity = authResult.rows[0]
+    if (!managedIdentity) {
+      throw repositoryError(401, 'Không tìm thấy tài khoản trong Neon Auth', 'AUTH_USER_NOT_FOUND')
+    }
+    if (managedIdentity.banned) {
+      throw repositoryError(403, 'Tài khoản đã bị khóa trên Neon Auth', 'AUTH_USER_BANNED')
+    }
+
+    const email = String(managedIdentity.email || '').trim().toLowerCase()
+    const name = String(managedIdentity.name || email.split('@')[0] || 'Thành viên QuadPro').trim().slice(0, 60)
+    const authRole = managedIdentity.role === 'admin' ? 'admin' : 'customer'
+    const emailVerified = managedIdentity.email_verified === true
+    if (!email) throw repositoryError(401, 'Tài khoản Neon Auth thiếu email', 'INVALID_AUTH_IDENTITY')
+
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth:${authUserId}`])
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth-email:${email}`])
 
@@ -399,7 +414,7 @@ export async function syncUserFromAuth(identity) {
       if (legacyUser.role === 'admin' && authRole !== 'admin') {
         throw repositoryError(403, 'Hãy cấp quyền admin cho tài khoản này trong Neon trước khi liên kết', 'ADMIN_LINK_REQUIRES_NEON_ROLE')
       }
-      if (legacyUser.role !== 'admin' && !identity.emailVerified) {
+      if (legacyUser.role !== 'admin' && !emailVerified) {
         throw repositoryError(409, 'Hãy xác minh email trong Neon Auth trước khi liên kết tài khoản cũ', 'EMAIL_VERIFICATION_REQUIRED')
       }
 

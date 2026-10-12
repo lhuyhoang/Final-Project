@@ -103,13 +103,8 @@ const authenticate = asyncHandler(async (req, res, next) => {
     return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' })
   }
 
-  if (payload.banned === true) return res.status(403).json({ message: 'Tài khoản đã bị khóa trên Neon Auth' })
   const user = await syncUserFromAuth({
-    authUserId: payload.sub || payload.id,
-    email: payload.email,
-    name: payload.name,
-    emailVerified: payload.emailVerified === true,
-    role: payload.role
+    authUserId: payload.sub || payload.id
   })
   if (!user || user.status !== 'active') return res.status(401).json({ message: 'Tài khoản không còn hoạt động' })
   req.user = safeUser(user)
