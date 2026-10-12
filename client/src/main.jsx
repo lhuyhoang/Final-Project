@@ -1829,7 +1829,13 @@ function App() {
           </div>
           <div>
             <h3>Hỗ trợ khách hàng</h3>
-            <a>Hướng dẫn mua hàng</a>
+            <a
+              href="/documents/huong-dan-mua-hang-quadshop.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Hướng dẫn mua hàng
+            </a>
             <a>Chính sách bảo hành</a>
             <a>Chính sách đổi trả</a>
             <a>Vận chuyển & thanh toán</a>
