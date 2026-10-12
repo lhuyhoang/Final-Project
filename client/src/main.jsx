@@ -35,6 +35,7 @@ import {
   Microchip,
   Monitor,
   MonitorUp,
+  Moon,
   Mouse,
   RefreshCcw,
   Search,
@@ -46,6 +47,7 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Star,
+  Sun,
   Trash2,
   Truck,
   UserRound,
@@ -62,6 +64,20 @@ import AuthModal from "./components/AuthModal";
 import ProductDetail from "./components/ProductDetail";
 import "./styles.css";
 import "./admin.css";
+
+const THEME_KEY = "quadpro-theme";
+
+function loadTheme() {
+  try {
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  } catch {
+    // Use the operating-system preference when storage is unavailable.
+  }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 const formatPrice = (value) =>
   new Intl.NumberFormat("vi-VN").format(value) + "₫";
@@ -824,6 +840,7 @@ function CategoryCatalog({
 }
 
 function App() {
+  const [theme, setTheme] = useState(loadTheme);
   const [products, setProducts] = useState(fallbackProducts);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tất cả");
@@ -850,6 +867,20 @@ function App() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const categoryMenuTimerRef = useRef(null);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // The selected theme still applies for the current session.
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  };
 
   async function refreshProducts() {
     try {
@@ -914,10 +945,11 @@ function App() {
     [],
   );
 
+  const normalizedQuery = query.trim().toLowerCase();
   const filtered = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(query.toLowerCase()) ||
-      product.brand.toLowerCase().includes(query.toLowerCase());
+    const matchesSearch = [product.name, product.brand, product.category].some(
+      (value) => String(value || "").toLowerCase().includes(normalizedQuery),
+    );
     return (
       matchesSearch &&
       (activeCategory === "Tất cả" || product.category === activeCategory)
@@ -1164,7 +1196,7 @@ function App() {
             quantity: item.quantity,
           })),
           shipping: { address: "Nhận tại showroom QuadPro" },
-          paymentMethod: "sandbox",
+          paymentMethod: "cod",
         }),
       });
       setCart([]);
@@ -1187,6 +1219,8 @@ function App() {
         onBack={leaveAdmin}
         onLogout={logout}
         onProductsChanged={refreshProducts}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -1198,6 +1232,8 @@ function App() {
         onBack={leaveAccountSettings}
         onLogout={logout}
         onUserUpdated={handleUserUpdated}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -1253,6 +1289,18 @@ function App() {
             )}
           </form>
           <div className="header-actions">
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
+              title={theme === "dark" ? "Giao diện sáng" : "Giao diện tối"}
+            >
+              {theme === "dark" ? <Sun /> : <Moon />}
+              <span>
+                Giao diện<small>{theme === "dark" ? "Sáng" : "Tối"}</small>
+              </span>
+            </button>
             <button>
               <MapPin />
               <span>
@@ -1668,25 +1716,32 @@ function App() {
               <span>SẢN PHẨM</span>
               <h2>Dành riêng cho bạn</h2>
             </div>
-            <div className="filter-tabs">
-              <button
-                className={activeCategory === "Tất cả" ? "active" : ""}
-                onClick={() => setActiveCategory("Tất cả")}
-              >
-                Tất cả
-              </button>
-              {["PC Gaming", "Laptop", "Màn hình", "VGA - Card đồ họa"].map(
-                (item) => (
-                  <button
-                    className={activeCategory === item ? "active" : ""}
-                    onClick={() => setActiveCategory(item)}
-                    key={item}
-                  >
-                    {item}
-                  </button>
-                ),
+            <form
+              className="products-search"
+              role="search"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setActiveCategory("Tất cả");
+                }}
+                placeholder="Tìm kiếm sản phẩm..."
+                aria-label="Tìm kiếm trong danh sách sản phẩm"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Xóa nội dung tìm kiếm"
+                >
+                  <X size={17} />
+                </button>
               )}
-            </div>
+            </form>
           </div>
           {filtered.length ? (
             <div className="product-category-showcase">
@@ -1871,7 +1926,7 @@ function App() {
                 {checkoutLoading
                   ? "ĐANG TẠO ĐƠN..."
                   : session
-                    ? "THANH TOÁN SANDBOX"
+                    ? "ĐẶT HÀNG"
                     : "ĐĂNG NHẬP ĐỂ THANH TOÁN"}{" "}
                 <ArrowRight size={18} />
               </button>

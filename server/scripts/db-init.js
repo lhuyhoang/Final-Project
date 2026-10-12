@@ -16,6 +16,7 @@ const {
   initializeDatabase,
   withTransaction
 } = await import('../src/db.js')
+const { ensureConfiguredAdmin } = await import('../src/admin-bootstrap.js')
 
 const databaseIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/
 
@@ -156,9 +157,9 @@ export async function importLegacyData(data) {
       await client.query(`
         INSERT INTO products (
           id, name, category, brand, price, old_price, stock, rating,
-          reviews, discount, badge, image, created_at, updated_at
+          reviews, discount, badge, policy_text, description, image, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       `, [
         id,
         product.name,
@@ -171,6 +172,8 @@ export async function importLegacyData(data) {
         asInteger(product.reviews, `product ${id} reviews`),
         asInteger(product.discount, `product ${id} discount`),
         product.badge || 'Mới',
+        product.policyText || 'Trả góp 0% • Bảo hành 36 tháng',
+        product.description || '',
         product.image,
         createdAt,
         product.updatedAt || createdAt
@@ -203,7 +206,7 @@ export async function importLegacyData(data) {
         customer.phone ?? user.phone ?? '',
         order.shipping?.address || order.shippingAddress || 'Nhận tại showroom QuadPro',
         asMoney(total, `order ${order.id} total`),
-        order.paymentMethod || 'sandbox',
+        order.paymentMethod || 'cod',
         order.status || 'pending',
         createdAt,
         order.updatedAt || createdAt
@@ -278,17 +281,20 @@ export async function initializePostgres() {
   const legacy = await readLegacyData()
   if (!legacy.data) {
     console.log(`Legacy import skipped because ${legacy.filePath} does not exist.`)
-    return
+  } else {
+    const importResult = await importLegacyData(legacy.data)
+    if (!importResult.imported) {
+      console.log('Legacy import skipped because at least one target table already contains data.')
+    } else {
+      const { users, products, orders, orderItems } = importResult.counts
+      console.log(`Imported ${users} users, ${products} products, ${orders} orders, and ${orderItems} order items.`)
+    }
   }
 
-  const importResult = await importLegacyData(legacy.data)
-  if (!importResult.imported) {
-    console.log('Legacy import skipped because at least one target table already contains data.')
-    return
-  }
-
-  const { users, products, orders, orderItems } = importResult.counts
-  console.log(`Imported ${users} users, ${products} products, ${orders} orders, and ${orderItems} order items.`)
+  const adminResult = await ensureConfiguredAdmin()
+  if (adminResult.created) console.log('Created the administrator configured through environment variables.')
+  else if (adminResult.reason === 'already-exists') console.log('Configured administrator already exists.')
+  else console.log('Administrator bootstrap skipped because ADMIN_EMAIL and ADMIN_PASSWORD are not configured.')
 }
 
 const invokedAsScript = process.argv[1]

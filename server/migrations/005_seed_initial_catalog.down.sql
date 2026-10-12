@@ -1,0 +1,1 @@
+-- The initial catalog is retained to avoid deleting products edited by administrators.

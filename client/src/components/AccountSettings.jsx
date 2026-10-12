@@ -6,11 +6,13 @@ import {
   KeyRound,
   LoaderCircle,
   LogOut,
+  Moon,
   PackageOpen,
   Save,
   Settings,
   ShieldCheck,
   ShoppingBag,
+  Sun,
   UserRound
 } from 'lucide-react'
 import { api } from '../api'
@@ -83,7 +85,7 @@ const formatDate = value => new Intl.DateTimeFormat('vi-VN', {
   timeStyle: 'short'
 }).format(new Date(value))
 
-export default function AccountSettings({ session, onBack, onLogout, onUserUpdated }) {
+export default function AccountSettings({ session, onBack, onLogout, onUserUpdated, theme, onToggleTheme }) {
   const [activeTab, setActiveTab] = useState('profile')
   const [profile, setProfile] = useState(() => profileFromUser(session.user))
   const [profileLoading, setProfileLoading] = useState(false)
@@ -188,9 +190,14 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
           <Settings size={17}/>
           Trung tâm tài khoản
         </div>
-        <button className="account-back" type="button" onClick={onBack}>
-          <ArrowLeft size={17}/> Tiếp tục mua sắm
-        </button>
+        <div className="account-topbar-actions">
+          <button className="account-theme-toggle" type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} title={theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}>
+            {theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}
+          </button>
+          <button className="account-back" type="button" onClick={onBack}>
+            <ArrowLeft size={17}/> Tiếp tục mua sắm
+          </button>
+        </div>
       </div>
 
       <main className="account-layout">

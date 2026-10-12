@@ -860,3 +860,82 @@
     animation: none !important;
   }
 }
+
+.account-topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-self: end;
+}
+
+.account-theme-toggle {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  color: #eee;
+  background: #ffffff0d;
+  border: 1px solid #ffffff1a;
+  border-radius: 9px;
+}
+
+.account-theme-toggle:hover {
+  color: #fff;
+  background: #ffffff18;
+}
+
+html[data-theme="dark"] .account-page {
+  color: #eef0f4;
+  background: radial-gradient(circle at 92% 8%, rgba(230, 51, 42, .12), transparent 25%), #101114;
+}
+
+html[data-theme="dark"] :where(.account-sidebar, .account-panel, .account-navigation) {
+  color: #eef0f4;
+  background: #1b1d22;
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] .account-navigation button {
+  color: #c7cad1;
+}
+
+html[data-theme="dark"] .account-navigation button:hover {
+  color: #fff;
+  background: #272930;
+}
+
+html[data-theme="dark"] .account-navigation button.active {
+  color: #ff6c64;
+  background: #321b1c;
+}
+
+html[data-theme="dark"] :where(.account-field input, .account-field select) {
+  color: #eef0f4;
+  background: #14161a;
+  border-color: #3a3d45;
+}
+
+html[data-theme="dark"] :where(.account-field input:focus, .account-field select:focus) {
+  background: #17191e;
+}
+
+html[data-theme="dark"] :where(.account-field > span, .account-panel-heading h1, .account-order-header strong, .account-order-item span b, .account-empty-orders h2) {
+  color: #f2f3f5;
+}
+
+html[data-theme="dark"] .account-panel-heading,
+html[data-theme="dark"] .account-order-card,
+html[data-theme="dark"] .account-order-item,
+html[data-theme="dark"] .account-navigation .account-logout {
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] :where(.account-order-header, .account-order-footer) {
+  background: #14161a;
+}
+
+@media (max-width: 760px) {
+  .account-topbar-actions .account-back {
+    display: none;
+  }
+}

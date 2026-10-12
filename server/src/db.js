@@ -210,6 +210,7 @@ export function mapProductRow(row) {
     discount: numberValue(row.discount),
     badge: row.badge,
     policyText: row.policy_text,
+    description: row.description || '',
     image: row.image
   }
 }
@@ -399,9 +400,9 @@ export async function createProduct(input) {
   const result = await query(`
     INSERT INTO products (
       name, category, brand, price, old_price, stock, rating, reviews,
-      discount, badge, policy_text, image, created_at, updated_at
+      discount, badge, policy_text, description, image, created_at, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     RETURNING *
   `, [
     input.name,
@@ -415,6 +416,7 @@ export async function createProduct(input) {
     input.discount ?? 0,
     input.badge || 'Mới',
     input.policyText || DEFAULT_PRODUCT_POLICY_TEXT,
+    input.description || '',
     input.image,
     createdAt,
     input.updatedAt || createdAt
@@ -435,6 +437,7 @@ export async function updateProduct(id, updates = {}) {
     discount: 'discount',
     badge: 'badge',
     policyText: 'policy_text',
+    description: 'description',
     image: 'image',
     createdAt: 'created_at',
     updatedAt: 'updated_at'
@@ -559,7 +562,7 @@ async function generateOrderId(client) {
 export async function createOrder(input) {
   const requestedItems = normalizeRequestedItems(input.items)
   const status = input.status || 'pending'
-  const paymentMethod = ['cod', 'sandbox'].includes(input.paymentMethod) ? input.paymentMethod : 'sandbox'
+  const paymentMethod = 'cod'
   if (!ORDER_STATUSES.includes(status)) throw repositoryError(400, 'Trạng thái đơn hàng không hợp lệ', 'INVALID_ORDER_STATUS')
 
   return withTransaction(async client => {

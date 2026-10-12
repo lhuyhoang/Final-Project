@@ -425,16 +425,6 @@
   opacity: .65;
 }
 
-.demo-login {
-  display: block;
-  margin: 12px auto 0;
-  color: #777;
-  font-size: 9px;
-  text-decoration: underline;
-  background: transparent;
-  border: 0;
-}
-
 .auth-switch {
   margin-top: 16px !important;
   color: #777 !important;
@@ -828,7 +818,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 19px;
+  position: static;
+  z-index: auto;
+  background: transparent;
   border-bottom: 1px solid #ededed;
+  box-shadow: none;
 }
 
 .admin-panel header h2,
@@ -1293,7 +1287,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 15px 22px;
+  position: static;
+  z-index: auto;
+  background: transparent;
   border-bottom: 1px solid #eaeaea;
+  box-shadow: none;
 }
 
 .product-editor > header > button {
@@ -1336,9 +1334,9 @@
 }
 
 .product-form-fields input,
-.product-form-fields select {
+.product-form-fields select,
+.product-form-fields textarea {
   width: 100%;
-  height: 40px;
   padding: 0 10px;
   color: #282a2e;
   font-size: 10px;
@@ -1348,8 +1346,21 @@
   outline: 0;
 }
 
+.product-form-fields input,
+.product-form-fields select {
+  height: 40px;
+}
+
+.product-form-fields textarea {
+  min-height: 96px;
+  padding: 10px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
 .product-form-fields input:focus,
-.product-form-fields select:focus {
+.product-form-fields select:focus,
+.product-form-fields textarea:focus {
   border-color: #e7847e;
   box-shadow: 0 0 0 3px #e6332a0d;
 }
@@ -1732,4 +1743,463 @@
   .spin {
     animation: none !important;
   }
+}
+
+/* Dark theme: authentication and administration */
+html[data-theme="dark"] {
+  --admin-bg: #101217;
+  --admin-surface: #1b1e24;
+  --admin-surface-raised: #242830;
+  --admin-border: #363b46;
+  --admin-text: #f3f5f8;
+  --admin-muted: #abb1bc;
+  --admin-accent: #ff6b63;
+  --admin-primary: #bd211b;
+  --admin-primary-hover: #991914;
+}
+
+html[data-theme="dark"] :where(.account-menu, .auth-modal, .admin-topbar, .admin-stat, .admin-panel, .product-editor) {
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .account-menu::before {
+  background: #1b1d22;
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] .account-menu > div,
+html[data-theme="dark"] .auth-tabs,
+html[data-theme="dark"] .auth-content label > div,
+html[data-theme="dark"] .product-form-fields input,
+html[data-theme="dark"] .product-form-fields select,
+html[data-theme="dark"] .product-form-fields textarea,
+html[data-theme="dark"] .product-image-upload > label,
+html[data-theme="dark"] .product-preview > div {
+  color: #e7e9ed;
+  background: #14161a;
+  border-color: #373a42;
+}
+
+html[data-theme="dark"] :where(.auth-content input, .list-actions input) {
+  color: #eef0f4;
+  background: transparent;
+}
+
+html[data-theme="dark"] :where(.auth-content > h2, .admin-topbar h1, .admin-stat strong, .admin-panel header h2, .product-editor header h2, .admin-product-cell b, .account-cell b) {
+  color: #f6f7f9;
+}
+
+html[data-theme="dark"] .admin-shell,
+html[data-theme="dark"] .admin-main {
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+html[data-theme="dark"] :where(
+  .admin-topbar > div:first-child > span,
+  .admin-panel header > div > span,
+  .list-header > div > span,
+  .product-editor header > div > span
+) {
+  color: var(--admin-accent);
+}
+
+html[data-theme="dark"] .admin-top-actions button {
+  color: #d8dbe1;
+  background: var(--admin-surface-raised);
+  border-color: #414651;
+}
+
+html[data-theme="dark"] .admin-top-actions button:hover {
+  color: #fff;
+  background: #30343d;
+  border-color: var(--admin-accent);
+}
+
+html[data-theme="dark"] :where(.admin-primary, .product-editor footer .primary) {
+  color: #fff;
+  background: var(--admin-primary);
+}
+
+html[data-theme="dark"] :where(.admin-primary, .product-editor footer .primary):hover {
+  background: var(--admin-primary-hover);
+}
+
+html[data-theme="dark"] .admin-sidebar nav button b {
+  background: var(--admin-primary);
+}
+
+html[data-theme="dark"] :where(.admin-user > div, .account-cell > div) {
+  background: linear-gradient(135deg, #c82a23, #78120f);
+}
+
+html[data-theme="dark"] .admin-mobile-nav {
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .admin-mobile-nav button {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .admin-mobile-nav button.active {
+  color: var(--admin-accent);
+  border-bottom-color: var(--admin-accent);
+}
+
+html[data-theme="dark"] .admin-alert {
+  color: #ffb0aa;
+  background: #3b2022;
+  border-color: #713237;
+}
+
+html[data-theme="dark"] :where(.admin-loading, .panel-empty, .table-empty) {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] :where(.admin-stat span, .admin-stat small, .chart-column small, .stock-row small) {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .admin-stat-icon {
+  color: #ff8b84;
+  background: #442326;
+}
+
+html[data-theme="dark"] .admin-stat.blue .admin-stat-icon {
+  color: #8fc5ff;
+  background: #193654;
+}
+
+html[data-theme="dark"] .admin-stat.green .admin-stat-icon {
+  color: #7edbad;
+  background: #173d30;
+}
+
+html[data-theme="dark"] .admin-stat.amber .admin-stat-icon {
+  color: #ffd278;
+  background: #473716;
+}
+
+html[data-theme="dark"] .admin-panel > header,
+html[data-theme="dark"] .stock-row {
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .revenue-chart {
+  background-image: linear-gradient(#ffffff12 1px, transparent 1px);
+}
+
+html[data-theme="dark"] .stock-row b {
+  color: var(--admin-text);
+}
+
+html[data-theme="dark"] :where(.admin-panel > header > button, .stock-panel header button) {
+  color: var(--admin-accent);
+}
+
+html[data-theme="dark"] .stock-row > strong {
+  color: #ffd278;
+  background: #493714;
+}
+
+html[data-theme="dark"] .stock-row > strong.critical {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .admin-table-wrap tbody tr:hover {
+  background: var(--admin-surface-raised);
+}
+
+html[data-theme="dark"] .admin-table-wrap th {
+  color: #aeb2bb;
+  background: #14161a;
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] .admin-table-wrap td {
+  color: #c8cbd2;
+  border-color: #34363d;
+}
+
+html[data-theme="dark"] :where(
+  .admin-table-wrap td > strong,
+  .admin-table-wrap td > b,
+  .customer-cell b
+) {
+  color: #f5f6f8;
+}
+
+html[data-theme="dark"] .products-table td del {
+  color: #858993;
+}
+
+html[data-theme="dark"] .admin-product-cell img {
+  border-color: #3a3d45;
+}
+
+html[data-theme="dark"] .row-actions button {
+  color: #c5c8cf;
+  background: var(--admin-surface-raised);
+}
+
+html[data-theme="dark"] .row-actions button:hover {
+  color: #91c7ff;
+  background: #183a5c;
+}
+
+html[data-theme="dark"] .row-actions button.danger:hover {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .list-actions label {
+  color: var(--admin-muted);
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .list-actions label:focus-within {
+  color: var(--admin-accent);
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px #ff6b6322;
+}
+
+html[data-theme="dark"] :where(.status-badge, .status-select) {
+  color: #ffd278;
+  background-color: #493714;
+}
+
+html[data-theme="dark"] :where(.status-confirmed, .status-select.status-confirmed) {
+  color: #91c7ff;
+  background-color: #183a5c;
+}
+
+html[data-theme="dark"] :where(.status-processing, .status-select.status-processing) {
+  color: #d1b2ff;
+  background-color: #38275a;
+}
+
+html[data-theme="dark"] :where(.status-shipping, .status-select.status-shipping) {
+  color: #8cdeed;
+  background-color: #16404a;
+}
+
+html[data-theme="dark"] :where(.status-delivered, .status-select.status-delivered) {
+  color: #83dfb1;
+  background-color: #174635;
+}
+
+html[data-theme="dark"] :where(.status-cancelled, .status-select.status-cancelled) {
+  color: #ffaaa4;
+  background-color: #542326;
+}
+
+html[data-theme="dark"] .status-select option {
+  color: var(--admin-text);
+  background: var(--admin-surface-raised);
+}
+
+html[data-theme="dark"] .stock-count {
+  color: #83dfb1;
+  background: #174635;
+}
+
+html[data-theme="dark"] .stock-count.low {
+  color: #ffd278;
+  background: #493714;
+}
+
+html[data-theme="dark"] .stock-count.critical {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .role-badge.customer {
+  color: #c8ced8;
+  background: #303640;
+}
+
+html[data-theme="dark"] :where(.role-badge.admin, .account-status.blocked) {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .account-status.active {
+  color: #83dfb1;
+  background: #174635;
+}
+
+html[data-theme="dark"] .account-toggle {
+  color: #d0d3da;
+  background: var(--admin-surface-raised);
+}
+
+html[data-theme="dark"] .account-toggle:hover:not(:disabled) {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] :where(.product-form-fields label > span, .product-image-upload > span) {
+  color: #d6d9df;
+}
+
+html[data-theme="dark"] :where(.product-form-fields input, .product-form-fields select, .product-form-fields textarea) {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] :where(.product-form-fields input, .product-form-fields select, .product-form-fields textarea, .product-image-upload > label):focus-visible {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px #ff6b6322;
+}
+
+html[data-theme="dark"] .product-image-upload > label:hover {
+  color: #ffaaa4;
+  background: #342124;
+  border-color: var(--admin-accent);
+}
+
+html[data-theme="dark"] .product-preview {
+  color: var(--admin-text);
+  background: #15181d;
+}
+
+html[data-theme="dark"] :where(.product-preview > span, .product-image-upload > small) {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .product-editor > header > button,
+html[data-theme="dark"] .product-editor footer .secondary {
+  color: #d0d3da;
+  background: var(--admin-surface-raised);
+}
+
+html[data-theme="dark"] .product-editor > header > button:hover {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .admin-form-error {
+  color: #ffb0aa;
+  background: #3b2022;
+  border-color: #713237;
+}
+
+html[data-theme="dark"] .product-editor > header,
+html[data-theme="dark"] .product-editor form > footer {
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .admin-shell :where(button, input, select, label):focus-visible {
+  outline: 2px solid #ff8b84;
+  outline-offset: 2px;
+}
+
+.admin-theme-toggle {
+  color: var(--red) !important;
+}
+
+html[data-theme="dark"] .admin-theme-toggle {
+  color: var(--admin-accent) !important;
+}
+
+/* Keep the admin theme self-contained so every tab updates immediately. */
+.admin-shell.admin-theme-dark {
+  --admin-bg: #101217;
+  --admin-surface: #1b1e24;
+  --admin-surface-raised: #242830;
+  --admin-border: #363b46;
+  --admin-text: #f3f5f8;
+  --admin-muted: #abb1bc;
+  --admin-accent: #ff6b63;
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+.admin-shell.admin-theme-dark .admin-main {
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+.admin-shell.admin-theme-dark[data-admin-tab="overview"] :where(
+  .admin-stat,
+  .admin-panel
+),
+.admin-shell.admin-theme-dark[data-admin-tab="orders"] .admin-list-panel {
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark[data-admin-tab="overview"] :where(
+  .admin-stat strong,
+  .admin-panel h2,
+  .stock-row b,
+  .admin-table-wrap td > b,
+  .admin-table-wrap td > strong
+),
+.admin-shell.admin-theme-dark[data-admin-tab="orders"] :where(
+  .admin-list-panel h2,
+  .customer-cell b,
+  .admin-table-wrap td > b,
+  .admin-table-wrap td > strong
+) {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark[data-admin-tab="overview"] :where(
+  .admin-stat span,
+  .admin-stat small,
+  .chart-column small,
+  .stock-row small
+),
+.admin-shell.admin-theme-dark[data-admin-tab="orders"] :where(
+  .admin-table-wrap td,
+  .customer-cell small
+) {
+  color: var(--admin-muted);
+}
+
+.admin-shell.admin-theme-dark :where(
+  .admin-panel > header,
+  .stock-row,
+  .admin-table-wrap th,
+  .admin-table-wrap td
+) {
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .admin-table-wrap th {
+  color: #aeb2bb;
+  background: #14161a;
+}
+
+.admin-shell.admin-theme-dark .admin-table-wrap tbody tr:hover {
+  background: var(--admin-surface-raised);
+}
+
+.admin-shell.admin-theme-dark .revenue-chart {
+  background-color: var(--admin-surface);
+  background-image: linear-gradient(#ffffff12 1px, transparent 1px);
+}
+
+.admin-shell.admin-theme-dark .list-actions label {
+  color: var(--admin-muted);
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .list-actions input {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark :where(
+  .admin-panel header > div > span,
+  .list-header > div > span,
+  .admin-panel > header > button
+) {
+  color: var(--admin-accent);
 }

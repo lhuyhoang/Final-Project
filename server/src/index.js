@@ -1,12 +1,13 @@
 import 'dotenv/config'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import bcrypt from 'bcryptjs'
 import cors from 'cors'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import jwt from 'jsonwebtoken'
+import { ensureConfiguredAdmin } from './admin-bootstrap.js'
 import {
   DEFAULT_PRODUCT_POLICY_TEXT,
   ORDER_STATUSES,
@@ -30,7 +31,12 @@ import {
 
 const app = express()
 const PORT = process.env.PORT || 4000
-const JWT_SECRET = process.env.JWT_SECRET || 'development-only-secret-change-me'
+const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)
+const configuredJwtSecret = String(process.env.JWT_SECRET || '').trim()
+if (isProduction && configuredJwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must contain at least 32 characters in production')
+}
+const JWT_SECRET = configuredJwtSecret || 'development-only-secret-change-me'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 app.use(helmet({ contentSecurityPolicy: false }))
@@ -41,6 +47,24 @@ app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true,
 const authLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: true, legacyHeaders: false })
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 const httpError = (status, message) => Object.assign(new Error(message), { status })
+let databaseReadyPromise
+const ensureDatabaseReady = () => {
+  if (!databaseReadyPromise) {
+    databaseReadyPromise = initializeDatabase()
+      .then(() => ensureConfiguredAdmin())
+      .catch(error => {
+        databaseReadyPromise = null
+        throw error
+      })
+  }
+  return databaseReadyPromise
+}
+
+app.use('/api', asyncHandler(async (req, res, next) => {
+  await ensureDatabaseReady()
+  next()
+}))
+
 const safeUser = user => ({
   id: user.id,
   name: user.name,
@@ -122,6 +146,11 @@ function normalizeProduct(body = {}, current = {}) {
     if (!Number.isFinite(value) || value < minimum) throw httpError(400, `${key} không hợp lệ`)
     return value
   }
+  const optionalText = (key, max) => {
+    const value = String(body[key] ?? current[key] ?? '').trim()
+    if (value.length > max) throw httpError(400, `${key} không được vượt quá ${max} ký tự`)
+    return value
+  }
 
   const price = Math.round(number('price', 1))
   const oldPrice = Math.round(number('oldPrice', 1))
@@ -150,6 +179,7 @@ function normalizeProduct(body = {}, current = {}) {
     discount: oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0,
     badge: String(body.badge ?? current.badge ?? 'Mới').trim().slice(0, 40) || 'Mới',
     policyText: text('policyText', 120, DEFAULT_PRODUCT_POLICY_TEXT),
+    description: optionalText('description', 2000),
     image
   }
 }
@@ -283,8 +313,10 @@ app.patch('/api/admin/users/:id/status', asyncHandler(async (req, res) => {
 }))
 
 const clientDist = path.resolve(__dirname, '../../client/dist')
-app.use(express.static(clientDist))
-app.get('*', (req, res, next) => req.path.startsWith('/api') ? next() : res.sendFile(path.join(clientDist, 'index.html')))
+if (!process.env.VERCEL) {
+  app.use(express.static(clientDist))
+  app.get('*', (req, res, next) => req.path.startsWith('/api') ? next() : res.sendFile(path.join(clientDist, 'index.html')))
+}
 app.use((_, res) => res.status(404).json({ message: 'API endpoint không tồn tại' }))
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error)
@@ -295,7 +327,7 @@ app.use((error, req, res, next) => {
 
 async function startServer() {
   try {
-    await initializeDatabase()
+    await ensureDatabaseReady()
     app.listen(PORT, () => console.log(`QuadPro API running on http://localhost:${PORT}`))
   } catch (error) {
     console.error(`Unable to start QuadPro API: ${error.message}`)
@@ -303,4 +335,9 @@ async function startServer() {
   }
 }
 
-startServer()
+const invokedAsScript = process.argv[1]
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+
+if (invokedAsScript) startServer()
+
+export default app

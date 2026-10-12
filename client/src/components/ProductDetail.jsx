@@ -20,6 +20,64 @@ import {
 const formatPrice = (value) =>
   new Intl.NumberFormat("vi-VN").format(value || 0) + "₫";
 
+const normalizeRecommendationText = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+function getNameSimilarity(firstName, secondName) {
+  const firstTokens = new Set(
+    normalizeRecommendationText(firstName).split(" ").filter((token) => token.length > 1),
+  );
+  const secondTokens = new Set(
+    normalizeRecommendationText(secondName).split(" ").filter((token) => token.length > 1),
+  );
+  if (!firstTokens.size || !secondTokens.size) return 0;
+  const sharedTokens = [...firstTokens].filter((token) => secondTokens.has(token)).length;
+  return sharedTokens / Math.min(firstTokens.size, secondTokens.size);
+}
+
+function getRelatedProducts(product, products, limit = 4) {
+  const productPrice = Math.max(Number(product.price) || 0, 1);
+  const productCategory = normalizeRecommendationText(product.category);
+  const productBrand = normalizeRecommendationText(product.brand);
+
+  return products
+    .filter((item) => item.id !== product.id)
+    .map((item) => {
+      const sameCategory = normalizeRecommendationText(item.category) === productCategory;
+      const sameBrand = normalizeRecommendationText(item.brand) === productBrand;
+      const nameSimilarity = getNameSimilarity(product.name, item.name);
+      const priceDifference = Math.abs((Number(item.price) || 0) - productPrice) / productPrice;
+      const priceScore = Math.max(0, 40 - priceDifference * 65);
+      const highPriceDifferencePenalty = priceDifference > 0.6
+        ? (priceDifference - 0.6) * 70
+        : 0;
+
+      return {
+        product: item,
+        priceDifference,
+        score:
+          (sameCategory ? 60 : 0) +
+          (sameBrand ? 45 : 0) +
+          nameSimilarity * 35 +
+          priceScore -
+          highPriceDifferencePenalty,
+      };
+    })
+    .sort((first, second) =>
+      second.score - first.score ||
+      first.priceDifference - second.priceDifference ||
+      (Number(second.product.rating) || 0) - (Number(first.product.rating) || 0),
+    )
+    .slice(0, limit)
+    .map((item) => item.product);
+}
+
 function ProductDetailState({ loading, onBack }) {
   return (
     <section className="product-detail-state container" aria-live="polite">
@@ -117,17 +175,12 @@ export default function ProductDetail({
   const stock = stockKnown ? product.stock : 99;
   const policyText =
     product.policyText || "Trả góp 0% • Bảo hành 36 tháng";
-  const relatedProducts = [
-    ...products.filter(
-      (item) => item.id !== product.id && item.category === product.category,
-    ),
-    ...products.filter(
-      (item) => item.id !== product.id && item.category !== product.category,
-    ),
-  ].slice(0, 4);
+  const productDescription = product.description?.trim() ||
+    `${product.name} là sản phẩm chính hãng từ ${product.brand}, phù hợp cho nhu cầu thuộc nhóm ${product.category.toLowerCase()}. Sản phẩm được QuadPro kiểm tra ngoại quan và chức năng trước khi bàn giao.`;
+  const relatedProducts = getRelatedProducts(product, products);
   const specificationRows = [
     ["Mã sản phẩm", `QP-${String(product.id).padStart(5, "0")}`],
-    ["Thương hiệu", product.brand],
+    ["Thương hiệu / hãng sản xuất", product.brand],
     ["Danh mục", product.category],
     ["Giá niêm yết", formatPrice(product.oldPrice)],
     ["Giá bán", formatPrice(product.price)],
@@ -222,6 +275,7 @@ export default function ProductDetail({
 
             <div className="detail-highlights">
               <h2>Mô tả sản phẩm</h2>
+              <p>{productDescription}</p>
               <ul>
                 {highlights.map((highlight) => (
                   <li key={highlight}>
@@ -338,11 +392,7 @@ export default function ProductDetail({
           <article className="product-description-panel">
             <span className="detail-section-label">QUADPRO REVIEW</span>
             <h2>Điểm nổi bật của {product.name}</h2>
-            <p>
-              {product.name} là sản phẩm chính hãng từ {product.brand}, phù hợp
-              cho nhu cầu thuộc nhóm {product.category.toLowerCase()}. Sản phẩm
-              được QuadPro kiểm tra ngoại quan và chức năng trước khi bàn giao.
-            </p>
+            <p>{productDescription}</p>
             <ul>
               {highlights.map((highlight) => (
                 <li key={highlight}>

@@ -61,12 +61,6 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
     }
   }
 
-  function fillAdminDemo() {
-    setMode('login')
-    setForm({ ...emptyForm, email: 'admin@quadpro.vn', password: 'Admin@123' })
-    setError('')
-  }
-
   return <div className="auth-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
     <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <button className="auth-close" onClick={onClose} aria-label="Đóng"><X size={20}/></button>
@@ -99,7 +93,6 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button className="auth-submit" disabled={loading}>{loading ? 'Đang xử lý...' : mode === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẢN'}</button>
         </form>
-        {mode === 'login' && <button className="demo-login" onClick={fillAdminDemo}>Điền tài khoản quản trị demo</button>}
         <p className="auth-switch">{mode === 'login' ? 'Chưa có tài khoản?' : 'Đã là thành viên?'} <button onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}</button></p>
       </div>
     </section>

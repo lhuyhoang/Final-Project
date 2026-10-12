@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, LogOut, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories } from '../data'
 
@@ -14,9 +14,20 @@ const statusLabels = {
   cancelled: 'Đã hủy'
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
-const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText }
+const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText, description: '' }
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
+const adminTabStorageKey = 'quadpro-admin-tab'
+const validAdminTabs = new Set(['overview', 'products', 'orders', 'users'])
+
+function loadAdminTab() {
+  try {
+    const savedTab = sessionStorage.getItem(adminTabStorageKey)
+    return validAdminTabs.has(savedTab) ? savedTab : 'overview'
+  } catch {
+    return 'overview'
+  }
+}
 
 function StatusBadge({ status }) {
   return <span className={`status-badge status-${status}`}>{statusLabels[status] || status}</span>
@@ -39,7 +50,8 @@ function ProductEditor({ product, onClose, onSaved }) {
     stock: product.stock,
     image: product.image,
     badge: product.badge,
-    policyText: product.policyText || defaultPolicyText
+    policyText: product.policyText || defaultPolicyText,
+    description: product.description || ''
   } : emptyProduct)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -126,6 +138,7 @@ function ProductEditor({ product, onClose, onSaved }) {
             <label><span>Tồn kho</span><input type="number" name="stock" value={form.stock} onChange={update} min="0" required/></label>
             <label><span>Nhãn nổi bật</span><input name="badge" value={form.badge} onChange={update} maxLength="40"/></label>
             <label className="full"><span>Thông tin trả góp / bảo hành</span><input name="policyText" value={form.policyText} onChange={update} maxLength="120" required/></label>
+            <label className="full"><span>Mô tả sản phẩm</span><textarea name="description" value={form.description} onChange={update} maxLength="2000" rows="5" placeholder="Nhập đặc điểm, công dụng và thông tin nổi bật của sản phẩm..."/></label>
             <label className="full"><span>URL hình ảnh</span><input type="url" name="image" value={form.image} onChange={update} placeholder="https://..." required/></label>
             <div className="product-image-upload full">
               <span>Tải ảnh từ máy</span>
@@ -151,8 +164,8 @@ function ProductEditor({ product, onClose, onSaved }) {
   </div>
 }
 
-export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged }) {
-  const [tab, setTab] = useState('overview')
+export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, theme, onToggleTheme }) {
+  const [tab, setTab] = useState(loadAdminTab)
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
@@ -189,6 +202,14 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   }
 
   useEffect(() => { loadDashboard() }, [])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(adminTabStorageKey, tab)
+    } catch {
+      // The active tab still works when browser storage is unavailable.
+    }
+  }, [tab])
 
   function showNotice(message) {
     setNotice(message)
@@ -253,7 +274,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     { id: 'users', label: 'Khách hàng', icon: Users }
   ]
 
-  return <div className="admin-shell">
+  return <div
+    className={`admin-shell admin-theme-${theme}`}
+    data-admin-tab={tab}
+  >
     <aside className="admin-sidebar">
       <button className="admin-logo" onClick={onBack}><span>Q</span><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
       <div className="admin-nav-label">QUẢN TRỊ</div>
@@ -265,7 +289,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     <main className="admin-main">
       <header className="admin-topbar">
         <div><span>QUADPRO COMMERCE</span><h1>{navItems.find(item => item.id === tab)?.label}</h1></div>
-        <div className="admin-top-actions"><button onClick={() => loadDashboard(true)} disabled={refreshing} title="Làm mới"><RefreshCw className={refreshing ? 'spin' : ''} size={19}/></button><button onClick={onBack}><ArrowLeft size={18}/> Về cửa hàng</button></div>
+        <div className="admin-top-actions"><button onClick={() => loadDashboard(true)} disabled={refreshing} title="Làm mới"><RefreshCw className={refreshing ? 'spin' : ''} size={19}/></button><button className="admin-theme-toggle" onClick={onToggleTheme} title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}>{theme === 'dark' ? <Sun size={19}/> : <Moon size={19}/>}</button><button onClick={onBack}><ArrowLeft size={18}/> Về cửa hàng</button></div>
       </header>
 
       <div className="admin-mobile-nav">{navItems.map(item => { const Icon = item.icon; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={18}/><span>{item.label}</span></button> })}</div>
