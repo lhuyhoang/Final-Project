@@ -34,8 +34,7 @@ let neonAuthIssuer = ''
 let neonJwks
 if (neonAuthBaseUrl) {
   try {
-    new URL(neonAuthBaseUrl)
-    neonAuthIssuer = neonAuthBaseUrl
+    neonAuthIssuer = new URL(neonAuthBaseUrl).origin
     neonJwks = createRemoteJWKSet(new URL(`${neonAuthBaseUrl}/.well-known/jwks.json`))
   } catch {
     throw new Error('NEON_AUTH_BASE_URL must be a valid URL')
@@ -100,7 +99,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
     })
     payload = verified.payload
   } catch (error) {
-    console.warn(`Neon Auth token validation failed: ${error.code || error.message}`)
+    console.warn(`Neon Auth token validation failed: ${error.code || 'UNKNOWN'}: ${error.message}`)
     return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' })
   }
 

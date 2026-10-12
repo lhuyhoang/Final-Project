@@ -29,21 +29,20 @@ const requiresAuthentication = path => (
 
 async function getAccessToken() {
   const auth = requireAuthClient()
-  const tokenResult = await auth.token()
-  let token = tokenResult.data?.token || tokenResult.data?.session?.token
-  let error = tokenResult.error
+  let tokenResult = await auth.token()
 
-  // Immediately after sign-up/sign-in, the Neon adapter can serve its cached
-  // session before /token is fetched. In that response the JWT is stored on
-  // session.token instead of the top-level token field.
-  if (!token) {
-    const sessionResult = await auth.getSession()
-    token = sessionResult.data?.session?.token
-    error ||= sessionResult.error
+  // @neondatabase/auth can serve its cached session for /token immediately
+  // after sign-in. Force the real token endpoint when the expected JWT shape
+  // is absent; session.token may be an opaque Better Auth session identifier.
+  if (!tokenResult.data?.token) {
+    tokenResult = await auth.token({
+      fetchOptions: { headers: { 'X-Force-Fetch': 'true' } }
+    })
   }
 
+  const token = tokenResult.data?.token
   if (!token) {
-    const authError = new Error(error?.message || 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn')
+    const authError = new Error(tokenResult.error?.message || 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn')
     authError.status = 401
     throw authError
   }
