@@ -1,10 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories } from '../data'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+const zeroDecimalCurrencies = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'])
+const stripeStatusLabels = {
+  succeeded: 'Thành công',
+  processing: 'Đang xử lý',
+  requires_action: 'Chờ xác thực',
+  requires_capture: 'Chờ thu tiền',
+  requires_confirmation: 'Chờ xác nhận',
+  requires_payment_method: 'Chưa thanh toán',
+  canceled: 'Đã hủy'
+}
+const formatStripeAmount = ({ amount = 0, currency = 'usd' }) => new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: currency.toUpperCase(),
+  maximumFractionDigits: zeroDecimalCurrencies.has(currency.toLowerCase()) ? 0 : 2
+}).format(amount / (zeroDecimalCurrencies.has(currency.toLowerCase()) ? 1 : 100))
+const formatStripeDay = value => new Intl.DateTimeFormat('vi-VN', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))
 const statusLabels = {
   pending: 'Chờ xác nhận',
   confirmed: 'Đã xác nhận',
@@ -18,7 +34,8 @@ const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', ol
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
-const validAdminTabs = new Set(['overview', 'products', 'orders', 'online-payments', 'users'])
+const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
+const validAdminTabs = new Set(['overview', 'products', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
 
 function loadAdminTab() {
   try {
@@ -27,6 +44,30 @@ function loadAdminTab() {
   } catch {
     return 'overview'
   }
+}
+
+function loadAdminNotificationReads(userId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${adminNotificationStoragePrefix}:${userId}`) || '{}')
+    return {
+      orders: typeof saved.orders === 'string' ? saved.orders : '',
+      onlinePayments: typeof saved.onlinePayments === 'string' ? saved.onlinePayments : ''
+    }
+  } catch {
+    return { orders: '', onlinePayments: '' }
+  }
+}
+
+function isAfterLastRead(value, lastRead) {
+  if (!lastRead) return true
+  const valueTime = Date.parse(value)
+  const lastReadTime = Date.parse(lastRead)
+  return Number.isFinite(valueTime) && (!Number.isFinite(lastReadTime) || valueTime > lastReadTime)
+}
+
+function latestDate(items, field) {
+  const latestTime = Math.max(0, ...items.map(item => Date.parse(item[field])).filter(Number.isFinite))
+  return latestTime ? new Date(latestTime).toISOString() : ''
 }
 
 function StatusBadge({ status }) {
@@ -38,6 +79,11 @@ function StatCard({ icon: Icon, label, value, note, tone }) {
     <div className="admin-stat-icon"><Icon size={21}/></div>
     <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>
   </article>
+}
+
+function StripeMoneyList({ amounts, empty = '0' }) {
+  if (!amounts?.length) return <>{empty}</>
+  return <span className="stripe-money-list">{amounts.map(item => <span key={item.currency}>{formatStripeAmount(item)}</span>)}</span>
 }
 
 function ProductEditor({ product, onClose, onSaved }) {
@@ -166,10 +212,12 @@ function ProductEditor({ product, onClose, onSaved }) {
 
 export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
+  const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
   const [onlinePayments, setOnlinePayments] = useState([])
+  const [stripeOverview, setStripeOverview] = useState(null)
   const [users, setUsers] = useState([])
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
@@ -183,18 +231,24 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     silent ? setRefreshing(true) : setLoading(true)
     setError('')
     try {
-      const [statsData, productData, orderData, paymentData, userData] = await Promise.all([
+      const stripeRequest = api('/api/admin/stripe/overview')
+        .then(data => ({ data }))
+        .catch(stripeError => ({ error: stripeError }))
+      const [statsData, productData, orderData, paymentData, userData, stripeResult] = await Promise.all([
         api('/api/admin/stats'),
         api('/api/admin/products'),
         api('/api/admin/orders'),
         api('/api/admin/payments'),
-        api('/api/admin/users')
+        api('/api/admin/users'),
+        stripeRequest
       ])
+      if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
       setStats(statsData)
       setProducts(productData)
       setOrders(orderData)
       setOnlinePayments(paymentData)
       setUsers(userData)
+      setStripeOverview(stripeResult.data || { error: stripeResult.error?.message || 'Không thể tải dữ liệu Stripe Sandbox' })
     } catch (requestError) {
       setError(requestError.message)
       if (requestError.status === 401 || requestError.status === 403) onLogout()
@@ -213,6 +267,24 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       // The active tab still works when browser storage is unavailable.
     }
   }, [tab])
+
+  useEffect(() => {
+    if (loading || (tab !== 'orders' && tab !== 'online-payments')) return
+    const field = tab === 'orders' ? 'orders' : 'onlinePayments'
+    const viewedAt = tab === 'orders' ? latestDate(orders, 'createdAt') : latestDate(onlinePayments, 'paidAt')
+    if (!viewedAt) return
+
+    setNotificationReads(current => {
+      if (!isAfterLastRead(viewedAt, current[field])) return current
+      const next = { ...current, [field]: viewedAt }
+      try {
+        localStorage.setItem(`${adminNotificationStoragePrefix}:${user.id}`, JSON.stringify(next))
+      } catch {
+        // Notifications still clear for this session when browser storage is unavailable.
+      }
+      return next
+    })
+  }, [loading, onlinePayments, orders, tab, user.id])
 
   function showNotice(message) {
     setNotice(message)
@@ -269,13 +341,23 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const visibleOrders = useMemo(() => orders.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email}`.toLowerCase().includes(normalizedQuery)), [orders, normalizedQuery])
   const visibleOnlinePayments = useMemo(() => onlinePayments.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email} ${order.stripePaymentIntentId || ''} ${order.stripeCheckoutSessionId || ''} ${order.vnpayTransactionNo || ''} ${order.vnpayBankCode || ''}`.toLowerCase().includes(normalizedQuery)), [onlinePayments, normalizedQuery])
   const visibleUsers = useMemo(() => users.filter(account => `${account.name} ${account.email} ${account.phone}`.toLowerCase().includes(normalizedQuery)), [users, normalizedQuery])
+  const unreadOrders = useMemo(() => orders.filter(order => order.status === 'pending' && isAfterLastRead(order.createdAt, notificationReads.orders)).length, [notificationReads.orders, orders])
+  const unreadOnlinePayments = useMemo(() => onlinePayments.filter(order => isAfterLastRead(order.paidAt, notificationReads.onlinePayments)).length, [notificationReads.onlinePayments, onlinePayments])
   const maxRevenue = Math.max(1, ...(stats?.revenueSeries || []).map(item => item.value))
+  const stripeGross = stripeOverview?.summary?.gross || []
+  const stripePrimaryCurrency = stripeGross[0]?.currency || stripeOverview?.balance?.available?.[0]?.currency || 'usd'
+  const stripeRevenueSeries = (stripeOverview?.revenueSeries || []).map(item => ({
+    ...item,
+    amount: item.amounts.find(amount => amount.currency === stripePrimaryCurrency)?.amount || 0
+  }))
+  const maxStripeRevenue = Math.max(1, ...stripeRevenueSeries.map(item => item.amount))
 
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
+    { id: 'stripe-dashboard', label: 'Stripe Sandbox', icon: WalletCards },
     { id: 'users', label: 'Khách hàng', icon: Users }
   ]
 
@@ -286,7 +368,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     <aside className="admin-sidebar">
       <button className="admin-logo" onClick={onBack}><span>Q</span><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
       <div className="admin-nav-label">QUẢN TRỊ</div>
-      <nav>{navItems.map(item => { const Icon = item.icon; const count = item.id === 'orders' ? stats?.statusCounts?.pending : item.id === 'online-payments' ? stats?.paidOnlineOrders : 0; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{count > 0 && <b>{count}</b>}</button> })}</nav>
+      <nav>{navItems.map(item => { const Icon = item.icon; const count = item.id === 'orders' ? unreadOrders : item.id === 'online-payments' ? unreadOnlinePayments : 0; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{count > 0 && <b aria-label={`${count} thông báo chưa xem`}>{count}</b>}</button> })}</nav>
       <div className="admin-user"><div>{user.name.charAt(0).toUpperCase()}</div><span><b>{user.name}</b><small>Quản trị viên</small></span></div>
       <button className="admin-logout" onClick={onLogout}><LogOut size={18}/> Đăng xuất</button>
     </aside>
@@ -332,6 +414,37 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <header className="list-header"><div><span>THANH TOÁN TRỰC TUYẾN</span><h2>{onlinePayments.length} đơn đã thanh toán</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng, mã giao dịch..."/></label></div></header>
           <div className="admin-table-wrap"><table className="online-payments-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Cổng thanh toán</th><th>Mã giao dịch</th><th>Thanh toán lúc</th><th>Doanh thu</th><th>Trạng thái đơn</th></tr></thead><tbody>{visibleOnlinePayments.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td><span className={`payment-provider-badge ${order.paymentMethod}`}>{order.paymentMethod === 'vnpay' ? 'VNPay' : 'Stripe'}</span></td><td><code>{order.vnpayTransactionNo || order.stripePaymentIntentId || order.stripeCheckoutSessionId}</code><span className="payment-paid-badge">Đã thanh toán</span></td><td>{formatDate(order.paidAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table>{!visibleOnlinePayments.length && <div className="table-empty">Chưa có đơn thanh toán online phù hợp.</div>}</div>
         </section>}
+
+        {tab === 'stripe-dashboard' && <div className="stripe-admin-dashboard">
+          <section className="admin-panel stripe-dashboard-heading">
+            <header><div><span>STRIPE COMMERCE</span><h2>Tổng quan thanh toán Stripe</h2></div><div className="stripe-heading-actions"><span className={stripeOverview?.livemode ? 'live' : 'sandbox'}>{stripeOverview?.livemode ? 'LIVE MODE' : 'SANDBOX'}</span><a href="https://dashboard.stripe.com/test/dashboard" target="_blank" rel="noreferrer">Mở Stripe Dashboard <ExternalLink size={14}/></a></div></header>
+          </section>
+
+          {stripeOverview?.error ? <div className="admin-panel stripe-dashboard-error"><AlertTriangle size={24}/><div><b>Không tải được Stripe Sandbox</b><span>{stripeOverview.error}</span></div></div> : !stripeOverview ? <div className="admin-loading"><RefreshCw className="spin"/><span>Đang tải dữ liệu Stripe...</span></div> : <>
+            <section className="stripe-metrics-grid">
+              <article className="stripe-metric"><div><WalletCards size={21}/></div><span>Doanh thu gộp · 7 ngày</span><strong><StripeMoneyList amounts={stripeOverview.summary.gross}/></strong><small>{stripeOverview.summary.succeeded} giao dịch thành công</small></article>
+              <article className="stripe-metric success"><div><Check size={21}/></div><span>Thanh toán thành công</span><strong>{stripeOverview.summary.succeeded}</strong><small>Trong {stripeOverview.rangeDays} ngày gần nhất</small></article>
+              <article className="stripe-metric failed"><div><X size={21}/></div><span>Thanh toán thất bại</span><strong>{stripeOverview.summary.failed}</strong><small>Không bao gồm phiên chưa hoàn tất</small></article>
+              <article className="stripe-metric refunded"><div><RefreshCw size={21}/></div><span>Đã hoàn tiền</span><strong><StripeMoneyList amounts={stripeOverview.summary.refunded}/></strong><small>Dữ liệu trực tiếp từ Stripe</small></article>
+            </section>
+
+            <section className="stripe-dashboard-grid">
+              <article className="admin-panel stripe-revenue-panel">
+                <header><div><span>GROSS VOLUME</span><h2>Doanh thu Stripe 7 ngày</h2></div><strong>{stripePrimaryCurrency.toUpperCase()}</strong></header>
+                <div className="stripe-revenue-chart">{stripeRevenueSeries.map(item => <div className="stripe-chart-column" key={item.date}><div><i style={{ height: `${Math.max(item.amount ? 10 : 2, item.amount / maxStripeRevenue * 100)}%` }}><span>{formatStripeAmount({ amount: item.amount, currency: stripePrimaryCurrency })}</span></i></div><small>{formatStripeDay(item.date)}</small></div>)}</div>
+              </article>
+              <article className="admin-panel stripe-balance-panel">
+                <header><div><span>BALANCE</span><h2>Số dư Stripe</h2></div><span className="stripe-balance-mode">{stripeOverview.livemode ? 'Live' : 'Test data'}</span></header>
+                <div className="stripe-balance-content"><div><span>Khả dụng</span><strong><StripeMoneyList amounts={stripeOverview.balance.available}/></strong><small>Có thể sử dụng hoặc chi trả</small></div><div><span>Đang chờ</span><strong><StripeMoneyList amounts={stripeOverview.balance.pending}/></strong><small>Đang chờ Stripe xử lý</small></div></div>
+              </article>
+            </section>
+
+            <section className="admin-panel stripe-transactions-panel">
+              <header><div><span>PAYMENT INTENTS</span><h2>Giao dịch Stripe gần đây</h2></div><small>Cập nhật {formatDate(stripeOverview.generatedAt)}</small></header>
+              <div className="admin-table-wrap"><table className="stripe-transactions-table"><thead><tr><th>Giao dịch</th><th>Đơn hàng</th><th>Khách hàng</th><th>Thẻ</th><th>Thời gian</th><th>Số tiền</th><th>Trạng thái</th></tr></thead><tbody>{stripeOverview.recentPayments.map(payment => <tr key={payment.id}><td><code title={payment.id}>{payment.id}</code></td><td>{payment.orderId ? <b>#{payment.orderId}</b> : '—'}</td><td>{payment.email || 'Chưa có email'}</td><td>{payment.card ? `${payment.card.brand.toUpperCase()} •••• ${payment.card.last4}` : '—'}</td><td>{formatDate(payment.createdAt)}</td><td><strong>{formatStripeAmount(payment)}</strong></td><td><span className={`stripe-payment-status ${payment.failed ? 'failed' : payment.status}`}>{payment.failed ? 'Thất bại' : stripeStatusLabels[payment.status] || payment.status}</span></td></tr>)}</tbody></table>{!stripeOverview.recentPayments.length && <div className="table-empty">Chưa có giao dịch Stripe trong 7 ngày gần nhất.</div>}</div>
+            </section>
+          </>}
+        </div>}
 
         {tab === 'users' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>THÀNH VIÊN</span><h2>{users.length} tài khoản</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, email, số điện thoại..."/></label></div></header>

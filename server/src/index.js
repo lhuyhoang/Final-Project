@@ -76,6 +76,113 @@ function requireStripe() {
   return stripe
 }
 
+async function listStripePaymentIntents(stripeClient, createdGte) {
+  const paymentIntents = []
+  let startingAfter
+
+  for (let pageNumber = 0; pageNumber < 5; pageNumber += 1) {
+    const page = await stripeClient.paymentIntents.list({
+      created: { gte: createdGte },
+      expand: ['data.latest_charge'],
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {})
+    })
+    paymentIntents.push(...page.data)
+    if (!page.has_more || !page.data.length) break
+    startingAfter = page.data.at(-1).id
+  }
+
+  return paymentIntents
+}
+
+function addStripeAmount(amounts, currency, amount) {
+  if (!(amounts instanceof Map)) return
+  const normalizedCurrency = String(currency || '').toLowerCase()
+  if (!normalizedCurrency || !Number.isFinite(amount)) return
+  amounts.set(normalizedCurrency, (amounts.get(normalizedCurrency) || 0) + amount)
+}
+
+function serializeStripeAmounts(amounts) {
+  return [...amounts.entries()].map(([currency, amount]) => ({ currency, amount }))
+}
+
+function stripeDateKey(timestamp) {
+  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+async function getStripeAdminOverview() {
+  const stripeClient = requireStripe()
+  const now = new Date()
+  const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6))
+  const createdGte = Math.floor(firstDay.getTime() / 1000)
+
+  const [balance, paymentIntents] = await Promise.all([
+    stripeClient.balance.retrieve(),
+    listStripePaymentIntents(stripeClient, createdGte)
+  ])
+
+  const gross = new Map()
+  const refunded = new Map()
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(firstDay)
+    date.setUTCDate(firstDay.getUTCDate() + index)
+    return { date: date.toISOString().slice(0, 10), amounts: new Map() }
+  })
+  const dayLookup = new Map(days.map(day => [day.date, day]))
+  let succeeded = 0
+  let failed = 0
+
+  for (const paymentIntent of paymentIntents) {
+    const charge = typeof paymentIntent.latest_charge === 'object' ? paymentIntent.latest_charge : null
+    if (paymentIntent.status === 'succeeded') {
+      succeeded += 1
+      const received = Number(paymentIntent.amount_received || paymentIntent.amount || 0)
+      addStripeAmount(gross, paymentIntent.currency, received)
+      addStripeAmount(dayLookup.get(stripeDateKey(paymentIntent.created))?.amounts, paymentIntent.currency, received)
+      addStripeAmount(refunded, paymentIntent.currency, Number(charge?.amount_refunded || 0))
+    } else if (paymentIntent.status === 'canceled' || paymentIntent.last_payment_error) {
+      failed += 1
+    }
+  }
+
+  return {
+    configured: true,
+    livemode: Boolean(balance.livemode),
+    generatedAt: new Date().toISOString(),
+    rangeDays: 7,
+    balance: {
+      available: balance.available.map(item => ({ currency: item.currency, amount: item.amount })),
+      pending: balance.pending.map(item => ({ currency: item.currency, amount: item.amount }))
+    },
+    summary: {
+      total: paymentIntents.length,
+      succeeded,
+      failed,
+      gross: serializeStripeAmounts(gross),
+      refunded: serializeStripeAmounts(refunded)
+    },
+    revenueSeries: days.map(day => ({
+      date: day.date,
+      amounts: serializeStripeAmounts(day.amounts)
+    })),
+    recentPayments: paymentIntents.slice(0, 12).map(paymentIntent => {
+      const charge = typeof paymentIntent.latest_charge === 'object' ? paymentIntent.latest_charge : null
+      const card = charge?.payment_method_details?.card
+      return {
+        id: paymentIntent.id,
+        orderId: paymentIntent.metadata?.orderId || '',
+        amount: Number(paymentIntent.amount_received || paymentIntent.amount || 0),
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
+        failed: Boolean(paymentIntent.last_payment_error),
+        email: charge?.billing_details?.email || paymentIntent.receipt_email || '',
+        card: card ? { brand: card.brand, last4: card.last4 } : null,
+        createdAt: new Date(paymentIntent.created * 1000).toISOString()
+      }
+    })
+  }
+}
+
 function requireVnpay() {
   if (!vnpayTmnCode || !vnpayHashSecret) throw httpError(503, 'VNPay Sandbox chưa được cấu hình trên máy chủ')
   try {
@@ -645,6 +752,16 @@ app.get('/api/admin/orders', asyncHandler(async (req, res) => res.json(await lis
 
 app.get('/api/admin/payments', asyncHandler(async (req, res) => {
   res.json(await listOrders({ paymentMethods: ['stripe', 'vnpay'], paymentStatus: 'paid' }))
+}))
+
+app.get('/api/admin/stripe/overview', asyncHandler(async (req, res) => {
+  try {
+    res.json(await getStripeAdminOverview())
+  } catch (error) {
+    if (error.status) throw error
+    console.error('Unable to load Stripe admin overview:', error)
+    throw httpError(502, 'Không thể tải dữ liệu Stripe Sandbox')
+  }
 }))
 
 app.patch('/api/admin/orders/:id/status', asyncHandler(async (req, res) => {

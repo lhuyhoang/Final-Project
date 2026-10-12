@@ -2368,3 +2368,341 @@ html[data-theme="dark"] .auth-tabs button.active {
   background: #173753;
   color: #9bcfff;
 }
+
+/* Stripe Sandbox dashboard */
+.stripe-admin-dashboard {
+  display: grid;
+  gap: 14px;
+}
+
+.stripe-dashboard-heading > header {
+  border-bottom: 0;
+}
+
+.stripe-heading-actions,
+.stripe-heading-actions a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stripe-heading-actions > span {
+  padding: 5px 8px;
+  color: #5543d8;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .5px;
+  background: #eeebff;
+  border-radius: 999px;
+}
+
+.stripe-heading-actions > span.live {
+  color: #9c211b;
+  background: #ffe8e6;
+}
+
+.stripe-heading-actions a {
+  padding: 8px 10px;
+  color: #4338ca;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: none;
+  background: #f4f2ff;
+  border: 1px solid #ddd8ff;
+  border-radius: 7px;
+}
+
+.stripe-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stripe-metric {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 39px minmax(0, 1fr);
+  column-gap: 11px;
+  align-items: center;
+  padding: 17px;
+  background: #fff;
+  border: 1px solid #e7e7e7;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px #1f28330a;
+}
+
+.stripe-metric > div {
+  display: grid;
+  grid-row: 1 / 4;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  color: #635bff;
+  background: #efedff;
+  border-radius: 10px;
+}
+
+.stripe-metric.success > div { color: #168655; background: #e9f8f0; }
+.stripe-metric.failed > div { color: #c52c25; background: #ffecea; }
+.stripe-metric.refunded > div { color: #8a5a00; background: #fff3da; }
+
+.stripe-metric > span,
+.stripe-metric > strong,
+.stripe-metric > small {
+  min-width: 0;
+}
+
+.stripe-metric > span {
+  color: #858991;
+  font-size: 8px;
+}
+
+.stripe-metric > strong {
+  margin: 4px 0 3px;
+  overflow: hidden;
+  color: #202126;
+  font-size: clamp(16px, 1.5vw, 22px);
+  text-overflow: ellipsis;
+}
+
+.stripe-metric > small {
+  overflow: hidden;
+  color: #9a9da4;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stripe-money-list {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stripe-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, .75fr);
+  gap: 14px;
+}
+
+.stripe-revenue-panel > header > strong {
+  color: #635bff;
+  font-size: 11px;
+}
+
+.stripe-revenue-chart {
+  display: flex;
+  height: 230px;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 27px 25px 17px;
+  background-image: linear-gradient(#f0f0f2 1px, transparent 1px);
+  background-size: 100% 43px;
+}
+
+.stripe-chart-column {
+  display: flex;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.stripe-chart-column > div {
+  position: relative;
+  width: min(34px, 68%);
+  height: calc(100% - 20px);
+}
+
+.stripe-chart-column i {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: 3px;
+  background: linear-gradient(#7b73ff, #5148e5);
+  border-radius: 5px 5px 2px 2px;
+  transition: height .35s ease;
+}
+
+.stripe-chart-column i span {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  z-index: 2;
+  display: none;
+  padding: 4px 6px;
+  color: #fff;
+  font-size: 7px;
+  font-style: normal;
+  white-space: nowrap;
+  background: #252525;
+  border-radius: 4px;
+  transform: translateX(-50%);
+}
+
+.stripe-chart-column i:hover span {
+  display: block;
+}
+
+.stripe-chart-column small {
+  color: #96989d;
+  font-size: 8px;
+  text-transform: capitalize;
+}
+
+.stripe-balance-mode {
+  color: #7068e8;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.stripe-balance-content {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.stripe-balance-content > div {
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  background: #f8f8fb;
+  border: 1px solid #eeeeF5;
+  border-radius: 9px;
+}
+
+.stripe-balance-content span,
+.stripe-balance-content small {
+  color: #8b8e96;
+  font-size: 8px;
+}
+
+.stripe-balance-content strong {
+  color: #24252a;
+  font-size: 20px;
+}
+
+.stripe-transactions-panel > header > small {
+  color: #92959c;
+  font-size: 8px;
+}
+
+.stripe-transactions-table code {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  color: #5147d9;
+  font-size: 8px;
+  text-overflow: ellipsis;
+}
+
+.stripe-payment-status {
+  display: inline-flex;
+  padding: 5px 8px;
+  color: #766000;
+  font-size: 8px;
+  font-weight: 750;
+  background: #fff4d8;
+  border-radius: 999px;
+}
+
+.stripe-payment-status.succeeded { color: #15754b; background: #e5f7ee; }
+.stripe-payment-status.failed,
+.stripe-payment-status.canceled { color: #a12620; background: #ffe8e6; }
+.stripe-payment-status.processing { color: #245fa7; background: #eaf2ff; }
+
+.stripe-dashboard-error {
+  display: flex;
+  min-height: 150px;
+  gap: 13px;
+  align-items: center;
+  justify-content: center;
+  color: #9c211b;
+}
+
+.stripe-dashboard-error div,
+.stripe-dashboard-error b,
+.stripe-dashboard-error span {
+  display: block;
+}
+
+.stripe-dashboard-error span {
+  margin-top: 5px;
+  color: #767a82;
+  font-size: 9px;
+}
+
+.admin-shell.admin-theme-dark :where(.stripe-metric) {
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .stripe-metric > strong,
+.admin-shell.admin-theme-dark .stripe-balance-content strong {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark :where(.stripe-metric > span, .stripe-metric > small, .stripe-chart-column small, .stripe-balance-content span, .stripe-balance-content small, .stripe-transactions-panel > header > small, .stripe-dashboard-error span) {
+  color: var(--admin-muted);
+}
+
+.admin-shell.admin-theme-dark .stripe-heading-actions a {
+  color: #c8c5ff;
+  background: #302d54;
+  border-color: #4b4777;
+}
+
+.admin-shell.admin-theme-dark .stripe-heading-actions > span {
+  color: #cbc8ff;
+  background: #35315d;
+}
+
+.admin-shell.admin-theme-dark .stripe-balance-content > div {
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .stripe-revenue-chart {
+  background-image: linear-gradient(#ffffff12 1px, transparent 1px);
+}
+
+.admin-shell.admin-theme-dark .stripe-transactions-table code {
+  color: #bdb9ff;
+}
+
+.admin-shell.admin-theme-dark .stripe-payment-status.succeeded { color: #83dfb1; background: #174635; }
+.admin-shell.admin-theme-dark :where(.stripe-payment-status.failed, .stripe-payment-status.canceled) { color: #ffaaa4; background: #542326; }
+.admin-shell.admin-theme-dark .stripe-payment-status.processing { color: #9bcfff; background: #173753; }
+
+@media (max-width: 1100px) {
+  .stripe-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stripe-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .stripe-dashboard-heading > header,
+  .stripe-heading-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stripe-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .stripe-revenue-chart {
+    height: 190px;
+    gap: 5px;
+    padding: 20px 12px 13px;
+  }
+}
