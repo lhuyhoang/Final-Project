@@ -371,7 +371,6 @@ app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req,
     const appBaseUrl = getAppBaseUrl(req)
     checkoutSession = await stripeClient.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: order.items.map(item => ({
         quantity: item.quantity,
         price_data: {
