@@ -2177,6 +2177,14 @@ html[data-theme="dark"] .admin-theme-toggle {
   background: #14161a;
 }
 
+.admin-shell.admin-theme-dark .admin-table-wrap td > strong {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark .products-table td del {
+  color: var(--admin-muted);
+}
+
 .admin-shell.admin-theme-dark .admin-table-wrap tbody tr:hover {
   background: var(--admin-surface-raised);
 }
