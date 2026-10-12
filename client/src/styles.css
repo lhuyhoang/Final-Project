@@ -2770,3 +2770,239 @@ html[data-theme="dark"] :where(.detail-highlights > p, .product-description-pane
     display: none;
   }
 }
+
+/*
+ * Theme contrast guardrails
+ *
+ * Keep this block after every component rule. Several component styles are
+ * intentionally declared late in this file, so earlier dark-theme rules were
+ * being overridden by their light-theme text colors.
+ */
+:root {
+  --theme-text-primary: #181a1f;
+  --theme-text-secondary: #555b65;
+  --theme-text-muted: #6e7279;
+  --theme-text-subtle: #858a93;
+  --theme-panel: #fff;
+  --theme-panel-soft: #f5f6f8;
+  --theme-border: #e2e4e8;
+  --theme-price: #d92d24;
+}
+
+html[data-theme="dark"] {
+  --theme-text-primary: #f5f7fa;
+  --theme-text-secondary: #d2d7df;
+  --theme-text-muted: #b3bac6;
+  --theme-text-subtle: #9ca5b3;
+  --theme-panel: #1b1e24;
+  --theme-panel-soft: #242830;
+  --theme-border: #3a404b;
+  --theme-price: #ff746c;
+}
+
+html[data-theme="dark"] :where(input, textarea, select)::placeholder {
+  color: #929cab;
+  opacity: 1;
+}
+
+html[data-theme="dark"] :where(
+  .product-card,
+  .catalog-filters,
+  .catalog-results,
+  .catalog-product-grid .product-card,
+  .category-product-carousel,
+  .cart-drawer,
+  .product-detail-hero,
+  .detail-services,
+  .product-description-panel,
+  .product-specification-panel,
+  .related-products-section,
+  .related-product-card,
+  .product-detail-state
+) {
+  color: var(--theme-text-primary);
+  background-color: var(--theme-panel);
+  border-color: var(--theme-border);
+}
+
+/* The catalog rule has two classes, so it needs an equally specific override. */
+html[data-theme="dark"] .catalog-product-grid .product-card {
+  color: var(--theme-text-primary);
+  background: var(--theme-panel);
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] :where(
+  .product-body h3,
+  .product-name-link,
+  .catalog-toolbar h1,
+  .catalog-filter-heading strong,
+  .catalog-filters legend,
+  .cart-item b,
+  .cart-summary > div,
+  .product-detail-summary h1,
+  .detail-highlights h2,
+  .detail-services b,
+  .product-description-panel h2,
+  .product-specification-panel h2,
+  .related-products-section h2,
+  .related-product-card h3 button,
+  .specification-table strong,
+  .product-detail-state h1
+) {
+  color: var(--theme-text-primary);
+}
+
+html[data-theme="dark"] :where(
+  .brand,
+  .price-row del,
+  .rating small,
+  .section-heading > a,
+  .empty,
+  .cart-empty,
+  .remove,
+  .catalog-breadcrumb,
+  .catalog-breadcrumb button,
+  .catalog-toolbar > label,
+  .catalog-filters label b,
+  .product-breadcrumb,
+  .product-breadcrumb strong,
+  .product-detail-gallery > p,
+  .detail-rating-row,
+  .detail-price-panel del,
+  .detail-services small,
+  .related-products-section > header > button,
+  .related-product-card > div > del,
+  .product-detail-state p
+) {
+  color: var(--theme-text-muted);
+}
+
+html[data-theme="dark"] :where(
+  .catalog-filters label,
+  .detail-highlights > p,
+  .detail-highlights li,
+  .product-description-panel > p,
+  .product-description-panel li,
+  .detail-promotion li
+) {
+  color: var(--theme-text-secondary);
+}
+
+html[data-theme="dark"] :where(
+  .price-row strong,
+  .cart-item strong,
+  .cart-summary > div b,
+  .detail-price-panel strong,
+  .related-product-card > div > strong
+) {
+  color: var(--theme-price);
+}
+
+html[data-theme="dark"] .catalog-page {
+  background: var(--surface);
+}
+
+html[data-theme="dark"] :where(.catalog-filters fieldset, .catalog-filter-heading, .catalog-toolbar, .category-carousel-header) {
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] :where(.catalog-toolbar select, .quantity button, .quantity span) {
+  color: var(--theme-text-primary);
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-border);
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] :where(.installment, .category-carousel-tabs button) {
+  color: var(--theme-text-secondary);
+  background: var(--theme-panel-soft);
+}
+
+html[data-theme="dark"] .product-detail-page {
+  --detail-ink: var(--theme-text-primary);
+}
+
+html[data-theme="dark"] :where(.product-detail-gallery, .product-detail-summary) {
+  color: var(--theme-text-primary);
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .detail-kicker span {
+  color: var(--theme-text-secondary);
+  background: var(--theme-panel-soft);
+}
+
+html[data-theme="dark"] .detail-price-panel {
+  color: var(--theme-text-primary);
+  background: linear-gradient(128deg, #342124, #241b1d 62%, #1b1e24);
+  border-color: #6b3637;
+}
+
+html[data-theme="dark"] .detail-price-panel > small {
+  color: #ffaaa4;
+}
+
+html[data-theme="dark"] .detail-price-panel > span {
+  color: #ffb0aa;
+  background: #3b2022;
+}
+
+html[data-theme="dark"] .detail-policy {
+  color: #d9f4e8;
+  background: #17362c;
+  border-color: #285443;
+}
+
+html[data-theme="dark"] .detail-policy small {
+  color: #9bd1bb;
+}
+
+html[data-theme="dark"] .detail-promotion {
+  border-color: #633033;
+}
+
+html[data-theme="dark"] .detail-promotion header {
+  color: #ffaaa4;
+  background: #3b2022;
+  border-color: #633033;
+}
+
+html[data-theme="dark"] :where(.detail-quantity button, .detail-quantity output, .detail-add-cart) {
+  color: var(--theme-text-primary);
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .detail-add-cart {
+  color: #ff8b84;
+  border-color: #ff746c;
+}
+
+html[data-theme="dark"] :where(.detail-stock-row > span.in-stock, .related-product-card footer > span.in-stock, .product-stock.in-stock) {
+  color: #8be4b8;
+  background: #174635;
+}
+
+html[data-theme="dark"] :where(.detail-stock-row > span.sold-out, .related-product-card footer > span.sold-out, .product-stock.sold-out) {
+  color: #ffaaa4;
+  background: #542326;
+}
+
+html[data-theme="dark"] .specification-table {
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .specification-table > div {
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .specification-table span {
+  color: var(--theme-text-muted);
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .related-product-card footer {
+  border-color: var(--theme-border);
+}

@@ -2211,3 +2211,102 @@ html[data-theme="dark"] .admin-theme-toggle {
 ) {
   color: var(--admin-accent);
 }
+
+/* Final contrast layer shared by every admin tab and editor state. */
+.admin-shell.admin-theme-dark :where(.admin-stat, .admin-panel, .admin-list-panel, .product-editor) {
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark :where(
+  .admin-topbar h1,
+  .admin-stat strong,
+  .admin-panel h2,
+  .list-header h2,
+  .stock-row b,
+  .admin-product-cell b,
+  .customer-cell b,
+  .account-cell b,
+  .product-editor h2,
+  .admin-table-wrap td > b,
+  .admin-table-wrap td > strong
+) {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark :where(
+  .admin-stat span,
+  .admin-stat small,
+  .chart-column small,
+  .stock-row small,
+  .admin-product-cell small,
+  .customer-cell small,
+  .account-cell small,
+  .panel-empty,
+  .table-empty,
+  .admin-loading
+) {
+  color: var(--admin-muted);
+}
+
+.admin-shell.admin-theme-dark .admin-table-wrap td {
+  color: #d4d8df;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .admin-table-wrap th {
+  color: #bdc4cf;
+  background: #14161a;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .products-table td:nth-child(3) > strong {
+  color: #ff746c;
+}
+
+.admin-shell.admin-theme-dark .products-table td del {
+  color: #9ca5b3;
+}
+
+.admin-shell.admin-theme-dark :where(.list-actions label, .product-form-fields input, .product-form-fields select, .product-form-fields textarea, .product-image-upload > label, .product-preview > div) {
+  color: #edf0f4;
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark :where(.list-actions input, .product-form-fields input, .product-form-fields select, .product-form-fields textarea) {
+  color: var(--admin-text);
+  color-scheme: dark;
+}
+
+.admin-shell.admin-theme-dark :where(.list-actions input, .product-form-fields input, .product-form-fields textarea)::placeholder {
+  color: #929cab;
+  opacity: 1;
+}
+
+.admin-shell.admin-theme-dark :where(.product-form-fields label > span, .product-image-upload > span) {
+  color: #d9dde4;
+}
+
+html[data-theme="dark"] :where(.account-menu small, .auth-content > p, .auth-content label > span, .password-hint, .auth-switch) {
+  color: #b3bac6;
+}
+
+html[data-theme="dark"] :where(.account-menu b, .account-menu > button, .auth-content > h2) {
+  color: #f5f7fa;
+}
+
+html[data-theme="dark"] .account-menu > button:hover {
+  color: #ff8b84;
+  background: #3a2022;
+}
+
+html[data-theme="dark"] :where(.auth-tabs button, .auth-content input) {
+  color: #d9dde4;
+}
+
+html[data-theme="dark"] .auth-tabs button.active {
+  color: #d92d24;
+  background: #fff;
+}

@@ -934,6 +934,98 @@ html[data-theme="dark"] :where(.account-order-header, .account-order-footer) {
   background: #14161a;
 }
 
+/* Complete dark-theme text contrast for every account tab. */
+html[data-theme="dark"] :where(
+  .account-panel-heading p,
+  .account-loading,
+  .account-order-header span,
+  .account-order-item span small,
+  .account-order-footer > span,
+  .account-order-footer > div,
+  .account-empty-orders
+) {
+  color: var(--theme-text-muted, #b3bac6);
+}
+
+html[data-theme="dark"] :where(
+  .account-panel-heading h1,
+  .account-field > span,
+  .account-order-header strong,
+  .account-order-item span b,
+  .account-empty-orders h2
+) {
+  color: var(--theme-text-primary, #f5f7fa);
+}
+
+html[data-theme="dark"] .account-field input::placeholder {
+  color: #929cab;
+  opacity: 1;
+}
+
+html[data-theme="dark"] .account-order-card {
+  color: var(--theme-text-primary, #f5f7fa);
+  background: #1b1d22;
+}
+
+html[data-theme="dark"] .account-order-total {
+  color: #ff8b84;
+  background: #3b2022;
+  border-color: #633033;
+}
+
+html[data-theme="dark"] .account-order-total small {
+  color: #d8a6a3;
+}
+
+html[data-theme="dark"] .account-security-note,
+html[data-theme="dark"] .account-password-rules {
+  color: #a7e1c8;
+  background: #17362c;
+  border-color: #285443;
+}
+
+html[data-theme="dark"] :where(.account-security-note b, .account-password-rules b) {
+  color: #c9f0df;
+}
+
+html[data-theme="dark"] :where(.account-security-note span, .account-password-rules span) {
+  color: #9bcbb7;
+}
+
+html[data-theme="dark"] .account-message.success {
+  color: #a7e1c8;
+  background: #17362c;
+  border-color: #285443;
+}
+
+html[data-theme="dark"] .account-message.error {
+  color: #ffb0aa;
+  background: #3b2022;
+  border-color: #713237;
+}
+
+html[data-theme="dark"] .order-status.pending,
+html[data-theme="dark"] .order-status.confirmed {
+  color: #ffd278;
+  background: #493714;
+}
+
+html[data-theme="dark"] .order-status.processing,
+html[data-theme="dark"] .order-status.shipping {
+  color: #91c7ff;
+  background: #183a5c;
+}
+
+html[data-theme="dark"] .order-status.delivered {
+  color: #83dfb1;
+  background: #174635;
+}
+
+html[data-theme="dark"] .order-status.cancelled {
+  color: #ffaaa4;
+  background: #542326;
+}
+
 @media (max-width: 760px) {
   .account-topbar-actions .account-back {
     display: none;
