@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories } from '../data'
 
@@ -31,11 +31,12 @@ const statusLabels = {
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
 const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText, description: '' }
+const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapUrl: '', isActive: true, sortOrder: 0 }
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
-const validAdminTabs = new Set(['overview', 'products', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
+const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
 
 function loadAdminTab() {
   try {
@@ -210,11 +211,67 @@ function ProductEditor({ product, onClose, onSaved }) {
   </div>
 }
 
-export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, theme, onToggleTheme }) {
+function ShowroomEditor({ showroom, onClose, onSaved }) {
+  const [form, setForm] = useState(showroom ? {
+    name: showroom.name,
+    address: showroom.address,
+    phone: showroom.phone,
+    openingHours: showroom.openingHours,
+    mapUrl: showroom.mapUrl,
+    isActive: showroom.isActive,
+    sortOrder: showroom.sortOrder
+  } : emptyShowroom)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  function update(event) {
+    const { name, type, checked, value } = event.target
+    setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const saved = await api(showroom ? `/api/admin/showrooms/${showroom.id}` : '/api/admin/showrooms', {
+        method: showroom ? 'PUT' : 'POST',
+        body: JSON.stringify({ ...form, sortOrder: Number(form.sortOrder) })
+      })
+      onSaved(saved, Boolean(showroom))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <div className="admin-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+    <section className="product-editor showroom-editor" role="dialog" aria-modal="true" aria-labelledby="showroom-editor-title">
+      <header><div><span>HỆ THỐNG CỬA HÀNG</span><h2 id="showroom-editor-title">{showroom ? 'Chỉnh sửa showroom' : 'Thêm showroom mới'}</h2></div><button type="button" onClick={onClose} aria-label="Đóng"><X/></button></header>
+      <form onSubmit={submit}>
+        <div className="product-form-fields">
+          <label><span>Tên showroom</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="120" placeholder="QuadPro Quận 1"/></label>
+          <label><span>Số điện thoại</span><input name="phone" value={form.phone} onChange={update} maxLength="30" placeholder="1900 6868"/></label>
+          <label className="full"><span>Địa chỉ</span><input name="address" value={form.address} onChange={update} required minLength="5" maxLength="250" placeholder="Số nhà, tên đường, quận/huyện, tỉnh/thành"/></label>
+          <label><span>Giờ mở cửa</span><input name="openingHours" value={form.openingHours} onChange={update} maxLength="120" placeholder="08:00 - 21:00, Thứ 2 - Chủ nhật"/></label>
+          <label><span>Thứ tự hiển thị</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
+          <label className="full"><span>Đường dẫn Google Maps</span><input type="url" name="mapUrl" value={form.mapUrl} onChange={update} maxLength="500" placeholder="https://maps.google.com/..."/></label>
+          <label className="showroom-active full"><input type="checkbox" name="isActive" checked={form.isActive} onChange={update}/><span>Hiển thị showroom này trên trang bán hàng</span></label>
+        </div>
+        {error && <div className="admin-form-error" role="alert">{error}</div>}
+        <footer><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary" disabled={saving}><Save size={17}/>{saving ? 'Đang lưu...' : 'Lưu showroom'}</button></footer>
+      </form>
+    </section>
+  </div>
+}
+
+export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
+  const [showrooms, setShowrooms] = useState([])
   const [orders, setOrders] = useState([])
   const [onlinePayments, setOnlinePayments] = useState([])
   const [stripeOverview, setStripeOverview] = useState(null)
@@ -222,6 +279,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [showroomEditor, setShowroomEditor] = useState(null)
+  const [showroomEditorOpen, setShowroomEditorOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -234,9 +293,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       const stripeRequest = api('/api/admin/stripe/overview')
         .then(data => ({ data }))
         .catch(stripeError => ({ error: stripeError }))
-      const [statsData, productData, orderData, paymentData, userData, stripeResult] = await Promise.all([
+      const [statsData, productData, showroomData, orderData, paymentData, userData, stripeResult] = await Promise.all([
         api('/api/admin/stats'),
         api('/api/admin/products'),
+        api('/api/admin/showrooms'),
         api('/api/admin/orders'),
         api('/api/admin/payments'),
         api('/api/admin/users'),
@@ -245,6 +305,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
       setStats(statsData)
       setProducts(productData)
+      setShowrooms(showroomData)
       setOrders(orderData)
       setOnlinePayments(paymentData)
       setUsers(userData)
@@ -313,6 +374,26 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     showNotice(isEditing ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm')
   }
 
+  async function removeShowroom(showroom) {
+    if (!window.confirm(`Xóa showroom “${showroom.name}”?`)) return
+    try {
+      await api(`/api/admin/showrooms/${showroom.id}`, { method: 'DELETE' })
+      setShowrooms(current => current.filter(item => item.id !== showroom.id))
+      await onShowroomsChanged()
+      showNotice('Đã xóa showroom')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  async function saveShowroom(saved, isEditing) {
+    setShowroomEditorOpen(false)
+    setShowroomEditor(null)
+    setShowrooms(current => (isEditing ? current.map(item => item.id === saved.id ? saved : item) : [...current, saved]).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id))
+    await onShowroomsChanged()
+    showNotice(isEditing ? 'Đã cập nhật showroom' : 'Đã thêm showroom')
+  }
+
   async function updateOrderStatus(orderId, status) {
     try {
       const updated = await api(`/api/admin/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
@@ -338,6 +419,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
   const normalizedQuery = query.trim().toLowerCase()
   const visibleProducts = useMemo(() => products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery)), [products, normalizedQuery])
+  const visibleShowrooms = useMemo(() => showrooms.filter(showroom => `${showroom.name} ${showroom.address} ${showroom.phone}`.toLowerCase().includes(normalizedQuery)), [showrooms, normalizedQuery])
   const visibleOrders = useMemo(() => orders.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email}`.toLowerCase().includes(normalizedQuery)), [orders, normalizedQuery])
   const visibleOnlinePayments = useMemo(() => onlinePayments.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email} ${order.stripePaymentIntentId || ''} ${order.stripeCheckoutSessionId || ''} ${order.vnpayTransactionNo || ''} ${order.vnpayBankCode || ''}`.toLowerCase().includes(normalizedQuery)), [onlinePayments, normalizedQuery])
   const visibleUsers = useMemo(() => users.filter(account => `${account.name} ${account.email} ${account.phone}`.toLowerCase().includes(normalizedQuery)), [users, normalizedQuery])
@@ -355,6 +437,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
+    { id: 'showrooms', label: 'Showroom', icon: MapPinned },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
     { id: 'stripe-dashboard', label: 'Stripe Sandbox', icon: WalletCards },
@@ -405,6 +488,11 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <div className="admin-table-wrap"><table className="products-table"><thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{visibleProducts.map(product => <tr key={product.id}><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
         </section>}
 
+        {tab === 'showrooms' && <section className="admin-panel admin-list-panel">
+          <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>
+          <div className="admin-table-wrap"><table className="showrooms-table"><thead><tr><th>Showroom</th><th>Liên hệ</th><th>Giờ mở cửa</th><th>Thứ tự</th><th>Hiển thị</th><th>Thao tác</th></tr></thead><tbody>{visibleShowrooms.map(showroom => <tr key={showroom.id}><td><div className="showroom-admin-cell"><span><MapPinned size={18}/></span><div><b>{showroom.name}</b><small>{showroom.address}</small></div></div></td><td>{showroom.phone || 'Chưa cập nhật'}</td><td>{showroom.openingHours || 'Chưa cập nhật'}</td><td>{showroom.sortOrder}</td><td><span className={`showroom-visibility ${showroom.isActive ? 'active' : 'hidden'}`}>{showroom.isActive ? 'Đang hiện' : 'Đang ẩn'}</span></td><td><div className="row-actions"><button onClick={() => { setShowroomEditor(showroom); setShowroomEditorOpen(true) }} aria-label={`Sửa ${showroom.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeShowroom(showroom)} aria-label={`Xóa ${showroom.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleShowrooms.length && <div className="table-empty">Chưa có showroom phù hợp.</div>}</div>
+        </section>}
+
         {tab === 'orders' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>VẬN HÀNH</span><h2>{orders.length} đơn hàng</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng..."/></label></div></header>
           <div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>{visibleOrders.map(order => { const online = ['stripe', 'vnpay'].includes(order.paymentMethod); return <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><select className={`status-select status-${order.status}`} value={order.status} disabled={online && order.paymentStatus !== 'paid'} title={online && order.paymentStatus !== 'paid' ? 'Cổng thanh toán sẽ tự cập nhật trạng thái' : ''} onChange={event => updateOrderStatus(order.id, event.target.value)}>{Object.entries(statusLabels).filter(([value]) => !(online && order.paymentStatus === 'paid' && value === 'cancelled')).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td></tr> })}</tbody></table>{!visibleOrders.length && <div className="table-empty">Không tìm thấy đơn hàng phù hợp.</div>}</div>
@@ -453,6 +541,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       </div>}
     </main>
     {editorOpen && <ProductEditor product={editor} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
+    {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {notice && <div className="admin-notice"><Check size={18}/>{notice}</div>}
   </div>
 }

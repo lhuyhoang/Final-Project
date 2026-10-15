@@ -225,6 +225,22 @@ export function mapProductRow(row) {
   }
 }
 
+export function mapShowroomRow(row) {
+  if (!row) return null
+  return {
+    id: numberValue(row.id),
+    name: row.name,
+    address: row.address,
+    phone: row.phone || '',
+    openingHours: row.opening_hours || '',
+    mapUrl: row.map_url || '',
+    isActive: Boolean(row.is_active),
+    sortOrder: numberValue(row.sort_order),
+    createdAt: timestampValue(row.created_at),
+    updatedAt: timestampValue(row.updated_at || row.created_at)
+  }
+}
+
 export function mapOrderItemRow(row) {
   if (!row) return null
   return {
@@ -567,6 +583,76 @@ export async function updateProduct(id, updates = {}) {
 export async function deleteProduct(id) {
   const result = await query('DELETE FROM products WHERE id = $1 RETURNING *', [id])
   return mapProductRow(result.rows[0])
+}
+
+export async function listShowrooms({ includeInactive = false } = {}) {
+  const where = includeInactive ? '' : 'WHERE is_active = TRUE'
+  const result = await query(`
+    SELECT * FROM showrooms
+    ${where}
+    ORDER BY sort_order ASC, id ASC
+  `)
+  return result.rows.map(mapShowroomRow)
+}
+
+export async function findShowroomById(id) {
+  const result = await query('SELECT * FROM showrooms WHERE id = $1', [id])
+  return mapShowroomRow(result.rows[0])
+}
+
+export async function createShowroom(input) {
+  const result = await query(`
+    INSERT INTO showrooms (
+      name, address, phone, opening_hours, map_url, is_active, sort_order
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `, [
+    input.name,
+    input.address,
+    input.phone || '',
+    input.openingHours || '',
+    input.mapUrl || '',
+    input.isActive ?? true,
+    input.sortOrder ?? 0
+  ])
+  return mapShowroomRow(result.rows[0])
+}
+
+export async function updateShowroom(id, updates = {}) {
+  const columnMap = {
+    name: 'name',
+    address: 'address',
+    phone: 'phone',
+    openingHours: 'opening_hours',
+    mapUrl: 'map_url',
+    isActive: 'is_active',
+    sortOrder: 'sort_order'
+  }
+  const assignments = []
+  const values = []
+
+  for (const [field, column] of Object.entries(columnMap)) {
+    if (updates[field] === undefined) continue
+    values.push(updates[field])
+    assignments.push(`${column} = $${values.length}`)
+  }
+
+  if (!assignments.length) return findShowroomById(id)
+  assignments.push('updated_at = NOW()')
+  values.push(id)
+  const result = await query(`
+    UPDATE showrooms
+    SET ${assignments.join(', ')}
+    WHERE id = $${values.length}
+    RETURNING *
+  `, values)
+  return mapShowroomRow(result.rows[0])
+}
+
+export async function deleteShowroom(id) {
+  const result = await query('DELETE FROM showrooms WHERE id = $1 RETURNING *', [id])
+  return mapShowroomRow(result.rows[0])
 }
 
 async function selectOrders(executor, { id, userId, status, paymentMethod, paymentMethods, paymentStatus, limit } = {}) {

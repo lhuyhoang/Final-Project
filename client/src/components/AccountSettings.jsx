@@ -86,8 +86,8 @@ const formatDate = value => new Intl.DateTimeFormat('vi-VN', {
   timeStyle: 'short'
 }).format(new Date(value))
 
-export default function AccountSettings({ session, onBack, onLogout, onUserUpdated, theme, onToggleTheme }) {
-  const [activeTab, setActiveTab] = useState('profile')
+export default function AccountSettings({ session, initialTab = 'profile', onBack, onLogout, onUserUpdated, theme, onToggleTheme }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [profile, setProfile] = useState(() => profileFromUser(session.user))
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileMessage, setProfileMessage] = useState(null)
@@ -101,6 +101,10 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
   useEffect(() => {
     setProfile(profileFromUser(session.user))
   }, [session.user])
+
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   useEffect(() => {
     let active = true
@@ -220,7 +224,11 @@ export default function AccountSettings({ session, onBack, onLogout, onUserUpdat
                   className={activeTab === item.id ? 'active' : ''}
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id)
+                    const path = item.id === 'orders' ? '/account/orders' : item.id === 'password' ? '/account/password' : '/account'
+                    if (window.location.pathname !== path) window.history.pushState({}, '', path)
+                  }}
                   aria-current={activeTab === item.id ? 'page' : undefined}
                 >
                   <Icon size={18}/>

@@ -1737,6 +1737,120 @@
   }
 }
 
+/* Showroom management */
+.showroom-editor {
+  width: min(690px, 100%);
+}
+
+.showroom-active {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 11px;
+  background: #f7f8fa;
+  border: 1px solid #e2e4e8;
+  border-radius: 8px;
+}
+
+.product-form-fields .showroom-active input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--red);
+}
+
+.product-form-fields .showroom-active span {
+  margin: 0;
+  color: #383b41;
+}
+
+.showroom-admin-cell {
+  display: flex;
+  min-width: 280px;
+  gap: 10px;
+  align-items: center;
+}
+
+.showroom-admin-cell > span {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--red);
+  background: #fff0ef;
+  border-radius: 8px;
+}
+
+.showroom-admin-cell b,
+.showroom-admin-cell small {
+  display: block;
+}
+
+.showroom-admin-cell b {
+  color: #303238;
+  font-size: 9px;
+}
+
+.showroom-admin-cell small {
+  max-width: 360px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #8e929a;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showroom-visibility {
+  display: inline-flex;
+  padding: 6px 8px;
+  font-size: 8px;
+  font-weight: 750;
+  border-radius: 999px;
+}
+
+.showroom-visibility.active {
+  color: #15754b;
+  background: #e5f7ee;
+}
+
+.showroom-visibility.hidden {
+  color: #777b83;
+  background: #eceef1;
+}
+
+.admin-shell.admin-theme-dark .showroom-active {
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .product-form-fields .showroom-active span,
+.admin-shell.admin-theme-dark .showroom-admin-cell b {
+  color: var(--admin-text);
+}
+
+.admin-shell.admin-theme-dark .showroom-admin-cell > span {
+  color: #ff8c85;
+  background: #3a2022;
+}
+
+.admin-shell.admin-theme-dark .showroom-admin-cell small {
+  color: var(--admin-muted);
+}
+
+.admin-shell.admin-theme-dark .showroom-visibility.active {
+  color: #83dfb1;
+  background: #174635;
+}
+
+.admin-shell.admin-theme-dark .showroom-visibility.hidden {
+  color: #afb4be;
+  background: #2b2e35;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-backdrop,
   .auth-modal,

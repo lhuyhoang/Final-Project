@@ -16,20 +16,25 @@ import {
   cancelUnpaidStripeOrder,
   confirmVnpayOrderPayment,
   confirmStripeOrderPayment,
+  createShowroom,
   createOrder as insertOrder,
   createProduct as insertProduct,
   deleteProduct as removeProduct,
+  deleteShowroom,
   findProductById,
+  findShowroomById,
   getAdminStats,
   healthCheck,
   initializeDatabase,
   listOrders,
   listProducts,
+  listShowrooms,
   listUsers,
   processStripeWebhookEvent,
   syncUserFromAuth,
   updateOrderStatus,
   updateProduct as saveProduct,
+  updateShowroom,
   updateUser as saveUser
 } from './db.js'
 
@@ -437,6 +442,49 @@ function normalizeProduct(body = {}, current = {}) {
   }
 }
 
+function normalizeShowroom(body = {}, current = {}) {
+  const requiredText = (key, minimum, maximum) => {
+    const value = String(body[key] ?? current[key] ?? '').trim().replace(/\s+/g, ' ')
+    if (value.length < minimum || value.length > maximum) {
+      throw httpError(400, `${key} phải có từ ${minimum} đến ${maximum} ký tự`)
+    }
+    return value
+  }
+  const optionalText = (key, maximum) => {
+    const value = String(body[key] ?? current[key] ?? '').trim().replace(/\s+/g, ' ')
+    if (value.length > maximum) throw httpError(400, `${key} không được vượt quá ${maximum} ký tự`)
+    return value
+  }
+
+  const mapUrl = optionalText('mapUrl', 500)
+  if (mapUrl) {
+    try {
+      const url = new URL(mapUrl)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
+    } catch {
+      throw httpError(400, 'Đường dẫn bản đồ không hợp lệ')
+    }
+  }
+
+  const sortOrder = Number(body.sortOrder ?? current.sortOrder ?? 0)
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 10000) {
+    throw httpError(400, 'Thứ tự hiển thị không hợp lệ')
+  }
+
+  const rawIsActive = body.isActive ?? current.isActive ?? true
+  if (typeof rawIsActive !== 'boolean') throw httpError(400, 'Trạng thái hiển thị không hợp lệ')
+
+  return {
+    name: requiredText('name', 2, 120),
+    address: requiredText('address', 5, 250),
+    phone: optionalText('phone', 30),
+    openingHours: optionalText('openingHours', 120),
+    mapUrl,
+    isActive: rawIsActive,
+    sortOrder
+  }
+}
+
 app.get('/api/health', asyncHandler(async (_, res) => {
   const database = await healthCheck()
   res.json({ ...database, service: 'quadpro-api' })
@@ -461,6 +509,10 @@ app.get('/api/products', asyncHandler(async (req, res) => {
 app.get('/api/products/:id', asyncHandler(async (req, res) => {
   const product = await findProductById(Number(req.params.id))
   product ? res.json(product) : res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
+}))
+
+app.get('/api/showrooms', asyncHandler(async (req, res) => {
+  res.json(await listShowrooms())
 }))
 
 app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req, res) => {
@@ -746,6 +798,30 @@ app.delete('/api/admin/products/:id', asyncHandler(async (req, res) => {
   const product = await removeProduct(Number(req.params.id))
   if (!product) throw httpError(404, 'Không tìm thấy sản phẩm')
   res.json({ message: 'Đã xóa sản phẩm', product })
+}))
+
+app.get('/api/admin/showrooms', asyncHandler(async (req, res) => {
+  res.json(await listShowrooms({ includeInactive: true }))
+}))
+
+app.post('/api/admin/showrooms', asyncHandler(async (req, res) => {
+  res.status(201).json(await createShowroom(normalizeShowroom(req.body)))
+}))
+
+app.put('/api/admin/showrooms/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id < 1) throw httpError(400, 'Mã showroom không hợp lệ')
+  const existing = await findShowroomById(id)
+  if (!existing) throw httpError(404, 'Không tìm thấy showroom')
+  res.json(await updateShowroom(id, normalizeShowroom(req.body, existing)))
+}))
+
+app.delete('/api/admin/showrooms/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id < 1) throw httpError(400, 'Mã showroom không hợp lệ')
+  const showroom = await deleteShowroom(id)
+  if (!showroom) throw httpError(404, 'Không tìm thấy showroom')
+  res.json({ message: 'Đã xóa showroom', showroom })
 }))
 
 app.get('/api/admin/orders', asyncHandler(async (req, res) => res.json(await listOrders())))

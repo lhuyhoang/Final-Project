@@ -851,6 +851,7 @@ function CategoryCatalog({
 function App() {
   const [theme, setTheme] = useState(loadTheme);
   const [products, setProducts] = useState(fallbackProducts);
+  const [showrooms, setShowrooms] = useState([]);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Tất cả");
@@ -880,6 +881,7 @@ function App() {
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(null);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const [showroomOpen, setShowroomOpen] = useState(false);
   const categoryMenuTimerRef = useRef(null);
   const paymentReturnHandledRef = useRef(false);
 
@@ -907,8 +909,17 @@ function App() {
     }
   }
 
+  async function refreshShowrooms() {
+    try {
+      setShowrooms(await api("/api/showrooms"));
+    } catch {
+      setShowrooms([]);
+    }
+  }
+
   useEffect(() => {
     refreshProducts();
+    refreshShowrooms();
   }, []);
   useEffect(() => {
     let active = true;
@@ -1166,6 +1177,21 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openOrderTracking() {
+    if (window.location.pathname !== "/account/orders") {
+      window.history.pushState({}, "", "/account/orders");
+    }
+    setAdminView(false);
+    setAccountView(true);
+    setCheckoutView(false);
+    setProductId(null);
+    setCatalogSelection(null);
+    setAccountOpen(false);
+    setShowroomOpen(false);
+    if (!session) openAuth("login");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function leaveAccountSettings() {
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setAccountView(false);
@@ -1380,6 +1406,7 @@ function App() {
         onBack={leaveAdmin}
         onLogout={logout}
         onProductsChanged={refreshProducts}
+        onShowroomsChanged={refreshShowrooms}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
@@ -1390,6 +1417,7 @@ function App() {
     return (
       <AccountSettings
         session={session}
+        initialTab={window.location.pathname.startsWith("/account/orders") ? "orders" : window.location.pathname.startsWith("/account/password") ? "password" : "profile"}
         onBack={leaveAccountSettings}
         onLogout={logout}
         onUserUpdated={handleUserUpdated}
@@ -1423,7 +1451,7 @@ function App() {
         <span>
           Hotline: <b>1900 6868</b>
         </span>
-        <span>Hệ thống 12 showroom toàn quốc</span>
+        <span>{showrooms.length ? `Hệ thống ${showrooms.length} showroom toàn quốc` : "Hệ thống showroom toàn quốc"}</span>
       </div>
       <header className="site-header">
         <div className="header-main container">
@@ -1541,13 +1569,59 @@ function App() {
                 Giao diện<small>{theme === "dark" ? "Sáng" : "Tối"}</small>
               </span>
             </button>
-            <button>
-              <MapPin />
-              <span>
-                Showroom<small>Gần bạn</small>
-              </span>
-            </button>
-            <button>
+            <div
+              className="showroom-wrap"
+              onMouseEnter={() => setShowroomOpen(true)}
+              onMouseLeave={() => setShowroomOpen(false)}
+              onFocus={() => setShowroomOpen(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setShowroomOpen(false);
+              }}
+            >
+              <button
+                className="showroom-trigger"
+                type="button"
+                onClick={() => setShowroomOpen((value) => !value)}
+                aria-expanded={showroomOpen}
+                aria-controls="showroom-menu"
+              >
+                <MapPin />
+                <span>
+                  Showroom<small>{showrooms.length ? `${showrooms.length} địa điểm` : "Gần bạn"}</small>
+                </span>
+              </button>
+              {showroomOpen && (
+                <div className="showroom-menu" id="showroom-menu">
+                  <header>
+                    <span>HỆ THỐNG QUADPRO</span>
+                    <b>Showroom gần bạn</b>
+                  </header>
+                  {showrooms.length ? (
+                    <div className="showroom-list">
+                      {showrooms.map((showroom) => {
+                        const mapUrl = showroom.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(showroom.address)}`;
+                        return (
+                          <a href={mapUrl} target="_blank" rel="noreferrer" key={showroom.id}>
+                            <MapPin size={18} aria-hidden="true" />
+                            <span>
+                              <b>{showroom.name}</b>
+                              <small>{showroom.address}</small>
+                              {(showroom.openingHours || showroom.phone) && (
+                                <em>{[showroom.openingHours, showroom.phone].filter(Boolean).join(" • ")}</em>
+                              )}
+                            </span>
+                            <ArrowUpRight size={15} aria-hidden="true" />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="showroom-empty">Danh sách showroom đang được cập nhật.</div>
+                  )}
+                </div>
+              )}
+            </div>
+            <button type="button" onClick={openOrderTracking}>
               <Truck />
               <span>
                 Tra cứu<small>Đơn hàng</small>
