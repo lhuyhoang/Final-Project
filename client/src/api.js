@@ -28,39 +28,59 @@ const requiresAuthentication = path => (
   || path.startsWith('/api/admin')
 )
 
-async function getAccessToken() {
+const forceFetchOptions = {
+  fetchOptions: { headers: { 'X-Force-Fetch': 'true' } }
+}
+
+async function getAccessToken({ force = false } = {}) {
   const auth = requireAuthClient()
-  let tokenResult = await auth.token()
+  let tokenResult = force
+    ? await auth.token(forceFetchOptions)
+    : await auth.token()
 
   // @neondatabase/auth can serve its cached session for /token immediately
   // after sign-in. Force the real token endpoint when the expected JWT shape
   // is absent; session.token may be an opaque Better Auth session identifier.
-  if (!tokenResult.data?.token) {
-    tokenResult = await auth.token({
-      fetchOptions: { headers: { 'X-Force-Fetch': 'true' } }
-    })
+  if (!force && !tokenResult.data?.token) {
+    tokenResult = await auth.token(forceFetchOptions)
   }
 
   const token = tokenResult.data?.token
   if (!token) {
     const authError = new Error(tokenResult.error?.message || 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn')
-    authError.status = 401
+    const status = Number(tokenResult.error?.status || tokenResult.error?.statusCode)
+    authError.status = Number.isInteger(status) && status >= 400 ? status : 401
     throw authError
   }
   return token
 }
 
-export async function api(path, options = {}) {
-  const { auth = requiresAuthentication(path), ...fetchOptions } = options
-  const token = auth ? await getAccessToken() : ''
-  const response = await fetch(path, {
+function sendRequest(path, fetchOptions, token) {
+  const headers = new Headers(fetchOptions.headers || {})
+  if (fetchOptions.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  return fetch(path, {
     ...fetchOptions,
-    headers: {
-      ...(fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...fetchOptions.headers
-    }
+    ...(token && fetchOptions.cache === undefined ? { cache: 'no-store' } : {}),
+    headers
   })
+}
+
+export async function api(path, options = {}) {
+  const { auth: shouldAuthenticate = requiresAuthentication(path), ...fetchOptions } = options
+  let token = shouldAuthenticate ? await getAccessToken() : ''
+  let response = await sendRequest(path, fetchOptions, token)
+
+  // A JWT cached by the browser SDK may expire while the HttpOnly Neon
+  // session is still valid. Refresh it once before treating the user as
+  // signed out.
+  if (shouldAuthenticate && response.status === 401) {
+    token = await getAccessToken({ force: true })
+    response = await sendRequest(path, fetchOptions, token)
+  }
 
   const payload = response.status === 204 ? null : await response.json().catch(() => null)
   if (!response.ok) {
@@ -70,4 +90,25 @@ export async function api(path, options = {}) {
     throw error
   }
   return payload
+}
+
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+
+export async function restoreAuthenticatedUser() {
+  const retryDelays = [250, 700]
+  let lastError
+
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    try {
+      return await api('/api/auth/me')
+    } catch (error) {
+      lastError = error
+      if (error.status === 401 || error.status === 403 || attempt === retryDelays.length) {
+        throw error
+      }
+      await wait(retryDelays[attempt])
+    }
+  }
+
+  throw lastError
 }

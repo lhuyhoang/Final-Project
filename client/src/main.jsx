@@ -57,7 +57,12 @@ import {
   Zap,
 } from "lucide-react";
 import { categories, categoryMenus, fallbackProducts } from "./data";
-import { api, clearSession, saveSession } from "./api";
+import {
+  api,
+  clearSession,
+  restoreAuthenticatedUser,
+  saveSession,
+} from "./api";
 import { requireAuthClient } from "./auth";
 import AccountSettings from "./components/AccountSettings";
 import AdminDashboard from "./components/AdminDashboard";
@@ -925,9 +930,7 @@ function App() {
     let active = true;
     async function restoreSession() {
       try {
-        const { data, error } = await requireAuthClient().getSession();
-        if (error || !data?.user) throw new Error("Không có phiên đăng nhập");
-        const { user } = await api("/api/auth/me");
+        const { user } = await restoreAuthenticatedUser();
         if (!active) return;
         const restored = { user };
         setSession(restored);
