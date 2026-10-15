@@ -1,7 +1,11 @@
 import { createAuthClient } from '@neondatabase/auth'
 import { BetterAuthVanillaAdapter } from '@neondatabase/auth/vanilla/adapters'
 
-const authUrl = String(import.meta.env.VITE_NEON_AUTH_URL || '').trim().replace(/\/+$/, '')
+// Keep authentication first-party. The server proxies this path to the
+// branch's Managed Neon Auth URL so browsers never need a third-party cookie.
+const authUrl = typeof window === 'undefined'
+  ? ''
+  : `${window.location.origin}/api/neon-auth`
 
 export const authClient = authUrl
   ? createAuthClient(authUrl, {

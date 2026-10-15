@@ -264,6 +264,100 @@ if (process.env.VERCEL) app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false }))
 app.use(cors())
 
+const authProxyLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 90,
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+const hopByHopHeaders = new Set([
+  'connection',
+  'content-encoding',
+  'content-length',
+  'expect',
+  'host',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade'
+])
+
+function firstPartyAuthCookie(cookie) {
+  return cookie
+    .replace(/;\s*Domain=[^;]*/gi, '')
+    .replace(/;\s*Partitioned/gi, '')
+}
+
+function managedAuthRequestCookies(cookieHeader = '') {
+  return String(cookieHeader)
+    .split(';')
+    .map(cookie => cookie.trim())
+    .filter(cookie => /^(?:__Secure-|__Host-)?neon-auth\./i.test(cookie))
+    .join('; ')
+}
+
+// Managed Neon Auth is hosted on a different domain. Proxying its browser
+// endpoints here makes the HttpOnly session cookie first-party, which keeps
+// reload restoration working even when cross-site cookies are blocked.
+app.use(
+  '/api/neon-auth',
+  authProxyLimiter,
+  express.raw({ type: () => true, limit: '100kb' }),
+  asyncHandler(async (req, res) => {
+    if (!neonAuthBaseUrl) throw httpError(503, 'Neon Auth chưa được cấu hình trên máy chủ')
+
+    const incomingUrl = new URL(req.url, 'http://localhost')
+    const upstreamUrl = new URL(`${neonAuthBaseUrl}${incomingUrl.pathname}`)
+    upstreamUrl.search = incomingUrl.search
+
+    const headers = new Headers()
+    for (const [name, rawValue] of Object.entries(req.headers)) {
+      const normalizedName = name.toLowerCase()
+      if (hopByHopHeaders.has(normalizedName) || normalizedName.startsWith('x-forwarded-')) continue
+      if (normalizedName === 'cookie') {
+        const authCookies = managedAuthRequestCookies(rawValue)
+        if (authCookies) headers.set(name, authCookies)
+        continue
+      }
+      if (Array.isArray(rawValue)) headers.set(name, rawValue.join(', '))
+      else if (rawValue !== undefined) headers.set(name, rawValue)
+    }
+
+    let upstream
+    try {
+      upstream = await fetch(upstreamUrl, {
+        method: req.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(15_000)
+      })
+    } catch (error) {
+      const causeCode = error.cause?.code ? ` (${error.cause.code})` : ''
+      console.warn(`Neon Auth proxy failed: ${error.name || 'Error'}: ${error.message}${causeCode}`)
+      throw httpError(502, 'Không thể kết nối Neon Auth')
+    }
+
+    for (const [name, value] of upstream.headers.entries()) {
+      const normalizedName = name.toLowerCase()
+      if (normalizedName === 'set-cookie' || hopByHopHeaders.has(normalizedName)) continue
+      res.setHeader(name, value)
+    }
+
+    const cookies = typeof upstream.headers.getSetCookie === 'function'
+      ? upstream.headers.getSetCookie()
+      : [upstream.headers.get('set-cookie')].filter(Boolean)
+    for (const cookie of cookies) res.append('Set-Cookie', firstPartyAuthCookie(cookie))
+
+    const body = Buffer.from(await upstream.arrayBuffer())
+    res.status(upstream.status).send(body)
+  })
+)
+
 // Stripe requires the exact raw request bytes to verify the webhook signature.
 // Keep this route before express.json() and outside the public API rate limiter.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncHandler(async (req, res) => {
