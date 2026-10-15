@@ -911,12 +911,41 @@ html[data-theme="dark"] .account-navigation button.active {
 
 html[data-theme="dark"] :where(.account-field input, .account-field select) {
   color: #eef0f4;
+  color-scheme: dark;
+  caret-color: #eef0f4;
   background: #14161a;
   border-color: #3a3d45;
 }
 
 html[data-theme="dark"] :where(.account-field input:focus, .account-field select:focus) {
+  color: #fff;
   background: #17191e;
+  border-color: #ee6b64;
+  box-shadow: 0 0 0 3px rgba(238, 107, 100, .16);
+}
+
+html[data-theme="dark"] .account-field input[readonly] {
+  color: #c8cdd6;
+  background: #181a1f;
+}
+
+/* Chrome/Safari paint saved account data with their own light autofill layer. */
+html[data-theme="dark"] .account-field input:-webkit-autofill,
+html[data-theme="dark"] .account-field input:-webkit-autofill:hover,
+html[data-theme="dark"] .account-field input:-webkit-autofill:active {
+  caret-color: #eef0f4;
+  border-color: #3a3d45;
+  -webkit-text-fill-color: #eef0f4;
+  -webkit-box-shadow: 0 0 0 1000px #14161a inset;
+  box-shadow: 0 0 0 1000px #14161a inset;
+}
+
+html[data-theme="dark"] .account-field input:-webkit-autofill:focus {
+  caret-color: #fff;
+  border-color: #ee6b64;
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16);
+  box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16);
 }
 
 html[data-theme="dark"] :where(.account-field > span, .account-panel-heading h1, .account-order-header strong, .account-order-item span b, .account-empty-orders h2) {
