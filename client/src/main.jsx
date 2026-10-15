@@ -852,6 +852,7 @@ function App() {
   const [theme, setTheme] = useState(loadTheme);
   const [products, setProducts] = useState(fallbackProducts);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [cart, setCart] = useState(loadCart);
   const [cartOpen, setCartOpen] = useState(false);
@@ -1059,6 +1060,7 @@ function App() {
       products: filtered.filter((product) => product.category === category.name),
     }))
     .filter((group) => group.products.length > 0);
+  const searchSuggestions = normalizedQuery ? filtered.slice(0, 5) : [];
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const selectedProduct = productId
@@ -1180,6 +1182,7 @@ function App() {
     setAccountView(false);
     setCheckoutView(false);
     setAccountOpen(false);
+    setSearchOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1218,6 +1221,7 @@ function App() {
 
   function submitProductSearch(event) {
     setActiveCategory("Tất cả");
+    setSearchOpen(false);
     openStorefrontSection(event, "#products");
   }
 
@@ -1441,6 +1445,12 @@ function App() {
             className="search"
             role="search"
             onSubmit={submitProductSearch}
+            onFocus={() => setSearchOpen(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                setSearchOpen(false);
+              }
+            }}
           >
             <button
               className="search-submit"
@@ -1455,9 +1465,16 @@ function App() {
               onChange={(event) => {
                 setQuery(event.target.value);
                 setActiveCategory("Tất cả");
+                setSearchOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setSearchOpen(false);
               }}
               placeholder="Bạn cần tìm sản phẩm gì?"
               aria-label="Tìm kiếm sản phẩm"
+              aria-autocomplete="list"
+              aria-expanded={searchOpen && Boolean(normalizedQuery)}
+              aria-controls="header-search-results"
             />
             {query && (
               <button
@@ -1465,11 +1482,50 @@ function App() {
                 onClick={() => {
                   setQuery("");
                   setActiveCategory("Tất cả");
+                  setSearchOpen(false);
                 }}
                 aria-label="Xóa tìm kiếm"
               >
                 <X size={17} />
               </button>
+            )}
+            {searchOpen && normalizedQuery && (
+              <div
+                className="header-search-results"
+                id="header-search-results"
+                aria-label="Gợi ý sản phẩm"
+              >
+                {searchSuggestions.length ? (
+                  <>
+                    {searchSuggestions.map((product) => (
+                      <button
+                        className="header-search-result"
+                        type="button"
+                        key={product.id}
+                        onClick={() => openProduct(product)}
+                      >
+                        <img src={product.image} alt="" />
+                        <span>
+                          <small>
+                            {product.brand} • {product.category}
+                          </small>
+                          <strong>{product.name}</strong>
+                        </span>
+                        <b>{formatPrice(product.price)}</b>
+                      </button>
+                    ))}
+                    <button className="header-search-all" type="submit">
+                      Xem tất cả {filtered.length} kết quả
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="header-search-empty">
+                    <SearchX size={21} aria-hidden="true" />
+                    <span>Không tìm thấy sản phẩm phù hợp</span>
+                  </div>
+                )}
+              </div>
             )}
           </form>
           <div className="header-actions">
