@@ -1094,13 +1094,13 @@ export async function updateOrder(id, updates = {}) {
 
     await client.query(`
       UPDATE orders
-      SET status = $1,
+      SET status = $1::varchar,
           payment_status = CASE
-            WHEN payment_method = 'cod' AND $1 = 'delivered' THEN 'paid'
+            WHEN payment_method = 'cod' AND $1::varchar = 'delivered' THEN 'paid'
             ELSE payment_status
           END,
           paid_at = CASE
-            WHEN payment_method = 'cod' AND $1 = 'delivered' THEN COALESCE(paid_at, NOW())
+            WHEN payment_method = 'cod' AND $1::varchar = 'delivered' THEN COALESCE(paid_at, NOW())
             ELSE paid_at
           END,
           updated_at = NOW()
