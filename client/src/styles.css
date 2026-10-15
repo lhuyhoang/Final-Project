@@ -3052,3 +3052,40 @@ html[data-theme="dark"] .stripe-checkout-button {
   background: #6f68ff;
   border-color: #8b86ff;
 }
+
+/* Sticky storefront header and accessible product search */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.search:focus-within {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .35), 0 4px 12px #8d15152b;
+}
+
+.search .search-submit,
+.search > button[aria-label="Xóa tìm kiếm"] {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 4px;
+  color: inherit;
+  border-radius: 6px;
+}
+
+.search .search-submit:hover,
+.search > button[aria-label="Xóa tìm kiếm"]:hover {
+  color: var(--red);
+  background: rgba(230, 51, 42, .09);
+}
+
+.products-section {
+  scroll-margin-top: 150px;
+}
+
+@media (max-width: 760px) {
+  .products-section {
+    scroll-margin-top: 105px;
+  }
+}

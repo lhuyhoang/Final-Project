@@ -93,6 +93,13 @@ const toSlug = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+const normalizeSearchText = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
 const productIdFromPath = (pathname = window.location.pathname) => {
   const match = pathname.match(/^\/products\/(\d+)(?:-[^/]*)?\/?$/);
   return match ? Number(match[1]) : null;
@@ -1036,10 +1043,10 @@ function App() {
     [],
   );
 
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = normalizeSearchText(query.trim());
   const filtered = products.filter((product) => {
     const matchesSearch = [product.name, product.brand, product.category].some(
-      (value) => String(value || "").toLowerCase().includes(normalizedQuery),
+      (value) => normalizeSearchText(value).includes(normalizedQuery),
     );
     return (
       matchesSearch &&
@@ -1207,6 +1214,11 @@ function App() {
         document.querySelector(selector)?.scrollIntoView({ behavior: "smooth" }),
       ),
     );
+  }
+
+  function submitProductSearch(event) {
+    setActiveCategory("Tất cả");
+    openStorefrontSection(event, "#products");
   }
 
   function clearCategoryMenuTimer() {
@@ -1409,7 +1421,7 @@ function App() {
         </span>
         <span>Hệ thống 12 showroom toàn quốc</span>
       </div>
-      <header>
+      <header className="site-header">
         <div className="header-main container">
           <button
             className="mobile-menu"
@@ -1427,23 +1439,33 @@ function App() {
           </a>
           <form
             className="search"
-            onSubmit={(event) =>
-              productId || catalogSelection
-                ? openStorefrontSection(event, "#products")
-                : event.preventDefault()
-            }
+            role="search"
+            onSubmit={submitProductSearch}
           >
-            <Search size={20} />
+            <button
+              className="search-submit"
+              type="submit"
+              aria-label="Tìm kiếm sản phẩm"
+            >
+              <Search size={20} aria-hidden="true" />
+            </button>
             <input
+              type="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActiveCategory("Tất cả");
+              }}
               placeholder="Bạn cần tìm sản phẩm gì?"
               aria-label="Tìm kiếm sản phẩm"
             />
             {query && (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setActiveCategory("Tất cả");
+                }}
                 aria-label="Xóa tìm kiếm"
               >
                 <X size={17} />
