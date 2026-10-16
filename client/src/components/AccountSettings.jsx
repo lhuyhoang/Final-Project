@@ -16,7 +16,6 @@ import {
   UserRound
 } from 'lucide-react'
 import { api } from '../api'
-import { authErrorMessage, requireAuthClient } from '../auth'
 import '../account.css'
 
 const provinces = [
@@ -139,8 +138,6 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
     setProfileLoading(true)
     setProfileMessage(null)
     try {
-      const authResult = await requireAuthClient().updateUser({ name: profile.name.trim() })
-      if (authResult.error) throw new Error(authErrorMessage(authResult.error, 'Không thể cập nhật tên tài khoản'))
       const { user } = await api('/api/auth/me', {
         method: 'PUT',
         body: JSON.stringify(profile)
@@ -164,12 +161,13 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
 
     setPasswordLoading(true)
     try {
-      const result = await requireAuthClient().changePassword({
-        currentPassword: password.currentPassword,
-        newPassword: password.newPassword,
-        revokeOtherSessions: true
+      await api('/api/auth/password', {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentPassword: password.currentPassword,
+          newPassword: password.newPassword
+        })
       })
-      if (result.error) throw new Error(authErrorMessage(result.error, 'Không thể đổi mật khẩu'))
       setPassword(emptyPassword)
       setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công.' })
     } catch (error) {
@@ -264,7 +262,7 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
                 <label className="account-field">
                   <span>Email</span>
                   <input type="email" name="email" value={profile.email} readOnly aria-describedby="managed-email-note"/>
-                  <small id="managed-email-note">Email đăng nhập được quản lý bởi Neon Auth.</small>
+                  <small id="managed-email-note">Email này được dùng để đăng nhập và không thể thay đổi tại đây.</small>
                 </label>
                 <label className="account-field">
                   <span>Địa chỉ nhà</span>

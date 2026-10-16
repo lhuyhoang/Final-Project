@@ -6,7 +6,6 @@ import cors from 'cors'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
-import { createRemoteJWKSet, jwtVerify } from 'jose'
 import Stripe from 'stripe'
 import {
   DEFAULT_PRODUCT_POLICY_TEXT,
@@ -19,10 +18,17 @@ import {
   createShowroom,
   createOrder as insertOrder,
   createProduct as insertProduct,
+  createUserSession,
+  deleteAllUserSessions,
+  deleteOtherUserSessions,
   deleteProduct as removeProduct,
   deleteShowroom,
+  deleteUserSession,
   findProductById,
   findShowroomById,
+  findUserByEmail,
+  findUserById,
+  findUserBySessionTokenHash,
   getAdminStats,
   healthCheck,
   initializeDatabase,
@@ -31,12 +37,13 @@ import {
   listShowrooms,
   listUsers,
   processStripeWebhookEvent,
-  syncUserFromAuth,
+  registerUserWithPassword,
   updateOrderStatus,
   updateProduct as saveProduct,
   updateShowroom,
   updateUser as saveUser
 } from './db.js'
+import { hashPassword, verifyPassword } from './password.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -49,18 +56,8 @@ const stripe = stripeSecretKey
 const vnpayTmnCode = String(process.env.VNPAY_TMN_CODE || '').trim()
 const vnpayHashSecret = String(process.env.VNPAY_HASH_SECRET || '').trim()
 const vnpayPaymentUrl = String(process.env.VNPAY_PAYMENT_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html').trim()
-const neonAuthBaseUrl = String(process.env.NEON_AUTH_BASE_URL || '').trim().replace(/\/+$/, '')
-if (isProduction && !neonAuthBaseUrl) throw new Error('NEON_AUTH_BASE_URL must be configured in production')
-let neonAuthIssuer = ''
-let neonJwks
-if (neonAuthBaseUrl) {
-  try {
-    neonAuthIssuer = new URL(neonAuthBaseUrl).origin
-    neonJwks = createRemoteJWKSet(new URL(`${neonAuthBaseUrl}/.well-known/jwks.json`))
-  } catch {
-    throw new Error('NEON_AUTH_BASE_URL must be a valid URL')
-  }
-}
+const SESSION_COOKIE_NAME = 'quadpro_session'
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 const httpError = (status, message) => Object.assign(new Error(message), { status })
@@ -264,106 +261,6 @@ if (process.env.VERCEL) app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false }))
 app.use(cors())
 
-const authProxyLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 90,
-  standardHeaders: true,
-  legacyHeaders: false
-})
-
-const hopByHopHeaders = new Set([
-  'connection',
-  'content-encoding',
-  'content-length',
-  'expect',
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade'
-])
-
-function firstPartyAuthCookie(cookie) {
-  return cookie
-    .replace(/;\s*Domain=[^;]*/gi, '')
-    .replace(/;\s*Partitioned/gi, '')
-    .replace(/;\s*SameSite=None/gi, '; SameSite=Lax')
-}
-
-function managedAuthRequestCookies(cookieHeader = '') {
-  return String(cookieHeader)
-    .split(';')
-    .map(cookie => cookie.trim())
-    .filter(cookie => /^(?:__Secure-|__Host-)?neon-auth\./i.test(cookie))
-    .join('; ')
-}
-
-// Managed Neon Auth is hosted on a different domain. Proxying its browser
-// endpoints here makes the HttpOnly session cookie first-party, which keeps
-// reload restoration working even when cross-site cookies are blocked.
-app.use(
-  '/api/neon-auth',
-  authProxyLimiter,
-  express.raw({ type: () => true, limit: '100kb' }),
-  asyncHandler(async (req, res) => {
-    if (!neonAuthBaseUrl) throw httpError(503, 'Neon Auth chưa được cấu hình trên máy chủ')
-
-    const incomingUrl = new URL(req.url, 'http://localhost')
-    const upstreamUrl = new URL(`${neonAuthBaseUrl}${incomingUrl.pathname}`)
-    upstreamUrl.search = incomingUrl.search
-
-    const headers = new Headers()
-    for (const [name, rawValue] of Object.entries(req.headers)) {
-      const normalizedName = name.toLowerCase()
-      if (hopByHopHeaders.has(normalizedName) || normalizedName.startsWith('x-forwarded-')) continue
-      if (normalizedName === 'cookie') {
-        const authCookies = managedAuthRequestCookies(rawValue)
-        if (authCookies) headers.set(name, authCookies)
-        continue
-      }
-      if (Array.isArray(rawValue)) headers.set(name, rawValue.join(', '))
-      else if (rawValue !== undefined) headers.set(name, rawValue)
-    }
-
-    let upstream
-    try {
-      upstream = await fetch(upstreamUrl, {
-        method: req.method,
-        headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
-        redirect: 'manual',
-        signal: AbortSignal.timeout(15_000)
-      })
-    } catch (error) {
-      const causeCode = error.cause?.code ? ` (${error.cause.code})` : ''
-      console.warn(`Neon Auth proxy failed: ${error.name || 'Error'}: ${error.message}${causeCode}`)
-      throw httpError(502, 'Không thể kết nối Neon Auth')
-    }
-
-    for (const [name, value] of upstream.headers.entries()) {
-      const normalizedName = name.toLowerCase()
-      if (normalizedName === 'set-cookie' || hopByHopHeaders.has(normalizedName)) continue
-      res.setHeader(name, value)
-    }
-
-    // Auth responses must never be reused by an intermediary. The proxied
-    // cookie is now same-site, so Lax is both sufficient and more compatible
-    // with browsers/privacy extensions that discard SameSite=None cookies.
-    res.setHeader('Cache-Control', 'private, no-store, max-age=0')
-
-    const cookies = typeof upstream.headers.getSetCookie === 'function'
-      ? upstream.headers.getSetCookie()
-      : [upstream.headers.get('set-cookie')].filter(Boolean)
-    for (const cookie of cookies) res.append('Set-Cookie', firstPartyAuthCookie(cookie))
-
-    const body = Buffer.from(await upstream.arrayBuffer())
-    res.status(upstream.status).send(body)
-  })
-)
-
 // Stripe requires the exact raw request bytes to verify the webhook signature.
 // Keep this route before express.json() and outside the public API rate limiter.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncHandler(async (req, res) => {
@@ -429,30 +326,94 @@ const safeUser = user => ({
   updatedAt: user.updatedAt || user.createdAt
 })
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.' }
+})
+
+function normalizeAuthEmail(value) {
+  const email = String(value || '').trim().toLowerCase()
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw httpError(400, 'Email không hợp lệ')
+  }
+  return email
+}
+
+function validatePassword(value, label = 'Mật khẩu') {
+  const password = String(value || '')
+  if (password.length < 8 || password.length > 128) {
+    throw httpError(400, `${label} phải có từ 8 đến 128 ký tự`)
+  }
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+    throw httpError(400, `${label} cần có chữ hoa, chữ thường và ít nhất một chữ số`)
+  }
+  return password
+}
+
+function parseCookieHeader(header = '') {
+  return Object.fromEntries(String(header)
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const separator = part.indexOf('=')
+      if (separator < 0) return [part, '']
+      return [part.slice(0, separator), part.slice(separator + 1)]
+    }))
+}
+
+function sessionTokenHash(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_DURATION_MS
+  }
+}
+
+function clearSessionCookie(res) {
+  res.clearCookie(SESSION_COOKIE_NAME, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/'
+  })
+}
+
+async function issueSession(req, res, user) {
+  const previousToken = parseCookieHeader(req.headers.cookie)[SESSION_COOKIE_NAME] || ''
+  if (previousToken) await deleteUserSession(sessionTokenHash(previousToken))
+  const token = crypto.randomBytes(32).toString('base64url')
+  await createUserSession({
+    tokenHash: sessionTokenHash(token),
+    userId: user.id,
+    expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+    userAgent: String(req.get('user-agent') || '').slice(0, 500),
+    ipAddress: getClientIp(req).slice(0, 64)
+  })
+  res.cookie(SESSION_COOKIE_NAME, token, sessionCookieOptions())
+}
+
 const authenticate = asyncHandler(async (req, res, next) => {
-  const authorization = req.headers.authorization || ''
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+  const token = parseCookieHeader(req.headers.cookie)[SESSION_COOKIE_NAME] || ''
   if (!token) return res.status(401).json({ message: 'Vui lòng đăng nhập' })
 
-  if (!neonJwks) return res.status(503).json({ message: 'Neon Auth chưa được cấu hình trên máy chủ' })
-
-  let payload
-  try {
-    const verified = await jwtVerify(token, neonJwks, {
-      issuer: neonAuthIssuer,
-      algorithms: ['EdDSA']
-    })
-    payload = verified.payload
-  } catch (error) {
-    console.warn(`Neon Auth token validation failed: ${error.code || 'UNKNOWN'}: ${error.message}`)
+  const tokenHash = sessionTokenHash(token)
+  const user = await findUserBySessionTokenHash(tokenHash)
+  if (!user) {
+    clearSessionCookie(res)
     return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' })
   }
-
-  const user = await syncUserFromAuth({
-    authUserId: payload.sub || payload.id
-  })
-  if (!user || user.status !== 'active') return res.status(401).json({ message: 'Tài khoản không còn hoạt động' })
   req.user = safeUser(user)
+  req.sessionTokenHash = tokenHash
   next()
 })
 
@@ -471,7 +432,7 @@ function validateProfile(body = {}, currentEmail = '') {
 
   if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên phải có từ 2 đến 60 ký tự')
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, 'Email không hợp lệ')
-  if (email !== currentEmail) throw httpError(400, 'Email đăng nhập được quản lý trong Neon Auth và không thể đổi tại đây')
+  if (email !== currentEmail) throw httpError(400, 'Email đăng nhập không thể đổi tại trang này')
   if (address.length > 250) throw httpError(400, 'Địa chỉ không được vượt quá 250 ký tự')
   if (province.length > 80) throw httpError(400, 'Tỉnh/Thành phố không hợp lệ')
   if (phone && !/^(?:\+84\d{9}|0\d{9})$/.test(phone)) throw httpError(400, 'Số điện thoại di động không hợp lệ')
@@ -590,6 +551,57 @@ app.get('/api/health', asyncHandler(async (_, res) => {
   res.json({ ...database, service: 'quadpro-api' })
 }))
 
+app.use('/api/auth', (_, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+  next()
+})
+
+app.post('/api/auth/register', authLimiter, asyncHandler(async (req, res) => {
+  const name = String(req.body?.name || '').trim().replace(/\s+/g, ' ')
+  const email = normalizeAuthEmail(req.body?.email)
+  const phone = String(req.body?.phone || '').trim().replace(/[\s.-]/g, '')
+  const password = validatePassword(req.body?.password)
+  if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên phải có từ 2 đến 60 ký tự')
+  if (phone && !/^(?:\+84\d{9}|0\d{9})$/.test(phone)) throw httpError(400, 'Số điện thoại không hợp lệ')
+
+  const user = await registerUserWithPassword({
+    name,
+    email,
+    phone,
+    passwordHash: await hashPassword(password)
+  })
+  await issueSession(req, res, user)
+  res.status(201).json({ user: safeUser(user) })
+}))
+
+app.post('/api/auth/login', authLimiter, asyncHandler(async (req, res) => {
+  const email = normalizeAuthEmail(req.body?.email)
+  const password = String(req.body?.password || '')
+  if (!password || password.length > 128) throw httpError(401, 'Email hoặc mật khẩu không đúng')
+
+  const user = await findUserByEmail(email)
+  if (!user) throw httpError(401, 'Email hoặc mật khẩu không đúng')
+  if (user.status !== 'active') throw httpError(403, 'Tài khoản đã bị khóa')
+  if (!user.passwordHash) throw httpError(401, 'Email hoặc mật khẩu không đúng')
+  if (!await verifyPassword(password, user.passwordHash)) {
+    throw httpError(401, 'Email hoặc mật khẩu không đúng')
+  }
+
+  if (user.passwordHash.startsWith('better-auth$')) {
+    await saveUser(user.id, { passwordHash: await hashPassword(password) })
+  }
+
+  await issueSession(req, res, user)
+  res.json({ user: safeUser(user) })
+}))
+
+app.post('/api/auth/logout', asyncHandler(async (req, res) => {
+  const token = parseCookieHeader(req.headers.cookie)[SESSION_COOKIE_NAME] || ''
+  if (token) await deleteUserSession(sessionTokenHash(token))
+  clearSessionCookie(res)
+  res.status(204).end()
+}))
+
 app.get('/api/auth/me', authenticate, (req, res) => res.json({ user: req.user }))
 
 app.put('/api/auth/me', authenticate, asyncHandler(async (req, res) => {
@@ -597,6 +609,19 @@ app.put('/api/auth/me', authenticate, asyncHandler(async (req, res) => {
   const user = await saveUser(req.user.id, profile)
   if (!user) throw httpError(404, 'Không tìm thấy tài khoản')
   res.json({ user: safeUser(user) })
+}))
+
+app.put('/api/auth/password', authenticate, asyncHandler(async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || '')
+  const newPassword = validatePassword(req.body?.newPassword, 'Mật khẩu mới')
+  const user = await findUserById(req.user.id)
+  if (!user?.passwordHash || !await verifyPassword(currentPassword, user.passwordHash)) {
+    throw httpError(400, 'Mật khẩu hiện tại không đúng')
+  }
+
+  await saveUser(req.user.id, { passwordHash: await hashPassword(newPassword) })
+  await deleteOtherUserSessions(req.user.id, req.sessionTokenHash)
+  res.json({ message: 'Đổi mật khẩu thành công' })
 }))
 
 app.get('/api/products', asyncHandler(async (req, res) => {
@@ -954,6 +979,17 @@ app.patch('/api/admin/users/:id/status', asyncHandler(async (req, res) => {
   if (req.params.id === req.user.id) throw httpError(400, 'Không thể tự khóa tài khoản đang đăng nhập')
   const user = await saveUser(req.params.id, { status })
   if (!user) throw httpError(404, 'Không tìm thấy người dùng')
+  if (status === 'blocked') await deleteAllUserSessions(user.id)
+  res.json(safeUser(user))
+}))
+
+app.patch('/api/admin/users/:id/role', asyncHandler(async (req, res) => {
+  const role = String(req.body?.role || '')
+  if (!['admin', 'customer'].includes(role)) throw httpError(400, 'Vai trò tài khoản không hợp lệ')
+  if (req.params.id === req.user.id) throw httpError(400, 'Không thể tự thay đổi quyền của tài khoản đang đăng nhập')
+  const user = await saveUser(req.params.id, { role })
+  if (!user) throw httpError(404, 'Không tìm thấy người dùng')
+  await deleteAllUserSessions(user.id)
   res.json(safeUser(user))
 }))
 

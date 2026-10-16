@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "db:init": "node scripts/db-init.js"
+    "db:init": "node scripts/db-init.js",
+    "test:password": "node scripts/password-self-test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -13,7 +14,6 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
-    "jose": "^6.2.12",
     "pg": "^8.23.0",
     "stripe": "^23.0.0"
   }

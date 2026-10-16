@@ -417,6 +417,19 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     }
   }
 
+  async function updateUserRole(account, role) {
+    try {
+      const updated = await api(`/api/admin/users/${account.id}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role })
+      })
+      setUsers(current => current.map(item => item.id === updated.id ? updated : item))
+      showNotice(role === 'admin' ? 'Đã cấp quyền quản trị' : 'Đã chuyển thành khách hàng')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
   const normalizedQuery = query.trim().toLowerCase()
   const visibleProducts = useMemo(() => products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery)), [products, normalizedQuery])
   const visibleShowrooms = useMemo(() => showrooms.filter(showroom => `${showroom.name} ${showroom.address} ${showroom.phone}`.toLowerCase().includes(normalizedQuery)), [showrooms, normalizedQuery])
@@ -536,7 +549,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
         {tab === 'users' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>THÀNH VIÊN</span><h2>{users.length} tài khoản</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, email, số điện thoại..."/></label></div></header>
-          <div className="admin-table-wrap"><table><thead><tr><th>Người dùng</th><th>Liên hệ</th><th>Vai trò</th><th>Ngày đăng ký</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{visibleUsers.map(account => <tr key={account.id}><td><div className="account-cell"><div>{account.name.charAt(0).toUpperCase()}</div><span><b>{account.name}</b><small>{account.id}</small></span></div></td><td><div className="customer-cell"><b>{account.email}</b><small>{account.phone || 'Chưa cập nhật SĐT'}</small></div></td><td><span className={`role-badge ${account.role}`}>{account.role === 'admin' ? 'Quản trị' : 'Khách hàng'}</span></td><td>{formatDate(account.createdAt)}</td><td><span className={`account-status ${account.status}`}>{account.status === 'active' ? 'Hoạt động' : 'Đã khóa'}</span></td><td><button className="account-toggle" disabled={account.id === user.id} onClick={() => toggleUserStatus(account)}>{account.status === 'active' ? 'Khóa' : 'Mở khóa'}</button></td></tr>)}</tbody></table>{!visibleUsers.length && <div className="table-empty">Không tìm thấy tài khoản phù hợp.</div>}</div>
+          <div className="admin-table-wrap"><table><thead><tr><th>Người dùng</th><th>Liên hệ</th><th>Vai trò</th><th>Ngày đăng ký</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{visibleUsers.map(account => <tr key={account.id}><td><div className="account-cell"><div>{account.name.charAt(0).toUpperCase()}</div><span><b>{account.name}</b><small>{account.id}</small></span></div></td><td><div className="customer-cell"><b>{account.email}</b><small>{account.phone || 'Chưa cập nhật SĐT'}</small></div></td><td><select className={`role-badge role-select ${account.role}`} value={account.role} disabled={account.id === user.id} onChange={event => updateUserRole(account, event.target.value)} aria-label={`Vai trò của ${account.name}`}><option value="customer">Khách hàng</option><option value="admin">Quản trị</option></select></td><td>{formatDate(account.createdAt)}</td><td><span className={`account-status ${account.status}`}>{account.status === 'active' ? 'Hoạt động' : 'Đã khóa'}</span></td><td><button className="account-toggle" disabled={account.id === user.id} onClick={() => toggleUserStatus(account)}>{account.status === 'active' ? 'Khóa' : 'Mở khóa'}</button></td></tr>)}</tbody></table>{!visibleUsers.length && <div className="table-empty">Không tìm thấy tài khoản phù hợp.</div>}</div>
         </section>}
       </div>}
     </main>

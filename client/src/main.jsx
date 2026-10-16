@@ -63,7 +63,6 @@ import {
   restoreAuthenticatedUser,
   saveSession,
 } from "./api";
-import { requireAuthClient } from "./auth";
 import AccountSettings from "./components/AccountSettings";
 import AdminDashboard from "./components/AdminDashboard";
 import AuthModal from "./components/AuthModal";
@@ -1334,7 +1333,7 @@ function App() {
 
   async function logout() {
     try {
-      await requireAuthClient().signOut();
+      await api("/api/auth/logout", { method: "POST", auth: false });
     } finally {
       clearSession();
       setSession(null);

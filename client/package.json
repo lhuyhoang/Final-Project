@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@neondatabase/auth": "^0.6.0-beta",
     "@vitejs/plugin-react": "^4.4.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

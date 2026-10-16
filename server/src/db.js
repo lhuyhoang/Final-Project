@@ -189,7 +189,6 @@ export function mapUserRow(row, { includePassword = true } = {}) {
   if (!row) return null
   const user = {
     id: row.id,
-    authUserId: row.auth_user_id || null,
     name: row.name,
     email: row.email,
     phone: row.phone || '',
@@ -201,7 +200,7 @@ export function mapUserRow(row, { includePassword = true } = {}) {
     createdAt: timestampValue(row.created_at),
     updatedAt: timestampValue(row.updated_at || row.created_at)
   }
-  if (includePassword && row.password_hash !== undefined) user.password = row.password_hash
+  if (includePassword && row.password_hash !== undefined) user.passwordHash = row.password_hash
   return user
 }
 
@@ -294,11 +293,6 @@ export async function findUserById(id, { includePassword = true } = {}) {
   return mapUserRow(result.rows[0], { includePassword })
 }
 
-export async function findUserByAuthId(authUserId, { includePassword = false } = {}) {
-  const result = await query('SELECT * FROM users WHERE auth_user_id = $1', [authUserId])
-  return mapUserRow(result.rows[0], { includePassword })
-}
-
 export async function findUserByEmail(email, { includePassword = true } = {}) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
   const result = await query('SELECT * FROM users WHERE email = $1', [normalizedEmail])
@@ -311,14 +305,13 @@ export async function createUser(input) {
   try {
     const result = await query(`
       INSERT INTO users (
-        id, auth_user_id, name, email, phone, landline, address, province,
+        id, name, email, phone, landline, address, province,
         password_hash, role, status, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `, [
       input.id || crypto.randomUUID(),
-      input.authUserId || null,
       input.name,
       String(input.email || '').trim().toLowerCase(),
       input.phone || '',
@@ -339,7 +332,6 @@ export async function createUser(input) {
 
 export async function updateUser(id, updates = {}) {
   const columnMap = {
-    authUserId: 'auth_user_id',
     name: 'name',
     email: 'email',
     phone: 'phone',
@@ -383,82 +375,67 @@ export async function updateUser(id, updates = {}) {
   }
 }
 
-export async function syncUserFromAuth(identity) {
-  const authUserId = String(identity.authUserId || '').trim()
-  if (!authUserId) throw repositoryError(401, 'Token đăng nhập thiếu thông tin người dùng', 'INVALID_AUTH_IDENTITY')
-
+export async function registerUserWithPassword(input) {
+  const email = String(input.email || '').trim().toLowerCase()
   return withTransaction(async client => {
-    const authResult = await client.query(`
-      SELECT id, name, email, "emailVerified" AS email_verified, role, COALESCE(banned, false) AS banned
-      FROM neon_auth."user"
-      WHERE id = $1
-    `, [authUserId])
-    const managedIdentity = authResult.rows[0]
-    if (!managedIdentity) {
-      throw repositoryError(401, 'Không tìm thấy tài khoản trong Neon Auth', 'AUTH_USER_NOT_FOUND')
-    }
-    if (managedIdentity.banned) {
-      throw repositoryError(403, 'Tài khoản đã bị khóa trên Neon Auth', 'AUTH_USER_BANNED')
-    }
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:register:${email}`])
+    let result = await client.query('SELECT * FROM users WHERE email = $1 FOR UPDATE', [email])
+    const existing = mapUserRow(result.rows[0])
 
-    const email = String(managedIdentity.email || '').trim().toLowerCase()
-    const name = String(managedIdentity.name || email.split('@')[0] || 'Thành viên QuadPro').trim().slice(0, 60)
-    const authRole = managedIdentity.role === 'admin' ? 'admin' : 'customer'
-    const emailVerified = managedIdentity.email_verified === true
-    if (!email) throw repositoryError(401, 'Tài khoản Neon Auth thiếu email', 'INVALID_AUTH_IDENTITY')
-
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth:${authUserId}`])
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:auth-email:${email}`])
-
-    let result = await client.query('SELECT * FROM users WHERE auth_user_id = $1 FOR UPDATE', [authUserId])
-    let user = mapUserRow(result.rows[0], { includePassword: false })
-
-    if (user) {
-      if (user.email !== email) {
-        throw repositoryError(409, 'Email Neon Auth không khớp với hồ sơ QuadPro', 'AUTH_EMAIL_MISMATCH')
+    if (existing) {
+      if (existing.status !== 'active') {
+        throw repositoryError(403, 'Tài khoản đã bị khóa', 'ACCOUNT_BLOCKED')
       }
-      if (user.role !== authRole) {
-        result = await client.query(
-          'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-          [authRole, user.id]
-        )
-        user = mapUserRow(result.rows[0], { includePassword: false })
-      }
-      return user
-    }
-
-    result = await client.query('SELECT * FROM users WHERE email = $1 FOR UPDATE', [email])
-    const legacyUser = mapUserRow(result.rows[0], { includePassword: false })
-    if (legacyUser) {
-      if (legacyUser.authUserId && legacyUser.authUserId !== authUserId) {
-        throw repositoryError(409, 'Email này đã được liên kết với tài khoản Neon Auth khác', 'AUTH_EMAIL_LINKED')
-      }
-      if (legacyUser.role === 'admin' && authRole !== 'admin') {
-        throw repositoryError(403, 'Hãy cấp quyền admin cho tài khoản này trong Neon trước khi liên kết', 'ADMIN_LINK_REQUIRES_NEON_ROLE')
-      }
-      if (legacyUser.role !== 'admin' && !emailVerified) {
-        throw repositoryError(409, 'Hãy xác minh email trong Neon Auth trước khi liên kết tài khoản cũ', 'EMAIL_VERIFICATION_REQUIRED')
-      }
-
-      result = await client.query(`
-        UPDATE users
-        SET auth_user_id = $1, role = $2, updated_at = NOW()
-        WHERE id = $3
-        RETURNING *
-      `, [authUserId, authRole, legacyUser.id])
-      return mapUserRow(result.rows[0], { includePassword: false })
+      throw repositoryError(409, 'Email đã được sử dụng', 'EMAIL_EXISTS')
     }
 
     result = await client.query(`
       INSERT INTO users (
-        id, auth_user_id, name, email, phone, landline, address, province,
+        id, name, email, phone, landline, address, province,
         password_hash, role, status, created_at, updated_at
       )
-      VALUES ($1, $1, $2, $3, '', '', '', '', NULL, $4, 'active', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, '', '', '', $5, 'customer', 'active', NOW(), NOW())
       RETURNING *
-    `, [authUserId, name.length >= 2 ? name : 'Thành viên QuadPro', email, authRole])
+    `, [crypto.randomUUID(), input.name, email, input.phone || '', input.passwordHash])
     return mapUserRow(result.rows[0], { includePassword: false })
   })
+}
+
+export async function createUserSession({ tokenHash, userId, expiresAt, userAgent = '', ipAddress = '' }) {
+  await withTransaction(async client => {
+    await client.query('DELETE FROM user_sessions WHERE expires_at <= NOW()')
+    await client.query(`
+      INSERT INTO user_sessions (token_hash, user_id, user_agent, ip_address, expires_at)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [tokenHash, userId, userAgent, ipAddress, expiresAt])
+  })
+}
+
+export async function findUserBySessionTokenHash(tokenHash) {
+  const result = await query(`
+    SELECT users.*
+    FROM user_sessions
+    JOIN users ON users.id = user_sessions.user_id
+    WHERE user_sessions.token_hash = $1
+      AND user_sessions.expires_at > NOW()
+      AND users.status = 'active'
+  `, [tokenHash])
+  return mapUserRow(result.rows[0], { includePassword: false })
+}
+
+export function deleteUserSession(tokenHash) {
+  return query('DELETE FROM user_sessions WHERE token_hash = $1', [tokenHash])
+}
+
+export function deleteOtherUserSessions(userId, currentTokenHash) {
+  return query(
+    'DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2',
+    [userId, currentTokenHash]
+  )
+}
+
+export function deleteAllUserSessions(userId) {
+  return query('DELETE FROM user_sessions WHERE user_id = $1', [userId])
 }
 
 export async function listUsers({ role, status } = {}) {

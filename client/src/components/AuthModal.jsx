@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound, X } from 'lucide-react'
 import { api, saveSession } from '../api'
-import { authErrorMessage, requireAuthClient } from '../auth'
 
 const emptyForm = { name: '', phone: '', email: '', password: '', confirmPassword: '' }
 
@@ -57,25 +56,16 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
 
     setLoading(true)
     try {
-      const auth = requireAuthClient()
       const credentials = {
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        ...(mode === 'register' ? { name: form.name.trim() } : {})
+        ...(mode === 'register' ? { name: form.name.trim(), phone: normalizedPhone } : {})
       }
-      const result = mode === 'register'
-        ? await auth.signUp.email(credentials)
-        : await auth.signIn.email(credentials)
-      if (result.error) throw new Error(authErrorMessage(result.error))
-
-      let { user } = await api('/api/auth/me')
-      if (mode === 'register' && normalizedPhone) {
-        const profile = await api('/api/auth/me', {
-          method: 'PUT',
-          body: JSON.stringify({ ...user, phone: normalizedPhone })
-        })
-        user = profile.user
-      }
+      const { user } = await api(mode === 'register' ? '/api/auth/register' : '/api/auth/login', {
+        method: 'POST',
+        auth: false,
+        body: JSON.stringify(credentials)
+      })
       const session = { user }
       saveSession(session)
       setForm(emptyForm)
