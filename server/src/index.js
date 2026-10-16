@@ -290,6 +290,7 @@ function firstPartyAuthCookie(cookie) {
   return cookie
     .replace(/;\s*Domain=[^;]*/gi, '')
     .replace(/;\s*Partitioned/gi, '')
+    .replace(/;\s*SameSite=None/gi, '; SameSite=Lax')
 }
 
 function managedAuthRequestCookies(cookieHeader = '') {
@@ -347,6 +348,11 @@ app.use(
       if (normalizedName === 'set-cookie' || hopByHopHeaders.has(normalizedName)) continue
       res.setHeader(name, value)
     }
+
+    // Auth responses must never be reused by an intermediary. The proxied
+    // cookie is now same-site, so Lax is both sufficient and more compatible
+    // with browsers/privacy extensions that discard SameSite=None cookies.
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0')
 
     const cookies = typeof upstream.headers.getSetCookie === 'function'
       ? upstream.headers.getSetCookie()
