@@ -1401,6 +1401,15 @@ function App() {
     }
   }
 
+  if (!sessionReady) {
+    return (
+      <div className="session-restore-screen" role="status" aria-live="polite">
+        <span className="session-restore-spinner" aria-hidden="true" />
+        <b>Đang khôi phục phiên đăng nhập...</b>
+      </div>
+    );
+  }
+
   if (adminView && session?.user.role === "admin") {
     return (
       <AdminDashboard

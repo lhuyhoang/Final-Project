@@ -56,7 +56,8 @@ const stripe = stripeSecretKey
 const vnpayTmnCode = String(process.env.VNPAY_TMN_CODE || '').trim()
 const vnpayHashSecret = String(process.env.VNPAY_HASH_SECRET || '').trim()
 const vnpayPaymentUrl = String(process.env.VNPAY_PAYMENT_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html').trim()
-const SESSION_COOKIE_NAME = 'quadpro_session'
+const LEGACY_SESSION_COOKIE_NAME = 'quadpro_session'
+const SESSION_COOKIE_NAME = isProduction ? '__Host-quadpro_session' : LEGACY_SESSION_COOKIE_NAME
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
@@ -375,6 +376,7 @@ function sessionCookieOptions() {
     secure: isProduction,
     sameSite: 'lax',
     path: '/',
+    priority: 'high',
     maxAge: SESSION_DURATION_MS
   }
 }
@@ -384,13 +386,28 @@ function clearSessionCookie(res) {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
+    path: '/',
+    priority: 'high'
+  })
+}
+
+function clearLegacySessionCookie(res) {
+  if (SESSION_COOKIE_NAME === LEGACY_SESSION_COOKIE_NAME) return
+  res.clearCookie(LEGACY_SESSION_COOKIE_NAME, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
     path: '/'
   })
 }
 
 async function issueSession(req, res, user) {
-  const previousToken = parseCookieHeader(req.headers.cookie)[SESSION_COOKIE_NAME] || ''
-  if (previousToken) await deleteUserSession(sessionTokenHash(previousToken))
+  const cookies = parseCookieHeader(req.headers.cookie)
+  const previousTokens = new Set([
+    cookies[SESSION_COOKIE_NAME],
+    cookies[LEGACY_SESSION_COOKIE_NAME]
+  ].filter(Boolean))
+  await Promise.all([...previousTokens].map(token => deleteUserSession(sessionTokenHash(token))))
   const token = crypto.randomBytes(32).toString('base64url')
   await createUserSession({
     tokenHash: sessionTokenHash(token),
@@ -399,6 +416,7 @@ async function issueSession(req, res, user) {
     userAgent: String(req.get('user-agent') || '').slice(0, 500),
     ipAddress: getClientIp(req).slice(0, 64)
   })
+  clearLegacySessionCookie(res)
   res.cookie(SESSION_COOKIE_NAME, token, sessionCookieOptions())
 }
 
@@ -596,9 +614,14 @@ app.post('/api/auth/login', authLimiter, asyncHandler(async (req, res) => {
 }))
 
 app.post('/api/auth/logout', asyncHandler(async (req, res) => {
-  const token = parseCookieHeader(req.headers.cookie)[SESSION_COOKIE_NAME] || ''
-  if (token) await deleteUserSession(sessionTokenHash(token))
+  const cookies = parseCookieHeader(req.headers.cookie)
+  const tokens = new Set([
+    cookies[SESSION_COOKIE_NAME],
+    cookies[LEGACY_SESSION_COOKIE_NAME]
+  ].filter(Boolean))
+  await Promise.all([...tokens].map(token => deleteUserSession(sessionTokenHash(token))))
   clearSessionCookie(res)
+  clearLegacySessionCookie(res)
   res.status(204).end()
 }))
 

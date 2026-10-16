@@ -34,7 +34,7 @@ function sendRequest(path, fetchOptions, authenticated) {
 
   return fetch(path, {
     ...fetchOptions,
-    credentials: 'same-origin',
+    credentials: 'include',
     ...(authenticated && fetchOptions.cache === undefined ? { cache: 'no-store' } : {}),
     headers
   })

@@ -3431,3 +3431,27 @@ html[data-theme="dark"] .search .header-search-all:focus-visible {
     scroll-margin-top: 105px;
   }
 }
+
+.session-restore-screen {
+  align-items: center;
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.session-restore-spinner {
+  animation: session-restore-spin .8s linear infinite;
+  border: 3px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 50%;
+  border-top-color: var(--red);
+  height: 30px;
+  width: 30px;
+}
+
+@keyframes session-restore-spin {
+  to { transform: rotate(360deg); }
+}
