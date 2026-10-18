@@ -47,9 +47,12 @@ function getRelatedProducts(product, products, limit = 4) {
   const productBrand = normalizeRecommendationText(product.brand);
 
   return products
-    .filter((item) => item.id !== product.id)
+    .filter(
+      (item) =>
+        item.id !== product.id &&
+        normalizeRecommendationText(item.category) === productCategory,
+    )
     .map((item) => {
-      const sameCategory = normalizeRecommendationText(item.category) === productCategory;
       const sameBrand = normalizeRecommendationText(item.brand) === productBrand;
       const nameSimilarity = getNameSimilarity(product.name, item.name);
       const priceDifference = Math.abs((Number(item.price) || 0) - productPrice) / productPrice;
@@ -62,7 +65,6 @@ function getRelatedProducts(product, products, limit = 4) {
         product: item,
         priceDifference,
         score:
-          (sameCategory ? 60 : 0) +
           (sameBrand ? 45 : 0) +
           nameSimilarity * 35 +
           priceScore -
