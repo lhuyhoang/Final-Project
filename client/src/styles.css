@@ -2479,6 +2479,10 @@ html[data-theme="dark"] .quick-view-rating small {
   contain-intrinsic-size: auto 600px;
 }
 
+.product-information-grid.has-component-specs {
+  grid-template-columns: 1fr;
+}
+
 .product-description-panel,
 .product-specification-panel,
 .related-products-section {
@@ -2562,6 +2566,66 @@ html[data-theme="dark"] :where(.detail-highlights > p, .product-description-pane
 .specification-table strong {
   color: #33373e;
   font-weight: 700;
+}
+
+.component-specification-table {
+  overflow-x: auto;
+  border: 1px solid #dfe2e6;
+  border-radius: 9px;
+}
+
+.component-specification-table table {
+  width: 100%;
+  min-width: 660px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.component-specification-index {
+  width: 72px;
+}
+
+.component-specification-quantity {
+  width: 86px;
+}
+
+.component-specification-warranty {
+  width: 110px;
+}
+
+.component-specification-table th,
+.component-specification-table td {
+  height: 46px;
+  padding: 10px 13px;
+  color: #25282e;
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+  border-right: 1px solid #dfe2e6;
+  border-bottom: 1px solid #dfe2e6;
+}
+
+.component-specification-table th {
+  color: #4c5159;
+  font-weight: 800;
+  background: #f5f6f7;
+}
+
+.component-specification-table td:nth-child(2) {
+  text-align: left;
+}
+
+.component-specification-table th:last-child,
+.component-specification-table td:last-child {
+  border-right: 0;
+}
+
+.component-specification-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.component-specification-table tbody tr:nth-child(even) td {
+  background: #fafbfc;
 }
 
 .related-products-section {
@@ -3187,6 +3251,25 @@ html[data-theme="dark"] .specification-table span {
   color: var(--theme-text-muted);
   background: var(--theme-panel-soft);
   border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .component-specification-table,
+html[data-theme="dark"] .component-specification-table :where(th, td) {
+  border-color: var(--theme-border);
+}
+
+html[data-theme="dark"] .component-specification-table th {
+  color: var(--theme-text-primary);
+  background: var(--theme-panel-soft);
+}
+
+html[data-theme="dark"] .component-specification-table td {
+  color: var(--theme-text-secondary);
+  background: #1b1e24;
+}
+
+html[data-theme="dark"] .component-specification-table tbody tr:nth-child(even) td {
+  background: #20242b;
 }
 
 html[data-theme="dark"] .related-product-card footer {

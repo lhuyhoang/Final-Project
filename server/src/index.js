@@ -488,6 +488,39 @@ function normalizeProduct(body = {}, current = {}) {
     if (value.length > max) throw httpError(400, `${key} không được vượt quá ${max} ký tự`)
     return value
   }
+  const rawHighlights = body.highlights ?? current.highlights ?? []
+  if (!Array.isArray(rawHighlights) || rawHighlights.length > 8) {
+    throw httpError(400, 'Điểm nổi bật phải là danh sách tối đa 8 dòng')
+  }
+  const highlights = rawHighlights.map((item, index) => {
+    if (typeof item !== 'string') throw httpError(400, `Điểm nổi bật ${index + 1} không hợp lệ`)
+    const value = item.trim().replace(/\s+/g, ' ')
+    if (value.length > 200) throw httpError(400, `Điểm nổi bật ${index + 1} không được vượt quá 200 ký tự`)
+    return value
+  }).filter(Boolean)
+
+  const rawSpecifications = body.specifications ?? current.specifications ?? []
+  if (!Array.isArray(rawSpecifications) || rawSpecifications.length > 30) {
+    throw httpError(400, 'Thông số kỹ thuật phải là danh sách tối đa 30 dòng')
+  }
+  const specifications = rawSpecifications.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw httpError(400, `Thông số kỹ thuật ${index + 1} không hợp lệ`)
+    }
+    const description = String(item.description || '').trim().replace(/\s+/g, ' ')
+    const warranty = String(item.warranty || '').trim().replace(/\s+/g, ' ')
+    const quantity = Number(item.quantity)
+    if (!description || description.length > 300) {
+      throw httpError(400, `Mô tả thiết bị ${index + 1} phải có từ 1 đến 300 ký tự`)
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+      throw httpError(400, `Số lượng thiết bị ${index + 1} phải từ 1 đến 99`)
+    }
+    if (warranty.length > 40) {
+      throw httpError(400, `Bảo hành thiết bị ${index + 1} không được vượt quá 40 ký tự`)
+    }
+    return { description, quantity, warranty }
+  })
 
   const price = Math.round(number('price', 1))
   const oldPrice = Math.round(number('oldPrice', 1))
@@ -517,6 +550,8 @@ function normalizeProduct(body = {}, current = {}) {
     badge: String(body.badge ?? current.badge ?? 'Mới').trim().slice(0, 40) || 'Mới',
     policyText: text('policyText', 120, DEFAULT_PRODUCT_POLICY_TEXT),
     description: optionalText('description', 2000),
+    highlights,
+    specifications,
     image
   }
 }

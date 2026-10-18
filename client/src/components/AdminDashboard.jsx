@@ -30,7 +30,7 @@ const statusLabels = {
   cancelled: 'Đã hủy'
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
-const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText, description: '' }
+const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText, description: '', highlightsText: '', specifications: [] }
 const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapUrl: '', isActive: true, sortOrder: 0 }
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
@@ -98,7 +98,15 @@ function ProductEditor({ product, onClose, onSaved }) {
     image: product.image,
     badge: product.badge,
     policyText: product.policyText || defaultPolicyText,
-    description: product.description || ''
+    description: product.description || '',
+    highlightsText: Array.isArray(product.highlights) ? product.highlights.join('\n') : '',
+    specifications: Array.isArray(product.specifications)
+      ? product.specifications.map(item => ({
+          description: item.description || '',
+          quantity: item.quantity || 1,
+          warranty: item.warranty || ''
+        }))
+      : []
   } : emptyProduct)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -106,6 +114,29 @@ function ProductEditor({ product, onClose, onSaved }) {
 
   function update(event) {
     setForm(current => ({ ...current, [event.target.name]: event.target.value }))
+  }
+
+  function addSpecification() {
+    setForm(current => ({
+      ...current,
+      specifications: [...current.specifications, { description: '', quantity: 1, warranty: '36 tháng' }]
+    }))
+  }
+
+  function updateSpecification(index, field, value) {
+    setForm(current => ({
+      ...current,
+      specifications: current.specifications.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, [field]: value } : item
+      ))
+    }))
+  }
+
+  function removeSpecification(index) {
+    setForm(current => ({
+      ...current,
+      specifications: current.specifications.filter((_, itemIndex) => itemIndex !== index)
+    }))
   }
 
   async function uploadImage(event) {
@@ -153,11 +184,18 @@ function ProductEditor({ product, onClose, onSaved }) {
     setSaving(true)
     setError('')
     try {
+      const { highlightsText, ...productFields } = form
       const payload = {
-        ...form,
+        ...productFields,
         price: Number(form.price),
         oldPrice: Number(form.oldPrice || form.price),
-        stock: Number(form.stock)
+        stock: Number(form.stock),
+        highlights: highlightsText.split(/\r?\n/).map(item => item.trim()).filter(Boolean),
+        specifications: form.specifications.map(item => ({
+          description: item.description.trim(),
+          quantity: Number(item.quantity),
+          warranty: item.warranty.trim()
+        }))
       }
       const saved = await api(product ? `/api/admin/products/${product.id}` : '/api/admin/products', {
         method: product ? 'PUT' : 'POST',
@@ -186,6 +224,23 @@ function ProductEditor({ product, onClose, onSaved }) {
             <label><span>Nhãn nổi bật</span><input name="badge" value={form.badge} onChange={update} maxLength="40"/></label>
             <label className="full"><span>Thông tin trả góp / bảo hành</span><input name="policyText" value={form.policyText} onChange={update} maxLength="120" required/></label>
             <label className="full"><span>Mô tả sản phẩm</span><textarea name="description" value={form.description} onChange={update} maxLength="2000" rows="5" placeholder="Nhập đặc điểm, công dụng và thông tin nổi bật của sản phẩm..."/></label>
+            <label className="full"><span>Điểm nổi bật (mỗi dòng một nội dung)</span><textarea name="highlightsText" value={form.highlightsText} onChange={update} maxLength="1600" rows="5" placeholder={'Sản phẩm chính hãng, đầy đủ phụ kiện\nHiệu năng ổn định cho công việc và giải trí'}/></label>
+            <div className="product-spec-editor full">
+              <div className="product-spec-heading">
+                <div><span>Cấu hình / thông số kỹ thuật</span><small>Tối đa 30 dòng · hiển thị theo mẫu STT, mô tả, SL và BH</small></div>
+                <button type="button" onClick={addSpecification} disabled={form.specifications.length >= 30}><Plus size={15}/> Thêm dòng</button>
+              </div>
+              {form.specifications.length > 0 ? <div className="product-spec-list">
+                <div className="product-spec-labels" aria-hidden="true"><span>STT</span><span>Mô tả thiết bị</span><span>SL</span><span>BH</span><span/></div>
+                {form.specifications.map((item, index) => <div className="product-spec-row" key={index}>
+                  <b>{index + 1}</b>
+                  <input value={item.description} onChange={event => updateSpecification(index, 'description', event.target.value)} required maxLength="300" placeholder="Ví dụ: CPU Intel Core i5-14400F" aria-label={`Mô tả thiết bị ${index + 1}`}/>
+                  <input type="number" value={item.quantity} onChange={event => updateSpecification(index, 'quantity', event.target.value)} required min="1" max="99" aria-label={`Số lượng thiết bị ${index + 1}`}/>
+                  <input value={item.warranty} onChange={event => updateSpecification(index, 'warranty', event.target.value)} maxLength="40" placeholder="36 tháng" aria-label={`Bảo hành thiết bị ${index + 1}`}/>
+                  <button type="button" onClick={() => removeSpecification(index)} aria-label={`Xóa thông số ${index + 1}`}><Trash2 size={15}/></button>
+                </div>)}
+              </div> : <div className="product-spec-empty">Chưa có cấu hình chi tiết. Trang sản phẩm sẽ tạm hiển thị thông tin cơ bản.</div>}
+            </div>
             <label className="full"><span>URL hình ảnh</span><input type="url" name="image" value={form.image} onChange={update} placeholder="https://..." required/></label>
             <div className="product-image-upload full">
               <span>Tải ảnh từ máy</span>

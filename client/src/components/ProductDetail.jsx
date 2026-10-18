@@ -178,7 +178,7 @@ export default function ProductDetail({
   const productDescription = product.description?.trim() ||
     `${product.name} là sản phẩm chính hãng từ ${product.brand}, phù hợp cho nhu cầu thuộc nhóm ${product.category.toLowerCase()}. Sản phẩm được QuadPro kiểm tra ngoại quan và chức năng trước khi bàn giao.`;
   const relatedProducts = getRelatedProducts(product, products);
-  const specificationRows = [
+  const basicSpecificationRows = [
     ["Mã sản phẩm", `QP-${String(product.id).padStart(5, "0")}`],
     ["Thương hiệu / hãng sản xuất", product.brand],
     ["Danh mục", product.category],
@@ -188,6 +188,9 @@ export default function ProductDetail({
     ["Đánh giá", `${product.rating}/5 từ ${product.reviews} lượt đánh giá`],
     ["Chính sách", policyText],
   ];
+  const technicalSpecifications = Array.isArray(product.specifications)
+    ? product.specifications.filter((item) => item?.description)
+    : [];
   const canBuy = stock > 0;
 
   function changeQuantity(change) {
@@ -388,7 +391,7 @@ export default function ProductDetail({
           </article>
         </section>
 
-        <section className="product-information-grid">
+        <section className={`product-information-grid${technicalSpecifications.length ? " has-component-specs" : ""}`}>
           <article className="product-description-panel">
             <span className="detail-section-label">QUADPRO REVIEW</span>
             <h2>Điểm nổi bật của {product.name}</h2>
@@ -405,14 +408,40 @@ export default function ProductDetail({
           <article className="product-specification-panel">
             <span className="detail-section-label">THÔNG TIN SẢN PHẨM</span>
             <h2>Thông số kỹ thuật</h2>
-            <div className="specification-table">
-              {specificationRows.map(([label, value]) => (
-                <div key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
+            {technicalSpecifications.length ? (
+              <div className="component-specification-table">
+                <table>
+                  <colgroup>
+                    <col className="component-specification-index" />
+                    <col />
+                    <col className="component-specification-quantity" />
+                    <col className="component-specification-warranty" />
+                  </colgroup>
+                  <thead>
+                    <tr><th>STT</th><th>Mô tả thiết bị</th><th>SL</th><th>BH</th></tr>
+                  </thead>
+                  <tbody>
+                    {technicalSpecifications.map((item, index) => (
+                      <tr key={`${item.description}-${index}`}>
+                        <td>{index + 1}</td>
+                        <td>{item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>{item.warranty || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="specification-table">
+                {basicSpecificationRows.map(([label, value]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </article>
         </section>
 
