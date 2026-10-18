@@ -909,17 +909,28 @@ html[data-theme="dark"] .account-navigation button.active {
   background: #321b1c;
 }
 
-html[data-theme="dark"] :where(.account-field input, .account-field select) {
+html[data-theme="dark"] .account-field input,
+html[data-theme="dark"] .account-field input:hover,
+html[data-theme="dark"] .account-field select,
+html[data-theme="dark"] .account-field select:hover {
   color: #eef0f4;
+  -webkit-text-fill-color: #eef0f4;
   color-scheme: dark;
   caret-color: #eef0f4;
-  background: #14161a;
+  background-color: #14161a;
+  background-image: none;
   border-color: #3a3d45;
 }
 
-html[data-theme="dark"] :where(.account-field input:focus, .account-field select:focus) {
+html[data-theme="dark"] .account-field input:focus,
+html[data-theme="dark"] .account-field input:focus-visible,
+html[data-theme="dark"] .account-field select:focus,
+html[data-theme="dark"] .account-field select:focus-visible {
   color: #fff;
-  background: #17191e;
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  background-color: #17191e;
+  background-image: none;
   border-color: #ee6b64;
   box-shadow: 0 0 0 3px rgba(238, 107, 100, .16);
 }
@@ -935,17 +946,18 @@ html[data-theme="dark"] .account-field input:-webkit-autofill:hover,
 html[data-theme="dark"] .account-field input:-webkit-autofill:active {
   caret-color: #eef0f4;
   border-color: #3a3d45;
-  -webkit-text-fill-color: #eef0f4;
-  -webkit-box-shadow: 0 0 0 1000px #14161a inset;
-  box-shadow: 0 0 0 1000px #14161a inset;
+  -webkit-text-fill-color: #eef0f4 !important;
+  -webkit-box-shadow: 0 0 0 1000px #14161a inset !important;
+  box-shadow: 0 0 0 1000px #14161a inset !important;
+  transition: background-color 999999s ease-out 0s;
 }
 
 html[data-theme="dark"] .account-field input:-webkit-autofill:focus {
   caret-color: #fff;
   border-color: #ee6b64;
-  -webkit-text-fill-color: #fff;
-  -webkit-box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16);
-  box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16);
+  -webkit-text-fill-color: #fff !important;
+  -webkit-box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16) !important;
+  box-shadow: 0 0 0 1000px #17191e inset, 0 0 0 3px rgba(238, 107, 100, .16) !important;
 }
 
 html[data-theme="dark"] :where(.account-field > span, .account-panel-heading h1, .account-order-header strong, .account-order-item span b, .account-empty-orders h2) {
