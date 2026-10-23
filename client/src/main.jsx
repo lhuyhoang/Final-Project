@@ -485,10 +485,14 @@ function CategoryProductCarousel({
     const startedAt = performance.now();
     const easeInOut = (progress) => {
       if (carouselEasing === "linear") return progress;
-      if (carouselEasing === "soft") return 1 - Math.pow(1 - progress, 3);
+      if (carouselEasing === "soft") {
+        return progress < 0.5
+          ? 8 * progress ** 4
+          : 1 - Math.pow(-2 * progress + 2, 4) / 2;
+      }
       return progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        ? 4 * progress ** 3
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
     };
 
     const frame = (now) => {

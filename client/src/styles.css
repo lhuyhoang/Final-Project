@@ -859,9 +859,14 @@ html[data-theme="dark"] .showroom-list > a > svg:first-child {
   gap: 10px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   scroll-snap-type: inline mandatory;
   scrollbar-width: none;
+}
+
+.category-product-track.is-transitioning {
+  scroll-snap-type: none;
+  overscroll-behavior: none;
 }
 
 .category-product-track .product-card {
