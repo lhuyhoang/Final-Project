@@ -1344,6 +1344,93 @@
   background: #ffe9e7;
 }
 
+.store-settings-panel {
+  max-width: 760px;
+  padding: 22px;
+}
+
+.store-settings-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eceef1;
+}
+
+.store-settings-panel > header > svg {
+  color: var(--red);
+}
+
+.store-settings-panel form {
+  padding-top: 20px;
+}
+
+.store-setting-card {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  background: #fafbfc;
+  border: 1px solid #eceef1;
+  border-radius: 11px;
+}
+
+.store-setting-card b,
+.store-setting-card small {
+  display: block;
+}
+
+.store-setting-card b {
+  color: #30343a;
+  font-size: 11px;
+}
+
+.store-setting-card small {
+  margin-top: 5px;
+  color: #858b95;
+  font-size: 9px;
+}
+
+.store-setting-card label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: #6c727d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.store-setting-card input {
+  width: 72px;
+  height: 42px;
+  padding: 0 10px;
+  color: #30343a;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #dfe2e6;
+  border-radius: 8px;
+  outline: 0;
+}
+
+.store-setting-card input:focus {
+  border-color: #e7847e;
+  box-shadow: 0 0 0 3px #e6332a0d;
+}
+
+.store-setting-hint {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 14px 0 18px;
+  color: #7f8590;
+  font-size: 9px;
+}
+
+.store-setting-hint svg {
+  color: #1d9a69;
+}
+
 .admin-product-cell,
 .account-cell {
   display: flex;
@@ -2922,6 +3009,36 @@ html[data-theme="dark"] .category-manager-item > button {
 html[data-theme="dark"] .category-manager-item > button:hover {
   color: #ffaaa4;
   background: #542326;
+}
+
+html[data-theme="dark"] .store-settings-panel > header {
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .store-setting-card {
+  background: #15181d;
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .store-setting-card b {
+  color: var(--admin-text);
+}
+
+html[data-theme="dark"] .store-setting-card small,
+html[data-theme="dark"] .store-setting-hint {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .store-setting-card input {
+  color: var(--admin-text);
+  background: var(--admin-surface-raised);
+  border-color: var(--admin-border);
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .store-setting-card input:focus {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px #ff6b6322;
 }
 
 html[data-theme="dark"] .list-actions label {

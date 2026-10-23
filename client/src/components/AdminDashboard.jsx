@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 
@@ -36,7 +36,7 @@ const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
-const validAdminTabs = new Set(['overview', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
+const validAdminTabs = new Set(['overview', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
 const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
 
 function normalizeImportHeader(value) {
@@ -669,6 +669,54 @@ function CategoryManager({ categories, onCreated, onRequestDelete }) {
   </section>
 }
 
+function StoreSettings({ galleryInterval, onSaved }) {
+  const [value, setValue] = useState(String(galleryInterval || 5))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setValue(String(galleryInterval || 5))
+  }, [galleryInterval])
+
+  async function submit(event) {
+    event.preventDefault()
+    const seconds = Number(value)
+    if (!Number.isInteger(seconds) || seconds < 2 || seconds > 60) {
+      setError('Thời gian phải là số nguyên từ 2 đến 60 giây.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await api('/api/admin/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ productGalleryIntervalSeconds: seconds })
+      })
+      onSaved(updated.productGalleryIntervalSeconds)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="admin-panel store-settings-panel">
+    <header>
+      <div><span>CẤU HÌNH CỬA HÀNG</span><h2>Cài đặt hiển thị</h2></div>
+      <Settings size={21}/>
+    </header>
+    <form onSubmit={submit}>
+      <div className="store-setting-card">
+        <div><b>Tự động chuyển ảnh sản phẩm</b><small>Ảnh trong gallery sẽ tự động chuyển trên trang chi tiết sản phẩm.</small></div>
+        <label><input type="number" min="2" max="60" step="1" value={value} onChange={event => setValue(event.target.value)} aria-label="Số giây tự động chuyển ảnh"/><span>giây</span></label>
+      </div>
+      <p className="store-setting-hint"><Check size={15}/> Khoảng thời gian áp dụng cho tất cả sản phẩm có từ 2 ảnh trở lên.</p>
+      {error && <div className="admin-form-error" role="alert">{error}</div>}
+      <button className="admin-primary" disabled={saving}><Save size={16}/>{saving ? 'Đang lưu...' : 'Lưu cài đặt'}</button>
+    </form>
+  </section>
+}
+
 export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
@@ -680,6 +728,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [onlinePayments, setOnlinePayments] = useState([])
   const [stripeOverview, setStripeOverview] = useState(null)
   const [users, setUsers] = useState([])
+  const [galleryInterval, setGalleryInterval] = useState(5)
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -701,7 +750,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       const stripeRequest = api('/api/admin/stripe/overview')
         .then(data => ({ data }))
         .catch(stripeError => ({ error: stripeError }))
-      const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, stripeResult] = await Promise.all([
+      const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, settingsData, stripeResult] = await Promise.all([
         api('/api/admin/stats'),
         api('/api/admin/products'),
         api('/api/admin/categories'),
@@ -709,6 +758,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         api('/api/admin/orders'),
         api('/api/admin/payments'),
         api('/api/admin/users'),
+        api('/api/admin/settings'),
         stripeRequest
       ])
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
@@ -719,6 +769,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       setOrders(orderData)
       setOnlinePayments(paymentData)
       setUsers(userData)
+      setGalleryInterval(settingsData.productGalleryIntervalSeconds || 5)
       setStripeOverview(stripeResult.data || { error: stripeResult.error?.message || 'Không thể tải dữ liệu Stripe Sandbox' })
     } catch (requestError) {
       setError(requestError.message)
@@ -797,6 +848,11 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   function saveCategory(category) {
     setCategories(current => [...current, category].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
     showNotice(`Đã thêm danh mục “${category.name}”`)
+  }
+
+  function saveGalleryInterval(seconds) {
+    setGalleryInterval(seconds)
+    showNotice(`Đã cập nhật thời gian chuyển ảnh: ${seconds} giây`)
   }
 
   function removeCategory(category) {
@@ -931,7 +987,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
     { id: 'stripe-dashboard', label: 'Stripe Sandbox', icon: WalletCards },
-    { id: 'users', label: 'Khách hàng', icon: Users }
+    { id: 'users', label: 'Khách hàng', icon: Users },
+    { id: 'settings', label: 'Cài đặt', icon: Settings }
   ]
 
   return <div
@@ -980,6 +1037,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </section>}
 
         {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onRequestDelete={removeCategory}/>}
+
+        {tab === 'settings' && <StoreSettings galleryInterval={galleryInterval} onSaved={saveGalleryInterval}/>}
 
         {tab === 'showrooms' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>

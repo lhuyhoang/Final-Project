@@ -33,6 +33,7 @@ import {
   findUserById,
   findUserBySessionTokenHash,
   getAdminStats,
+  getStoreSettings,
   healthCheck,
   initializeDatabase,
   listOrders,
@@ -45,6 +46,7 @@ import {
   updateOrderStatus,
   updateProduct as saveProduct,
   updateShowroom,
+  updateStoreSetting,
   updateUser as saveUser
 } from './db.js'
 import { hashPassword, verifyPassword } from './password.js'
@@ -577,6 +579,15 @@ function normalizeCategory(body = {}) {
   return { name, icon, color }
 }
 
+function mapPublicStoreSettings(settings) {
+  const parsedInterval = Number(settings.product_gallery_interval_seconds?.value)
+  return {
+    productGalleryIntervalSeconds: Number.isInteger(parsedInterval)
+      ? Math.min(Math.max(parsedInterval, 2), 60)
+      : 5
+  }
+}
+
 function normalizeShowroom(body = {}, current = {}) {
   const requiredText = (key, minimum, maximum) => {
     const value = String(body[key] ?? current[key] ?? '').trim().replace(/\s+/g, ' ')
@@ -712,6 +723,10 @@ app.get('/api/products', asyncHandler(async (req, res) => {
 
 app.get('/api/categories', asyncHandler(async (req, res) => {
   res.json(await listCategories())
+}))
+
+app.get('/api/settings', asyncHandler(async (req, res) => {
+  res.json(mapPublicStoreSettings(await getStoreSettings()))
 }))
 
 app.get('/api/products/:id', asyncHandler(async (req, res) => {
@@ -990,6 +1005,19 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
 app.get('/api/admin/products', asyncHandler(async (req, res) => res.json(await listProducts())))
 
 app.get('/api/admin/categories', asyncHandler(async (req, res) => res.json(await listCategories())))
+
+app.get('/api/admin/settings', asyncHandler(async (req, res) => {
+  res.json(mapPublicStoreSettings(await getStoreSettings()))
+}))
+
+app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
+  const rawInterval = Number(req.body?.productGalleryIntervalSeconds)
+  if (!Number.isInteger(rawInterval) || rawInterval < 2 || rawInterval > 60) {
+    throw httpError(400, 'Thời gian tự chuyển ảnh phải từ 2 đến 60 giây')
+  }
+  await updateStoreSetting('product_gallery_interval_seconds', String(rawInterval))
+  res.json({ productGalleryIntervalSeconds: rawInterval })
+}))
 
 app.post('/api/admin/categories', asyncHandler(async (req, res) => {
   try {

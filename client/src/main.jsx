@@ -830,6 +830,7 @@ function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
+  const [galleryInterval, setGalleryInterval] = useState(5);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Tất cả");
@@ -906,10 +907,22 @@ function App() {
     }
   }
 
+  async function refreshSettings() {
+    try {
+      const settings = await api("/api/settings");
+      if (Number.isInteger(settings.productGalleryIntervalSeconds)) {
+        setGalleryInterval(Math.min(Math.max(settings.productGalleryIntervalSeconds, 2), 60));
+      }
+    } catch {
+      /* The default interval keeps the gallery usable while settings load. */
+    }
+  }
+
   useEffect(() => {
     refreshProducts();
     refreshCategories();
     refreshShowrooms();
+    refreshSettings();
   }, []);
   useEffect(() => {
     let active = true;
@@ -1846,6 +1859,7 @@ function App() {
             product={productsLoaded ? selectedProduct : null}
             products={products}
             loading={!productsLoaded}
+            galleryInterval={galleryInterval}
             onBack={openStorefront}
             onOpenProduct={openProduct}
             onAdd={addToCart}

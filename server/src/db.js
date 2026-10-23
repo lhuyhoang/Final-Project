@@ -619,6 +619,26 @@ export async function deleteProducts(ids) {
   return result.rows.map(mapProductRow)
 }
 
+export async function getStoreSettings() {
+  const result = await query('SELECT key, value, updated_at FROM store_settings ORDER BY key ASC')
+  return Object.fromEntries(result.rows.map(row => [row.key, {
+    value: row.value,
+    updatedAt: timestampValue(row.updated_at)
+  }]))
+}
+
+export async function updateStoreSetting(key, value) {
+  const result = await query(`
+    INSERT INTO store_settings (key, value, updated_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (key) DO UPDATE
+      SET value = EXCLUDED.value, updated_at = NOW()
+    RETURNING key, value, updated_at
+  `, [key, value])
+  const row = result.rows[0]
+  return { key: row.key, value: row.value, updatedAt: timestampValue(row.updated_at) }
+}
+
 export async function listShowrooms({ includeInactive = false } = {}) {
   const where = includeInactive ? '' : 'WHERE is_active = TRUE'
   const result = await query(`

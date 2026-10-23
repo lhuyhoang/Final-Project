@@ -1978,6 +1978,46 @@ html[data-theme="dark"] .quick-view-rating small {
   animation: product-detail-enter .42s cubic-bezier(.2, .75, .25, 1) both;
 }
 
+.product-gallery-arrow {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: #323740;
+  background: rgba(255, 255, 255, .94);
+  border: 1px solid #e0e3e8;
+  border-radius: 50%;
+  box-shadow: 0 7px 20px rgba(28, 31, 38, .16);
+  transform: translateY(-50%);
+  transition: color .2s ease, background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.product-gallery-arrow.previous { left: 14px; }
+.product-gallery-arrow.next { right: 14px; }
+
+.product-gallery-arrow:hover,
+.product-gallery-arrow:focus-visible {
+  color: var(--red);
+  background: #fff;
+  box-shadow: 0 9px 24px rgba(230, 51, 42, .2);
+  transform: translateY(-50%) scale(1.06);
+}
+
+html[data-theme="dark"] .product-gallery-arrow {
+  color: #edf0f4;
+  background: rgba(27, 31, 38, .94);
+  border-color: #3a414d;
+}
+
+html[data-theme="dark"] .product-gallery-arrow:hover,
+html[data-theme="dark"] .product-gallery-arrow:focus-visible {
+  color: #ff8178;
+  background: #252b34;
+}
+
 .detail-discount {
   position: absolute;
   z-index: 2;

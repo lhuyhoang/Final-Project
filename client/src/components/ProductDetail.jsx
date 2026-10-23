@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
+  ChevronLeft,
   ChevronRight,
   Gift,
   Minus,
@@ -144,6 +145,7 @@ export default function ProductDetail({
   product,
   products,
   loading,
+  galleryInterval = 5,
   onBack,
   onOpenProduct,
   onAdd,
@@ -164,12 +166,28 @@ export default function ProductDetail({
     };
   }, [product?.id]);
 
+  const gallery = product
+    ? [
+        product.image,
+        ...(Array.isArray(product.gallery) ? product.gallery : []),
+      ].filter((image, index, images) => image && images.indexOf(image) === index)
+    : [];
+  const galleryKey = gallery.join("|");
+
+  useEffect(() => {
+    if (!product || gallery.length < 2) return undefined;
+    const interval = Math.max(2, Number(galleryInterval) || 5) * 1000;
+    const timer = window.setInterval(() => {
+      setActiveImage((current) => {
+        const currentIndex = Math.max(0, gallery.indexOf(current));
+        return gallery[(currentIndex + 1) % gallery.length];
+      });
+    }, interval);
+    return () => window.clearInterval(timer);
+  }, [galleryInterval, galleryKey, product?.id]);
+
   if (!product) return <ProductDetailState loading={loading} onBack={onBack} />;
 
-  const gallery = [
-    product.image,
-    ...(Array.isArray(product.gallery) ? product.gallery : []),
-  ].filter((image, index, images) => image && images.indexOf(image) === index);
   const savings = Math.max(0, product.oldPrice - product.price);
   const stockKnown = Number.isInteger(product.stock);
   const stock = stockKnown ? product.stock : 99;
@@ -199,6 +217,12 @@ export default function ProductDetail({
     );
   }
 
+  function moveImage(direction) {
+    if (gallery.length < 2) return;
+    const currentIndex = Math.max(0, gallery.indexOf(activeImage || product.image));
+    setActiveImage(gallery[(currentIndex + direction + gallery.length) % gallery.length]);
+  }
+
   return (
     <div className="product-detail-page">
       <div className="container">
@@ -219,6 +243,26 @@ export default function ProductDetail({
               <span className="product-image-glow" aria-hidden="true" />
               {product.discount > 0 && (
                 <span className="detail-discount">-{product.discount}%</span>
+              )}
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="product-gallery-arrow previous"
+                    onClick={() => moveImage(-1)}
+                    aria-label="Xem ảnh trước"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    className="product-gallery-arrow next"
+                    onClick={() => moveImage(1)}
+                    aria-label="Xem ảnh tiếp theo"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </>
               )}
               <img src={activeImage || product.image} alt={product.name} />
             </div>
