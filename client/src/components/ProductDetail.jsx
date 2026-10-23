@@ -384,13 +384,7 @@ export default function ProductDetail({
           </article>
         </section>
 
-        <section className={`product-information-grid${technicalSpecifications.length ? " has-component-specs" : ""}`}>
-          <article className="product-description-panel">
-            <span className="detail-section-label">QUADPRO REVIEW</span>
-            <h2>Mô tả sản phẩm</h2>
-            <p>{productDescription}</p>
-          </article>
-
+        <section className="product-information-grid has-component-specs">
           <article className="product-specification-panel">
             <span className="detail-section-label">THÔNG TIN SẢN PHẨM</span>
             <h2>Thông số kỹ thuật</h2>
