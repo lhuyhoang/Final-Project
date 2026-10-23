@@ -201,68 +201,6 @@ const loadCart = () => {
   }
 };
 
-const quickViewHighlights = {
-  "PC Gaming": [
-    "Lắp ráp hoàn thiện, đi dây gọn và kiểm tra tải trước khi giao",
-    "Hiệu năng tối ưu cho chơi game và làm việc đa nhiệm",
-    "Hỗ trợ nâng cấp linh kiện trong suốt vòng đời sản phẩm",
-  ],
-  Laptop: [
-    "Cấu hình cân bằng cho học tập, làm việc và giải trí",
-    "Máy chính hãng, nguyên seal và đầy đủ phụ kiện",
-    "Hỗ trợ cài đặt, tối ưu hệ thống khi nhận máy",
-  ],
-  "Màn hình": [
-    "Hình ảnh sắc nét, chuyển động mượt cho game và sáng tạo",
-    "Kiểm tra điểm ảnh và ngoại quan trước khi giao",
-    "Hỗ trợ cân chỉnh chế độ hiển thị theo nhu cầu",
-  ],
-  "VGA - Card đồ họa": [
-    "Tối ưu cho gaming, đồ họa và tác vụ tăng tốc GPU",
-    "Kiểm tra tải và nhiệt độ trước khi bàn giao",
-    "Tương thích với nhiều cấu hình PC phổ biến",
-  ],
-  "CPU - Bộ vi xử lý": [
-    "Hiệu năng mạnh cho gaming và xử lý đa nhiệm",
-    "Sản phẩm chính hãng, đầy đủ tem và hộp",
-    "Hỗ trợ kiểm tra tương thích mainboard và RAM",
-  ],
-  "SSD - HDD": [
-    "Tốc độ cao, rút ngắn thời gian khởi động và tải ứng dụng",
-    "Phù hợp nâng cấp máy bàn và laptop tương thích",
-    "Hỗ trợ kiểm tra sức khỏe và cài đặt ổ đĩa",
-  ],
-  "Bàn phím": [
-    "Phản hồi phím nhanh, phù hợp làm việc và chơi game",
-    "Thiết kế bền bỉ cho nhu cầu sử dụng hằng ngày",
-    "Hỗ trợ kiểm tra kết nối trước khi giao",
-  ],
-  "Chuột gaming": [
-    "Cảm biến chính xác và độ trễ thấp cho game thi đấu",
-    "Thiết kế công thái học, tối ưu thao tác lâu dài",
-    "Hỗ trợ thiết lập DPI và phần mềm điều khiển",
-  ],
-};
-
-function getQuickViewHighlights(product) {
-  const customHighlights = Array.isArray(product.highlights)
-    ? product.highlights
-        .filter((item) => typeof item === "string" && item.trim())
-        .slice(0, 4)
-    : [];
-
-  if (customHighlights.length) return customHighlights;
-
-  return [
-    `Sản phẩm ${product.brand} chính hãng, đầy đủ tem và phụ kiện`,
-    ...(quickViewHighlights[product.category] || [
-      "Được kiểm tra ngoại quan và chức năng trước khi giao",
-      "Hỗ trợ kỹ thuật tận tâm tại hệ thống QuadPro",
-      "Đổi trả linh hoạt theo chính sách cửa hàng",
-    ]),
-  ];
-}
-
 function ProductQuickView({ anchorRef, id, open, product }) {
   const popupRef = useRef(null);
   const [position, setPosition] = useState({
@@ -363,15 +301,9 @@ function ProductQuickView({ anchorRef, id, open, product }) {
             </dd>
           </div>
         </dl>
-        <div className="quick-view-label">Mô tả tóm tắt</div>
-        <ul className="quick-view-highlights">
-          {getQuickViewHighlights(product).map((highlight) => (
-            <li key={highlight}>
-              <CheckCircle2 aria-hidden="true" size={16} />
-              <span>{highlight}</span>
-            </li>
-          ))}
-        </ul>
+        {product.description?.trim() && (
+          <p className="quick-view-description">{product.description}</p>
+        )}
         <div className="quick-view-label promotion-label">Khuyến mãi</div>
         <div className="quick-view-promotion">
           <Zap aria-hidden="true" size={17} fill="currentColor" />
@@ -1900,7 +1832,6 @@ function App() {
             product={productsLoaded ? selectedProduct : null}
             products={products}
             loading={!productsLoaded}
-            highlights={selectedProduct ? getQuickViewHighlights(selectedProduct) : []}
             onBack={openStorefront}
             onOpenProduct={openProduct}
             onAdd={addToCart}

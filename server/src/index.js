@@ -488,17 +488,6 @@ function normalizeProduct(body = {}, current = {}) {
     if (value.length > max) throw httpError(400, `${key} không được vượt quá ${max} ký tự`)
     return value
   }
-  const rawHighlights = body.highlights ?? current.highlights ?? []
-  if (!Array.isArray(rawHighlights) || rawHighlights.length > 8) {
-    throw httpError(400, 'Điểm nổi bật phải là danh sách tối đa 8 dòng')
-  }
-  const highlights = rawHighlights.map((item, index) => {
-    if (typeof item !== 'string') throw httpError(400, `Điểm nổi bật ${index + 1} không hợp lệ`)
-    const value = item.trim().replace(/\s+/g, ' ')
-    if (value.length > 200) throw httpError(400, `Điểm nổi bật ${index + 1} không được vượt quá 200 ký tự`)
-    return value
-  }).filter(Boolean)
-
   const rawSpecifications = body.specifications ?? current.specifications ?? []
   if (!Array.isArray(rawSpecifications) || rawSpecifications.length > 30) {
     throw httpError(400, 'Thông số kỹ thuật phải là danh sách tối đa 30 dòng')
@@ -566,7 +555,6 @@ function normalizeProduct(body = {}, current = {}) {
     badge: String(body.badge ?? current.badge ?? 'Mới').trim().slice(0, 40) || 'Mới',
     policyText: text('policyText', 120, DEFAULT_PRODUCT_POLICY_TEXT),
     description: optionalText('description', 2000),
-    highlights,
     specifications,
     gallery,
     image

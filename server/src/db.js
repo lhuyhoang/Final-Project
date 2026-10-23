@@ -220,7 +220,6 @@ export function mapProductRow(row) {
     badge: row.badge,
     policyText: row.policy_text,
     description: row.description || '',
-    highlights: Array.isArray(row.highlights) ? row.highlights : [],
     specifications: Array.isArray(row.specifications) ? row.specifications : [],
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
     image: row.image
@@ -497,10 +496,10 @@ export async function createProduct(input) {
   const result = await query(`
     INSERT INTO products (
       name, category, brand, price, old_price, stock, rating, reviews,
-      discount, badge, policy_text, description, highlights, specifications,
+      discount, badge, policy_text, description, specifications,
       gallery, image, created_at, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     RETURNING *
   `, [
     input.name,
@@ -515,7 +514,6 @@ export async function createProduct(input) {
     input.badge || 'Mới',
     input.policyText || DEFAULT_PRODUCT_POLICY_TEXT,
     input.description || '',
-    JSON.stringify(input.highlights || []),
     JSON.stringify(input.specifications || []),
     JSON.stringify(input.gallery || []),
     input.image,
@@ -539,7 +537,6 @@ export async function updateProduct(id, updates = {}) {
     badge: 'badge',
     policyText: 'policy_text',
     description: 'description',
-    highlights: 'highlights',
     specifications: 'specifications',
     gallery: 'gallery',
     image: 'image',
@@ -551,7 +548,7 @@ export async function updateProduct(id, updates = {}) {
 
   for (const [field, column] of Object.entries(columnMap)) {
     if (updates[field] === undefined) continue
-    values.push(['highlights', 'specifications', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
+    values.push(['specifications', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
     assignments.push(`${column} = $${values.length}`)
   }
 

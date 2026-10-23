@@ -30,14 +30,14 @@ const statusLabels = {
   cancelled: 'Đã hủy'
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
-const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', gallery: [], galleryText: '', badge: 'Mới', policyText: defaultPolicyText, description: '', highlightsText: '', specifications: [] }
+const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', gallery: [], galleryText: '', badge: 'Mới', policyText: defaultPolicyText, description: '', specifications: [] }
 const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapUrl: '', isActive: true, sortOrder: 0 }
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
 const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
-const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'highlights']
+const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description']
 
 function normalizeImportHeader(value) {
   return String(value || '')
@@ -59,8 +59,7 @@ const importHeaderAliases = {
   gallery: ['gallery', 'anhphu', 'hinhanhphu', 'galleryurl', 'galleryurls'],
   badge: ['badge', 'nhannoibat', 'nhan'],
   policyText: ['policytext', 'chinhsach', 'baohanh'],
-  description: ['description', 'mota', 'motasanpham'],
-  highlights: ['highlights', 'diemnoibat', 'noibat']
+  description: ['description', 'mota', 'motasanpham']
 }
 
 function importCellText(value) {
@@ -137,7 +136,6 @@ function parseImportedRows(sheetRows) {
       badge: importCellText(get('badge')) || 'Mới',
       policyText: importCellText(get('policyText')) || defaultPolicyText,
       description: importCellText(get('description')),
-      highlights: importCellText(get('highlights')).split(/[\n|]/).map(item => item.trim()).filter(Boolean),
       specifications: []
     }
     const errors = []
@@ -228,7 +226,6 @@ function ProductEditor({ product, onClose, onSaved }) {
     badge: product.badge,
     policyText: product.policyText || defaultPolicyText,
     description: product.description || '',
-    highlightsText: Array.isArray(product.highlights) ? product.highlights.join('\n') : '',
     specifications: Array.isArray(product.specifications)
       ? product.specifications.map(item => ({
           description: item.description || '',
@@ -343,14 +340,13 @@ function ProductEditor({ product, onClose, onSaved }) {
     setSaving(true)
     setError('')
     try {
-      const { highlightsText, galleryText, ...productFields } = form
+      const { galleryText, ...productFields } = form
       const payload = {
         ...productFields,
         price: Number(form.price),
         oldPrice: Number(form.oldPrice || form.price),
         stock: Number(form.stock),
         gallery: form.gallery,
-        highlights: highlightsText.split(/\r?\n/).map(item => item.trim()).filter(Boolean),
         specifications: form.specifications.map(item => ({
           description: item.description.trim(),
           quantity: Number(item.quantity),
@@ -384,7 +380,6 @@ function ProductEditor({ product, onClose, onSaved }) {
             <label><span>Nhãn nổi bật</span><input name="badge" value={form.badge} onChange={update} maxLength="40"/></label>
             <label className="full"><span>Thông tin trả góp / bảo hành</span><input name="policyText" value={form.policyText} onChange={update} maxLength="120" required/></label>
             <label className="full"><span>Mô tả sản phẩm</span><textarea name="description" value={form.description} onChange={update} maxLength="2000" rows="5" placeholder="Nhập đặc điểm, công dụng và thông tin nổi bật của sản phẩm..."/></label>
-            <label className="full"><span>Điểm nổi bật (mỗi dòng một nội dung)</span><textarea name="highlightsText" value={form.highlightsText} onChange={update} maxLength="1600" rows="5" placeholder={'Sản phẩm chính hãng, đầy đủ phụ kiện\nHiệu năng ổn định cho công việc và giải trí'}/></label>
             <div className="product-spec-editor full">
               <div className="product-spec-heading">
                 <div><span>Cấu hình / thông số kỹ thuật</span><small>Tối đa 30 dòng · hiển thị theo mẫu STT, mô tả, SL và BH</small></div>
@@ -463,7 +458,7 @@ function BulkProductImporter({ onClose, onSaved }) {
   function downloadTemplate() {
     const sample = [
       bulkProductHeaders.join(','),
-      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'Hiệu năng ổn định|Bảo hành chính hãng'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
+      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
     ].join('\r\n')
     const blob = new Blob([`\ufeff${sample}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
-  CheckCircle2,
   ChevronRight,
   Gift,
   Minus,
@@ -145,7 +144,6 @@ export default function ProductDetail({
   product,
   products,
   loading,
-  highlights,
   onBack,
   onOpenProduct,
   onAdd,
@@ -278,16 +276,9 @@ export default function ProductDetail({
               </div>
             </div>
 
-            <div className="detail-highlights">
+            <div className="detail-description">
               <h2>Mô tả sản phẩm</h2>
               <p>{productDescription}</p>
-              <ul>
-                {highlights.map((highlight) => (
-                  <li key={highlight}>
-                    <CheckCircle2 size={17} /> <span>{highlight}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
 
             <div className="detail-promotion">
@@ -396,15 +387,8 @@ export default function ProductDetail({
         <section className={`product-information-grid${technicalSpecifications.length ? " has-component-specs" : ""}`}>
           <article className="product-description-panel">
             <span className="detail-section-label">QUADPRO REVIEW</span>
-            <h2>Điểm nổi bật của {product.name}</h2>
+            <h2>Mô tả sản phẩm</h2>
             <p>{productDescription}</p>
-            <ul>
-              {highlights.map((highlight) => (
-                <li key={highlight}>
-                  <CheckCircle2 size={18} /> {highlight}
-                </li>
-              ))}
-            </ul>
           </article>
 
           <article className="product-specification-panel">
