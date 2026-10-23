@@ -139,6 +139,46 @@ const catalogPath = (category, option = "", brand = "") => {
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
 };
+
+// Category tabs are merchandising tags rather than database categories. Keep
+// the matching rules in one place so every tab opens a genuinely filtered list.
+const matchesCategoryOption = (product, option = "") => {
+  if (!option) return true;
+
+  const optionText = normalizeSearchText(option);
+  const explicitTags = [product.tags, product.tag]
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .filter(Boolean)
+    .map(normalizeSearchText);
+  if (explicitTags.some((tag) => tag === optionText || tag.includes(optionText))) {
+    return true;
+  }
+
+  const text = normalizeSearchText(
+    [product.name, product.brand, product.description].filter(Boolean).join(" "),
+  );
+  const price = Number(product.price) || 0;
+
+  const rules = {
+    "pc gaming gia re": () => price < 25_000_000,
+    "pc stream game": () => /stream|streamer|creator/.test(text),
+    "pc gaming premium": () =>
+      price >= 25_000_000 || /premium|core ultra|i7|i9|ryzen 7|ryzen 9|rtx 4080|rtx 4090|rtx 5080|rtx 5090/.test(text),
+    "pc intel gaming": () => /intel|core ultra|core i[3579]|\bi[3579]\b/.test(text),
+    "pc gaming cao cap": () =>
+      price >= 40_000_000 || /cao cap|flagship|i9|ryzen 9|rtx 4080|rtx 4090|rtx 5080|rtx 5090/.test(text),
+    "pc amd gaming": () => /amd|ryzen/.test(text),
+    "pc mini": () => /mini|small form|sff|mini itx/.test(text),
+    "pc ai tri tue nhan tao": () => /\bai\b|tri tue nhan tao/.test(text),
+  };
+  const rule = rules[optionText];
+  if (rule) return rule();
+
+  // For tags not requiring a price tier, match all meaningful words in the
+  // product metadata (e.g. "Laptop Gaming", "Màn hình 2K", "RAM DDR5").
+  const keywords = optionText.split(/\s+/).filter((word) => word.length > 1);
+  return keywords.length > 0 && keywords.every((keyword) => text.includes(keyword));
+};
 const categoryIcons = {
   Armchair,
   CircuitBoard,
@@ -1084,7 +1124,9 @@ function App() {
     : null;
   const catalogProducts = selectedCatalogCategory
     ? products.filter(
-        (product) => product.category === selectedCatalogCategory.name,
+        (product) =>
+          product.category === selectedCatalogCategory.name &&
+          matchesCategoryOption(product, catalogSelection.option),
       )
     : [];
   const menuDetails = menuCategory ? categoryMenus[menuCategory] : null;
