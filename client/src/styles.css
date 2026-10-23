@@ -3538,3 +3538,12 @@ html[data-theme="dark"] .search .header-search-all:focus-visible {
 @keyframes session-restore-spin {
   to { transform: rotate(360deg); }
 }
+
+/* Keep the cart drawer above the sticky storefront header and navigation. */
+.drawer-backdrop {
+  z-index: 119;
+}
+
+.cart-drawer {
+  z-index: 120;
+}
