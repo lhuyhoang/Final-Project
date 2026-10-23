@@ -264,7 +264,12 @@ export default function ProductDetail({
                   </button>
                 </>
               )}
-              <img src={activeImage || product.image} alt={product.name} />
+              <img
+                key={activeImage || product.image}
+                className="product-gallery-image"
+                src={activeImage || product.image}
+                alt={product.name}
+              />
             </div>
             <div className="product-thumbnails" aria-label="Hình ảnh sản phẩm">
               {gallery.map((image, index) => (

@@ -1978,6 +1978,22 @@ html[data-theme="dark"] .quick-view-rating small {
   animation: product-detail-enter .42s cubic-bezier(.2, .75, .25, 1) both;
 }
 
+.product-image-stage > img.product-gallery-image {
+  will-change: opacity, transform;
+  animation: product-gallery-image-enter .48s cubic-bezier(.22, .75, .24, 1) both;
+}
+
+@keyframes product-gallery-image-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .product-gallery-arrow {
   position: absolute;
   z-index: 4;
