@@ -157,9 +157,9 @@ export async function importLegacyData(data) {
         INSERT INTO products (
           id, name, category, brand, price, old_price, stock, rating,
           reviews, discount, badge, policy_text, description, highlights,
-          specifications, image, created_at, updated_at
+          specifications, gallery, image, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
       `, [
         id,
         product.name,
@@ -176,6 +176,7 @@ export async function importLegacyData(data) {
         product.description || '',
         JSON.stringify(Array.isArray(product.highlights) ? product.highlights : []),
         JSON.stringify(Array.isArray(product.specifications) ? product.specifications : []),
+        JSON.stringify(Array.isArray(product.gallery) ? product.gallery : []),
         product.image,
         createdAt,
         product.updatedAt || createdAt

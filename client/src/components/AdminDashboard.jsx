@@ -30,14 +30,14 @@ const statusLabels = {
   cancelled: 'Đã hủy'
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
-const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', badge: 'Mới', policyText: defaultPolicyText, description: '', highlightsText: '', specifications: [] }
+const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', gallery: [], galleryText: '', badge: 'Mới', policyText: defaultPolicyText, description: '', highlightsText: '', specifications: [] }
 const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapUrl: '', isActive: true, sortOrder: 0 }
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
 const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
-const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'badge', 'policyText', 'description', 'highlights']
+const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'highlights']
 
 function normalizeImportHeader(value) {
   return String(value || '')
@@ -56,6 +56,7 @@ const importHeaderAliases = {
   oldPrice: ['oldprice', 'giacu', 'gianiemyet', 'giagoc'],
   stock: ['stock', 'tonkho', 'soluongton', 'soluong'],
   image: ['image', 'hinhanh', 'urlhinhanh', 'imageurl'],
+  gallery: ['gallery', 'anhphu', 'hinhanhphu', 'galleryurl', 'galleryurls'],
   badge: ['badge', 'nhannoibat', 'nhan'],
   policyText: ['policytext', 'chinhsach', 'baohanh'],
   description: ['description', 'mota', 'motasanpham'],
@@ -123,6 +124,7 @@ function parseImportedRows(sheetRows) {
     const oldPrice = importMoney(get('oldPrice')) || price
     const stock = Number(get('stock'))
     const image = importCellText(get('image'))
+    const gallery = importCellText(get('gallery')).split(/[\n|;]/).map(item => item.trim()).filter(Boolean)
     const product = {
       name: importCellText(get('name')),
       brand: importCellText(get('brand')),
@@ -131,6 +133,7 @@ function parseImportedRows(sheetRows) {
       oldPrice,
       stock,
       image,
+      gallery,
       badge: importCellText(get('badge')) || 'Mới',
       policyText: importCellText(get('policyText')) || defaultPolicyText,
       description: importCellText(get('description')),
@@ -150,6 +153,14 @@ function parseImportedRows(sheetRows) {
     } catch {
       errors.push('URL hình ảnh không hợp lệ')
     }
+    gallery.forEach((url, galleryIndex) => {
+      try {
+        const parsed = new URL(url)
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
+      } catch {
+        errors.push(`URL ảnh phụ ${galleryIndex + 1} không hợp lệ`)
+      }
+    })
     return { rowNumber: index + 2, product, errors }
   }).filter(item => item.product.name || item.product.brand || item.product.image || item.product.price)
 }
@@ -212,6 +223,8 @@ function ProductEditor({ product, onClose, onSaved }) {
     oldPrice: product.oldPrice,
     stock: product.stock,
     image: product.image,
+    gallery: Array.isArray(product.gallery) ? product.gallery : [],
+    galleryText: Array.isArray(product.gallery) ? product.gallery.join('\n') : '',
     badge: product.badge,
     policyText: product.policyText || defaultPolicyText,
     description: product.description || '',
@@ -255,16 +268,22 @@ function ProductEditor({ product, onClose, onSaved }) {
     }))
   }
 
-  async function uploadImage(event) {
-    const file = event.target.files?.[0]
+  async function uploadImages(event) {
+    const files = Array.from(event.target.files || [])
     event.target.value = ''
-    if (!file) return
-    if (!acceptedImageTypes.includes(file.type)) {
+    if (!files.length) return
+    if (files.length > 20 || files.length + form.gallery.length > 20) {
+      setError('Mỗi sản phẩm chỉ được có tối đa 20 ảnh phụ.')
+      return
+    }
+    const invalidType = files.find(file => !acceptedImageTypes.includes(file.type))
+    if (invalidType) {
       setError('Chỉ hỗ trợ ảnh JPG, PNG, WebP hoặc AVIF.')
       return
     }
-    if (file.size > maxImageSize) {
-      setError('Hình ảnh không được vượt quá 10 MB.')
+    const oversized = files.find(file => file.size > maxImageSize)
+    if (oversized) {
+      setError('Mỗi hình ảnh không được vượt quá 10 MB.')
       return
     }
 
@@ -278,16 +297,27 @@ function ProductEditor({ product, onClose, onSaved }) {
     setUploading(true)
     setError('')
     try {
-      const uploadData = new FormData()
-      uploadData.append('file', file)
-      uploadData.append('upload_preset', uploadPreset)
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, {
-        method: 'POST',
-        body: uploadData
+      const uploadedUrls = await Promise.all(files.map(async file => {
+        const uploadData = new FormData()
+        uploadData.append('file', file)
+        uploadData.append('upload_preset', uploadPreset)
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, {
+          method: 'POST',
+          body: uploadData
+        })
+        const result = await response.json()
+        if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'Không thể tải ảnh lên Cloudinary.')
+        return result.secure_url
+      }))
+      setForm(current => {
+        const gallery = [...new Set([...current.gallery, ...uploadedUrls])].slice(0, 20)
+        return {
+          ...current,
+          image: current.image || gallery[0] || '',
+          gallery,
+          galleryText: gallery.join('\n')
+        }
       })
-      const result = await response.json()
-      if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'Không thể tải ảnh lên Cloudinary.')
-      setForm(current => ({ ...current, image: result.secure_url }))
     } catch (uploadError) {
       setError(uploadError.message)
     } finally {
@@ -295,17 +325,31 @@ function ProductEditor({ product, onClose, onSaved }) {
     }
   }
 
+  function updateGalleryText(event) {
+    const galleryText = event.target.value
+    const gallery = galleryText.split(/\r?\n|[|;]/).map(item => item.trim()).filter(Boolean)
+    setForm(current => ({ ...current, galleryText, gallery }))
+  }
+
+  function removeGalleryImage(url) {
+    setForm(current => {
+      const gallery = current.gallery.filter(image => image !== url)
+      return { ...current, gallery, galleryText: gallery.join('\n') }
+    })
+  }
+
   async function submit(event) {
     event.preventDefault()
     setSaving(true)
     setError('')
     try {
-      const { highlightsText, ...productFields } = form
+      const { highlightsText, galleryText, ...productFields } = form
       const payload = {
         ...productFields,
         price: Number(form.price),
         oldPrice: Number(form.oldPrice || form.price),
         stock: Number(form.stock),
+        gallery: form.gallery,
         highlights: highlightsText.split(/\r?\n/).map(item => item.trim()).filter(Boolean),
         specifications: form.specifications.map(item => ({
           description: item.description.trim(),
@@ -357,16 +401,24 @@ function ProductEditor({ product, onClose, onSaved }) {
                 </div>)}
               </div> : <div className="product-spec-empty">Chưa có cấu hình chi tiết. Trang sản phẩm sẽ tạm hiển thị thông tin cơ bản.</div>}
             </div>
-            <label className="full"><span>URL hình ảnh</span><input type="url" name="image" value={form.image} onChange={update} placeholder="https://..." required/></label>
+            <label className="full"><span>URL hình ảnh chính</span><input type="url" name="image" value={form.image} onChange={update} placeholder="https://..." required/></label>
             <div className="product-image-upload full">
-              <span>Tải ảnh từ máy</span>
+              <span>Tải nhiều ảnh góc sản phẩm từ máy</span>
               <label className={uploading ? 'uploading' : ''}>
                 {uploading ? <RefreshCw className="spin" size={17}/> : <Upload size={17}/>}
-                {uploading ? 'Đang tải lên Cloudinary...' : 'Chọn hình ảnh'}
-                <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={uploadImage} disabled={uploading}/>
+                {uploading ? 'Đang tải lên Cloudinary...' : 'Chọn nhiều hình ảnh'}
+                <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" onChange={uploadImages} disabled={uploading}/>
               </label>
-              <small>JPG, PNG, WebP hoặc AVIF · tối đa 10 MB</small>
+              <small>Có thể chọn nhiều ảnh cùng lúc · JPG, PNG, WebP hoặc AVIF · tối đa 10 MB/ảnh</small>
             </div>
+            <label className="full"><span>URL ảnh phụ (mỗi dòng một URL)</span><textarea name="galleryText" value={form.galleryText} onChange={updateGalleryText} rows="4" placeholder="Dán các URL ảnh Cloudinary, mỗi dòng một URL"/></label>
+            {form.gallery.length > 0 && <div className="product-gallery-list full">
+              <span>Ảnh trong bộ sưu tập ({form.gallery.length}/20)</span>
+              <div>{form.gallery.map((url, index) => <figure key={url}>
+                <img src={url} alt={`Ảnh góc ${index + 1}`}/>
+                <button type="button" onClick={() => removeGalleryImage(url)} aria-label={`Xóa ảnh góc ${index + 1}`}><X size={13}/></button>
+              </figure>)}</div>
+            </div>}
           </div>
           <div className="product-preview">
             <span>XEM TRƯỚC</span>
@@ -411,7 +463,7 @@ function BulkProductImporter({ onClose, onSaved }) {
   function downloadTemplate() {
     const sample = [
       bulkProductHeaders.join(','),
-      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'Hiệu năng ổn định|Bảo hành chính hãng'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
+      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'Hiệu năng ổn định|Bảo hành chính hãng'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
     ].join('\r\n')
     const blob = new Blob([`\ufeff${sample}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -455,7 +507,7 @@ function BulkProductImporter({ onClose, onSaved }) {
           <button type="button" className="bulk-template-button" onClick={downloadTemplate}>Tải file mẫu CSV</button>
           {fileName && <small>{fileName}</small>}
         </div>
-        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Có thể dùng tên cột tiếng Việt tương ứng trong file mẫu.</p>
+        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Cột gallery là tùy chọn; nhập nhiều URL ảnh phụ, ngăn cách bằng dấu |. Có thể dùng tên cột tiếng Việt tương ứng trong file mẫu.</p>
         {error && <div className="admin-form-error" role="alert">{error}</div>}
         {rows.length > 0 && <>
           <div className="bulk-import-summary"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><b>{invalidCount}</b> dòng lỗi</span>}</div>

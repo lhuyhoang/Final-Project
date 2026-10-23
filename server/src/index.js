@@ -536,6 +536,22 @@ function normalizeProduct(body = {}, current = {}) {
     throw httpError(400, 'URL hình ảnh không hợp lệ')
   }
 
+  const rawGallery = body.gallery ?? current.gallery ?? []
+  if (!Array.isArray(rawGallery) || rawGallery.length > 20) {
+    throw httpError(400, 'Bộ sưu tập ảnh phải là danh sách tối đa 20 ảnh')
+  }
+  const gallery = [...new Set(rawGallery.map((value, index) => {
+    const url = String(value || '').trim()
+    if (!url || url.length > 500) throw httpError(400, `URL ảnh phụ ${index + 1} không hợp lệ`)
+    try {
+      const parsed = new URL(url)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
+    } catch {
+      throw httpError(400, `URL ảnh phụ ${index + 1} không hợp lệ`)
+    }
+    return url
+  }).filter(Boolean))]
+
   return {
     ...current,
     name: text('name'),
@@ -552,6 +568,7 @@ function normalizeProduct(body = {}, current = {}) {
     description: optionalText('description', 2000),
     highlights,
     specifications,
+    gallery,
     image
   }
 }
