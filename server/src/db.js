@@ -242,6 +242,18 @@ export function mapShowroomRow(row) {
   }
 }
 
+export function mapCategoryRow(row) {
+  if (!row) return null
+  return {
+    id: numberValue(row.id),
+    name: row.name,
+    icon: row.icon || 'Box',
+    color: row.color || '#edf0ff',
+    createdAt: timestampValue(row.created_at),
+    updatedAt: timestampValue(row.updated_at || row.created_at)
+  }
+}
+
 export function mapOrderItemRow(row) {
   if (!row) return null
   return {
@@ -456,6 +468,36 @@ export async function listUsers({ role, status } = {}) {
   return result.rows.map(row => mapUserRow(row, { includePassword: false }))
 }
 
+export async function listCategories() {
+  const result = await query(`
+    SELECT * FROM product_categories
+    ORDER BY created_at ASC, id ASC
+  `)
+  return result.rows.map(mapCategoryRow)
+}
+
+export async function createCategory({ name, icon = 'Box', color = '#edf0ff' }) {
+  const result = await query(`
+    INSERT INTO product_categories (name, icon, color)
+    VALUES ($1, $2, $3)
+    RETURNING *
+  `, [name, icon, color])
+  return mapCategoryRow(result.rows[0])
+}
+
+export async function deleteCategory(id) {
+  const result = await query(`
+    DELETE FROM product_categories AS category
+    WHERE category.id = $1
+      AND NOT EXISTS (
+        SELECT 1 FROM products
+        WHERE BTRIM(products.category) = BTRIM(category.name)
+      )
+    RETURNING *
+  `, [id])
+  return mapCategoryRow(result.rows[0])
+}
+
 export async function listProducts({ search, category, limit, offset = 0 } = {}) {
   const conditions = []
   const values = []
@@ -567,6 +609,14 @@ export async function updateProduct(id, updates = {}) {
 export async function deleteProduct(id) {
   const result = await query('DELETE FROM products WHERE id = $1 RETURNING *', [id])
   return mapProductRow(result.rows[0])
+}
+
+export async function deleteProducts(ids) {
+  const result = await query(
+    'DELETE FROM products WHERE id = ANY($1::integer[]) RETURNING *',
+    [ids]
+  )
+  return result.rows.map(mapProductRow)
 }
 
 export async function listShowrooms({ includeInactive = false } = {}) {

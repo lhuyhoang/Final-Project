@@ -56,7 +56,7 @@ import {
   Youtube,
   Zap,
 } from "lucide-react";
-import { categories, categoryMenus, fallbackProducts } from "./data";
+import { categories as defaultCategories, categoryMenus, fallbackProducts } from "./data";
 import {
   api,
   clearSession,
@@ -112,11 +112,12 @@ const productPath = (product) => `/products/${product.id}-${toSlug(product.name)
 const catalogSelectionFromLocation = (
   pathname = window.location.pathname,
   search = window.location.search,
+  categoryList = defaultCategories,
 ) => {
   const match = pathname.match(/^\/categories\/([^/]+)(?:\/([^/]+))?\/?$/);
   if (!match) return null;
 
-  const category = categories.find((item) => toSlug(item.name) === match[1]);
+  const category = categoryList.find((item) => toSlug(item.name) === match[1]);
   if (!category) return null;
 
   const option = match[2]
@@ -827,6 +828,7 @@ function CategoryCatalog({
 function App() {
   const [theme, setTheme] = useState(loadTheme);
   const [products, setProducts] = useState(fallbackProducts);
+  const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -852,7 +854,7 @@ function App() {
   );
   const [productId, setProductId] = useState(productIdFromPath);
   const [catalogSelection, setCatalogSelection] = useState(
-    catalogSelectionFromLocation,
+    () => catalogSelectionFromLocation(window.location.pathname, window.location.search, defaultCategories),
   );
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(null);
@@ -893,8 +895,20 @@ function App() {
     }
   }
 
+  async function refreshCategories() {
+    try {
+      const loadedCategories = await api("/api/categories");
+      if (Array.isArray(loadedCategories) && loadedCategories.length) {
+        setCategories(loadedCategories);
+      }
+    } catch {
+      /* Static categories keep the storefront usable while the API is unavailable. */
+    }
+  }
+
   useEffect(() => {
     refreshProducts();
+    refreshCategories();
     refreshShowrooms();
   }, []);
   useEffect(() => {
@@ -1018,12 +1032,12 @@ function App() {
       setAccountView(isAccountRoute);
       setCheckoutView(isCheckoutRoute);
       setProductId(productIdFromPath());
-      setCatalogSelection(catalogSelectionFromLocation());
+      setCatalogSelection(catalogSelectionFromLocation(window.location.pathname, window.location.search, categories));
       if (sessionReady && (isAdminRoute || isAccountRoute || isCheckoutRoute) && !session) openAuth("login");
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, [sessionReady, session]);
+  }, [categories, sessionReady, session]);
   useEffect(
     () => () => window.clearTimeout(categoryMenuTimerRef.current),
     [],

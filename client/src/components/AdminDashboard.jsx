@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
-import { categories } from '../data'
+import { categories as defaultCategories } from '../data'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -36,7 +36,7 @@ const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
-const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
+const validAdminTabs = new Set(['overview', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
 const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
 
 function normalizeImportHeader(value) {
@@ -240,7 +240,7 @@ function StripeMoneyList({ amounts, empty = '0' }) {
   return <span className="stripe-money-list">{amounts.map(item => <span key={item.currency}>{formatStripeAmount(item)}</span>)}</span>
 }
 
-function ProductEditor({ product, onClose, onSaved }) {
+function ProductEditor({ product, categories = defaultCategories, onClose, onSaved }) {
   const [form, setForm] = useState(product ? {
     name: product.name,
     brand: product.brand,
@@ -401,7 +401,7 @@ function ProductEditor({ product, onClose, onSaved }) {
           <div className="product-form-fields">
             <label className="full"><span>Tên sản phẩm</span><input name="name" value={form.name} onChange={update} required maxLength="160"/></label>
             <label><span>Thương hiệu</span><input name="brand" value={form.brand} onChange={update} required maxLength="50"/></label>
-            <label><span>Danh mục</span><select name="category" value={form.category} onChange={update}>{categories.map(item => <option key={item.name}>{item.name}</option>)}</select></label>
+            <label><span>Danh mục</span><select name="category" value={form.category} onChange={update}>{categories.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}{form.category && !categories.some(item => item.name === form.category) && <option value={form.category}>{form.category}</option>}</select></label>
             <label><span>Giá bán</span><input type="number" name="price" value={form.price} onChange={update} min="1" required/></label>
             <label><span>Giá niêm yết</span><input type="number" name="oldPrice" value={form.oldPrice} onChange={update} min="1" required/></label>
             <label><span>Tồn kho</span><input type="number" name="stock" value={form.stock} onChange={update} min="0" required/></label>
@@ -597,11 +597,61 @@ function ShowroomEditor({ showroom, onClose, onSaved }) {
   </div>
 }
 
+function CategoryManager({ categories, onCreated, onRequestDelete }) {
+  const [form, setForm] = useState({ name: '', icon: 'Box', color: '#edf0ff' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function update(event) {
+    setForm(current => ({ ...current, [event.target.name]: event.target.value }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const created = await api('/api/admin/categories', {
+        method: 'POST',
+        body: JSON.stringify(form)
+      })
+      onCreated(created)
+      setForm({ name: '', icon: 'Box', color: '#edf0ff' })
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="admin-panel category-manager">
+    <header>
+      <div><span>PHÂN LOẠI SẢN PHẨM</span><h2>Danh mục sản phẩm</h2></div>
+      <small>{categories.length} danh mục</small>
+    </header>
+    <form className="category-create-form" onSubmit={submit}>
+      <label><span>Tên danh mục mới</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder="Ví dụ: Webcam"/></label>
+      <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
+      <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
+      <button className="admin-primary" disabled={saving}><Plus size={17}/>{saving ? 'Đang thêm...' : 'Thêm danh mục'}</button>
+    </form>
+    {error && <div className="admin-form-error" role="alert">{error}</div>}
+    <div className="category-manager-list">
+      {categories.map(category => <div className="category-manager-item" key={category.id || category.name}>
+        <span className="category-manager-swatch" style={{ background: category.color }}/>
+        <span><b>{category.name}</b><small>{category.icon || 'Box'}</small></span>
+        {category.id && <button type="button" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`}><Trash2 size={16}/></button>}
+      </div>)}
+    </div>
+  </section>
+}
+
 export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState(defaultCategories)
   const [showrooms, setShowrooms] = useState([])
   const [orders, setOrders] = useState([])
   const [onlinePayments, setOnlinePayments] = useState([])
@@ -619,6 +669,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [notice, setNotice] = useState('')
   const [confirmation, setConfirmation] = useState(null)
   const [confirming, setConfirming] = useState(false)
+  const [selectedProductIds, setSelectedProductIds] = useState(() => new Set())
 
   async function loadDashboard(silent = false) {
     silent ? setRefreshing(true) : setLoading(true)
@@ -627,9 +678,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       const stripeRequest = api('/api/admin/stripe/overview')
         .then(data => ({ data }))
         .catch(stripeError => ({ error: stripeError }))
-      const [statsData, productData, showroomData, orderData, paymentData, userData, stripeResult] = await Promise.all([
+      const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, stripeResult] = await Promise.all([
         api('/api/admin/stats'),
         api('/api/admin/products'),
+        api('/api/admin/categories'),
         api('/api/admin/showrooms'),
         api('/api/admin/orders'),
         api('/api/admin/payments'),
@@ -639,6 +691,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
       setStats(statsData)
       setProducts(productData)
+      setCategories(categoryData.length ? categoryData : defaultCategories)
       setShowrooms(showroomData)
       setOrders(orderData)
       setOnlinePayments(paymentData)
@@ -681,6 +734,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     })
   }, [loading, onlinePayments, orders, tab, user.id])
 
+  useEffect(() => {
+    if (tab !== 'products') setSelectedProductIds(new Set())
+  }, [tab])
+
   function showNotice(message) {
     setNotice(message)
     window.setTimeout(() => setNotice(''), 2400)
@@ -688,6 +745,39 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
   function removeProduct(product) {
     setConfirmation({ kind: 'product', item: product })
+  }
+
+  function toggleProductSelection(id) {
+    setSelectedProductIds(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleVisibleProductSelection() {
+    const visibleIds = visibleProducts.map(product => product.id)
+    setSelectedProductIds(current => {
+      const next = new Set(current)
+      const shouldSelect = visibleIds.some(id => !next.has(id))
+      visibleIds.forEach(id => shouldSelect ? next.add(id) : next.delete(id))
+      return next
+    })
+  }
+
+  function removeSelectedProducts() {
+    const selected = products.filter(product => selectedProductIds.has(product.id))
+    if (selected.length) setConfirmation({ kind: 'products', items: selected })
+  }
+
+  function saveCategory(category) {
+    setCategories(current => [...current, category].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
+    showNotice(`Đã thêm danh mục “${category.name}”`)
+  }
+
+  function removeCategory(category) {
+    setConfirmation({ kind: 'category', item: category })
   }
 
   async function confirmDelete() {
@@ -701,6 +791,19 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         await loadDashboard(true)
         onProductsChanged()
         showNotice('Đã xóa sản phẩm')
+      } else if (current.kind === 'products') {
+        const deleted = await api('/api/admin/products', {
+          method: 'DELETE',
+          body: JSON.stringify({ ids: current.items.map(item => item.id) })
+        })
+        setSelectedProductIds(new Set())
+        await loadDashboard(true)
+        onProductsChanged()
+        showNotice(`Đã xóa ${deleted.products.length} sản phẩm`)
+      } else if (current.kind === 'category') {
+        await api(`/api/admin/categories/${current.item.id}`, { method: 'DELETE' })
+        setCategories(categories => categories.filter(item => item.id !== current.item.id))
+        showNotice('Đã xóa danh mục')
       } else {
         await api(`/api/admin/showrooms/${current.item.id}`, { method: 'DELETE' })
         setShowrooms(showrooms => showrooms.filter(item => item.id !== current.item.id))
@@ -800,6 +903,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
+    { id: 'categories', label: 'Danh mục', icon: ClipboardList },
     { id: 'showrooms', label: 'Showroom', icon: MapPinned },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
@@ -846,10 +950,13 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <section className="admin-panel recent-panel"><header><div><span>ĐƠN HÀNG</span><h2>Giao dịch gần đây</h2></div><button onClick={() => setTab('orders')}>Xem tất cả</button></header><div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày đặt</th><th>Giá trị</th><th>Trạng thái</th></tr></thead><tbody>{stats.recentOrders.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td>{order.customer?.name}</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table></div></section>
         </>}
 
-        {tab === 'products' && <section className="admin-panel admin-list-panel">
+    {tab === 'products' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
-          <div className="admin-table-wrap"><table className="products-table"><thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{visibleProducts.map(product => <tr key={product.id}><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
+          {selectedProductIds.size > 0 && <div className="admin-bulk-toolbar"><span><Check size={16}/> Đã chọn <b>{selectedProductIds.size}</b> sản phẩm</span><button className="admin-danger-action" onClick={removeSelectedProducts}><Trash2 size={16}/> Xóa đã chọn</button><button className="admin-secondary compact" onClick={() => setSelectedProductIds(new Set())}>Bỏ chọn</button></div>}
+          <div className="admin-table-wrap"><table className="products-table"><thead><tr><th className="admin-select-cell"><input type="checkbox" checked={visibleProducts.length > 0 && visibleProducts.every(product => selectedProductIds.has(product.id))} onChange={toggleVisibleProductSelection} aria-label="Chọn tất cả sản phẩm đang hiển thị"/></th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{visibleProducts.map(product => <tr key={product.id}><td className="admin-select-cell"><input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} aria-label={`Chọn ${product.name}`}/></td><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
         </section>}
+
+        {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onRequestDelete={removeCategory}/>}
 
         {tab === 'showrooms' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>
@@ -903,15 +1010,15 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </section>}
       </div>}
     </main>
-    {editorOpen && <ProductEditor product={editor} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
+    {editorOpen && <ProductEditor product={editor} categories={categories} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
     {bulkImporterOpen && <BulkProductImporter onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {confirmation && <div className="admin-confirm-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !confirming && setConfirmation(null)}>
       <section className="admin-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-description">
         <div className="admin-confirm-icon"><Trash2 size={22}/></div>
         <span className="admin-confirm-kicker">XÁC NHẬN THAO TÁC</span>
-        <h2 id="admin-confirm-title">Xóa {confirmation.kind === 'product' ? 'sản phẩm' : 'showroom'}?</h2>
-        <p id="admin-confirm-description">Bạn có chắc muốn xóa <strong>“{confirmation.item.name}”</strong>? Thao tác này không thể hoàn tác.</p>
+        <h2 id="admin-confirm-title">Xóa {confirmation.kind === 'products' ? 'sản phẩm đã chọn' : confirmation.kind === 'category' ? 'danh mục' : confirmation.kind === 'product' ? 'sản phẩm' : 'showroom'}?</h2>
+        <p id="admin-confirm-description">Bạn có chắc muốn xóa <strong>“{confirmation.kind === 'products' ? `${confirmation.items.length} sản phẩm đã chọn` : confirmation.item.name}”</strong>? Thao tác này không thể hoàn tác.</p>
         <footer>
           <button type="button" className="secondary" onClick={() => setConfirmation(null)} disabled={confirming}>Hủy</button>
           <button type="button" className="danger" onClick={confirmDelete} disabled={confirming}><Trash2 size={16}/>{confirming ? 'Đang xóa...' : 'Xóa'}</button>

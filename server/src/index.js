@@ -16,12 +16,15 @@ import {
   confirmVnpayOrderPayment,
   confirmStripeOrderPayment,
   createShowroom,
+  createCategory,
   createOrder as insertOrder,
   createProduct as insertProduct,
   createUserSession,
   deleteAllUserSessions,
   deleteOtherUserSessions,
   deleteProduct as removeProduct,
+  deleteProducts as removeProducts,
+  deleteCategory,
   deleteShowroom,
   deleteUserSession,
   findProductById,
@@ -33,6 +36,7 @@ import {
   healthCheck,
   initializeDatabase,
   listOrders,
+  listCategories,
   listProducts,
   listShowrooms,
   listUsers,
@@ -561,6 +565,18 @@ function normalizeProduct(body = {}, current = {}) {
   }
 }
 
+function normalizeCategory(body = {}) {
+  const name = String(body.name || '').trim().replace(/\s+/g, ' ')
+  if (name.length < 2 || name.length > 80) {
+    throw httpError(400, 'Tên danh mục phải có từ 2 đến 80 ký tự')
+  }
+
+  const icon = String(body.icon || 'Box').trim().slice(0, 40) || 'Box'
+  const color = String(body.color || '#edf0ff').trim().slice(0, 20) || '#edf0ff'
+  if (!/^#[0-9a-f]{6}$/i.test(color)) throw httpError(400, 'Màu danh mục không hợp lệ')
+  return { name, icon, color }
+}
+
 function normalizeShowroom(body = {}, current = {}) {
   const requiredText = (key, minimum, maximum) => {
     const value = String(body[key] ?? current[key] ?? '').trim().replace(/\s+/g, ' ')
@@ -692,6 +708,10 @@ app.get('/api/products', asyncHandler(async (req, res) => {
   const category = String(req.query.category || '').trim()
   const products = await listProducts({ search, category })
   res.json(products)
+}))
+
+app.get('/api/categories', asyncHandler(async (req, res) => {
+  res.json(await listCategories())
 }))
 
 app.get('/api/products/:id', asyncHandler(async (req, res) => {
@@ -969,6 +989,27 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
 
 app.get('/api/admin/products', asyncHandler(async (req, res) => res.json(await listProducts())))
 
+app.get('/api/admin/categories', asyncHandler(async (req, res) => res.json(await listCategories())))
+
+app.post('/api/admin/categories', asyncHandler(async (req, res) => {
+  try {
+    res.status(201).json(await createCategory(normalizeCategory(req.body)))
+  } catch (error) {
+    if (error.code === '23505') throw httpError(409, 'Danh mục này đã tồn tại')
+    throw error
+  }
+}))
+
+app.delete('/api/admin/categories/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id < 1) throw httpError(400, 'Mã danh mục không hợp lệ')
+  const category = await deleteCategory(id)
+  if (category) return res.json({ message: 'Đã xóa danh mục', category })
+  const categories = await listCategories()
+  if (!categories.some(item => item.id === id)) throw httpError(404, 'Không tìm thấy danh mục')
+  throw httpError(409, 'Không thể xóa danh mục đang có sản phẩm')
+}))
+
 app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {
   const inputProducts = req.body?.products
   if (!Array.isArray(inputProducts) || !inputProducts.length) {
@@ -984,6 +1025,19 @@ app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {
     savedProducts.push(await insertProduct(product))
   }
   res.status(201).json({ products: savedProducts })
+}))
+
+app.delete('/api/admin/products', asyncHandler(async (req, res) => {
+  const rawIds = req.body?.ids
+  if (!Array.isArray(rawIds) || !rawIds.length || rawIds.length > 100) {
+    throw httpError(400, 'Danh sách sản phẩm cần xóa không hợp lệ')
+  }
+  const ids = [...new Set(rawIds.map(Number))]
+  if (ids.some(id => !Number.isInteger(id) || id < 1)) {
+    throw httpError(400, 'Mã sản phẩm cần xóa không hợp lệ')
+  }
+  const products = await removeProducts(ids)
+  res.json({ message: `Đã xóa ${products.length} sản phẩm`, products })
 }))
 
 app.post('/api/admin/products', asyncHandler(async (req, res) => {
