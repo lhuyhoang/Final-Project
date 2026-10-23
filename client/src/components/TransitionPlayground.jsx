@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Code2, Copy, Layers, Pause, Play, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
+import { Check, Layers, Pause, Play, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api'
 
 const categories = [
@@ -48,14 +48,6 @@ function flattenImages(products) {
   return products.flatMap(product => [product.image, ...(Array.isArray(product.gallery) ? product.gallery : [])]).filter(Boolean).filter((item, index, list) => list.indexOf(item) === index).slice(0, 8)
 }
 
-function codeFor(variant, duration, easing, tab) {
-  const frames = keyframesFor(variant)
-  const top = frames.top || [{ opacity: 0 }, { opacity: 1 }]
-  const serialize = frame => Object.entries(frame).map(([key, value]) => `    ${key}: ${value};`).join('\n')
-  if (tab === 'html') return `<div class="image-slider-container">\n  <img src="photo-current.jpg" class="slider-img base" alt="Ảnh hiện tại">\n  <img src="photo-next.jpg" class="slider-img incoming" alt="Ảnh tiếp theo">\n</div>`
-  return `/* ${variant} · Web Animations API */\n.image-slider-container {\n  position: relative;\n  overflow: hidden;\n  perspective: 1200px;\n}\n\n.slider-img {\n  position: absolute; inset: 0; width: 100%; height: 100%;\n  object-fit: cover; will-change: transform, opacity, filter, clip-path;\n}\n\n/* ${duration.toFixed(1)}s · ${easing} */\n@keyframes ${variant}-in {\n  from {\n${serialize(top[0])}\n  }\n  to {\n${serialize(top[1])}\n  }\n}`
-}
-
 export default function TransitionPlayground({ products, settings, onSaved }) {
   const sourceImages = useMemo(() => flattenImages(products || []), [products])
   const images = sourceImages.length > 1 ? sourceImages : ['https://images.unsplash.com/photo-1517336714739-489689fd1ca8?q=80&w=1200&auto=format&fit=crop', 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=1200&auto=format&fit=crop']
@@ -70,7 +62,6 @@ export default function TransitionPlayground({ products, settings, onSaved }) {
   const [imageIndex, setImageIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [animating, setAnimating] = useState(false)
-  const [codeTab, setCodeTab] = useState('css')
   const [carouselTransition, setCarouselTransition] = useState(settings?.productCarouselTransition || 'slide')
   const [carouselDuration, setCarouselDuration] = useState(Number(settings?.productCarouselDurationMs || 860))
   const [carouselEasing, setCarouselEasing] = useState(settings?.productCarouselEasing || 'smooth')
@@ -161,8 +152,6 @@ export default function TransitionPlayground({ products, settings, onSaved }) {
   }
 
   const variantInfo = category.variants.find(item => item[0] === variant) || category.variants[0]
-  const code = codeFor(variant, duration, easing, codeTab)
-
   return <section className="transition-playground">
     <header className="transition-playground-header">
       <div className="transition-playground-brand"><span className="transition-brand-icon">✣</span><div><h2>VisualTransitions <b>HTML &amp; CSS Pro</b></h2><p>Bộ sưu tập &amp; Playground hiệu ứng chuyển ảnh mượt mà</p></div></div>
@@ -183,7 +172,6 @@ export default function TransitionPlayground({ products, settings, onSaved }) {
       </main>
       <aside className="transition-playground-controls">
         <div className="panel-glass transition-control-card"><div className="transition-panel-title"><span><SlidersHorizontal size={15}/> TÙY CHỈNH THÔNG SỐ</span><button type="button" onClick={() => { setDuration(.8); setEasing(easings[1][0]) }}><RotateCcw size={12}/> Mặc định</button></div><label><span>Thời gian (Duration): <b>{duration.toFixed(1)}s</b></span><input type="range" min=".3" max="2.5" step=".1" value={duration} onChange={event => setDuration(Number(event.target.value))}/></label><label><span>Đường cong Easing (Timing):</span><select value={easing} onChange={event => setEasing(event.target.value)}>{easings.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>Kiểu biến thể (Sub-Variant):</span><select value={variant} onChange={event => { setVariant(event.target.value); runTransition((imageIndex + 1) % images.length) }}>{category.variants.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>Tự động chuyển ảnh: <b>{interval}s</b></span><input type="range" min="2" max="60" step="1" value={interval} onChange={event => setIntervalSeconds(Number(event.target.value))}/></label><div className="transition-divider"/><label><span>Hiệu ứng dải sản phẩm:</span><select value={carouselTransition} onChange={event => setCarouselTransition(event.target.value)}><option value="slide">Slide trượt ngang</option><option value="fade">Fade khi trượt</option></select></label><label><span>Đường cong dải sản phẩm:</span><select value={carouselEasing} onChange={event => setCarouselEasing(event.target.value)}><option value="smooth">Smooth mềm</option><option value="soft">Soft chậm</option><option value="linear">Linear đều</option></select></label><label><span>Thời lượng dải sản phẩm: <b>{carouselDuration}ms</b></span><input type="range" min="400" max="1800" step="40" value={carouselDuration} onChange={event => setCarouselDuration(Number(event.target.value))}/></label><button type="button" className="transition-save-button" onClick={save}><Save size={16}/> Lưu hiệu ứng cửa hàng</button>{notice && <div className="transition-save-notice"><Check size={15}/> {notice}</div>}</div>
-        <div className="panel-glass transition-code-card"><div className="transition-panel-title"><span><Code2 size={15}/> MÃ NGUỒN CSS &amp; HTML</span><button type="button" onClick={() => navigator.clipboard?.writeText(code)}><Copy size={13}/> Sao chép</button></div><div className="transition-code-tabs"><button type="button" className={codeTab === 'css' ? 'active' : ''} onClick={() => setCodeTab('css')}>CSS Keyframes</button><button type="button" className={codeTab === 'html' ? 'active' : ''} onClick={() => setCodeTab('html')}>Cấu trúc HTML</button></div><pre><code>{code}</code></pre></div>
       </aside>
     </div>
     <section className="transition-hover-showcase panel-glass">

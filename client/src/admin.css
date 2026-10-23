@@ -2678,7 +2678,7 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
   min-height: 700px;
 }
 .transition-playground button, .transition-playground select, .transition-playground input { font: inherit; }
-.transition-playground-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 5px 5px 16px; border-bottom: 1px solid #1b263e; }
+.transition-playground-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid #1d2b46; border-radius: 12px; background: rgba(11, 19, 36, .82); }
 .transition-playground-brand { display: flex; align-items: center; gap: 11px; }
 .transition-brand-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #5c6ef8, #19c7df); font-size: 21px; box-shadow: 0 8px 22px rgba(44, 104, 236, .28); }
 .transition-playground-header h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
@@ -2733,7 +2733,7 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 .transition-thumb-grid button.active { border-color: #377df0; opacity: 1; box-shadow: 0 0 0 2px rgba(55,125,240,.18); }
 .transition-thumb-grid img { width: 100%; height: 100%; object-fit: cover; }
 .transition-playground-controls { display: grid; gap: 14px; }
-.transition-control-card, .transition-code-card { padding: 13px; }
+.transition-control-card { padding: 13px; }
 .transition-control-card label { display: grid; gap: 6px; padding-top: 13px; color: #c3cde0; font-size: 10px; }
 .transition-control-card label > span { display: flex; justify-content: space-between; gap: 6px; }
 .transition-control-card label b { color: #5fa0ff; font-family: ui-monospace, monospace; font-weight: 700; }
@@ -2762,13 +2762,7 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 .transition-hover-float:hover { transform: translateY(-6px) rotateX(4deg) rotateY(-4deg); border-color: #3b78d8; box-shadow: 0 15px 30px rgba(31,87,186,.22); }
 .transition-hover-shine > div::after { content: ''; position: absolute; inset: 0; width: 42%; background: linear-gradient(110deg, transparent, rgba(255,255,255,.38), transparent); transform: translateX(-180%) skewX(-16deg); transition: transform .8s ease-in-out; pointer-events: none; }
 .transition-hover-shine:hover > div::after { transform: translateX(320%) skewX(-16deg); }
-.transition-code-card { min-height: 300px; }
-.transition-code-card .transition-panel-title > button, .transition-control-card .transition-panel-title > button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid rgba(48, 181, 148, .45); border-radius: 6px; background: rgba(20, 150, 119, .15); color: #62dfba; padding: 4px 7px; font-size: 9px; cursor: pointer; }
 .transition-control-card .transition-panel-title > button { border: 0; background: transparent; color: #8291aa; }
-.transition-code-tabs { display: flex; gap: 3px; background: #0c1426; border: 1px solid #1c2a43; border-radius: 9px; padding: 3px; margin-top: 11px; }
-.transition-code-tabs button { flex: 1; color: #8896ae; background: transparent; border: 0; border-radius: 6px; padding: 6px; font-size: 10px; cursor: pointer; }
-.transition-code-tabs button.active { color: #75aaff; background: #1a2a42; }
-.transition-code-card pre { height: 220px; overflow: auto; margin: 10px 0 0; padding: 11px; border: 1px solid #1a2942; border-radius: 9px; background: #070c19; color: #b9c9df; white-space: pre-wrap; font: 10px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 @media (max-width: 1280px) {
   .transition-playground-workspace { grid-template-columns: minmax(190px, .8fr) minmax(360px, 1.5fr); }
