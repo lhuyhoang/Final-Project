@@ -617,6 +617,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [confirmation, setConfirmation] = useState(null)
+  const [confirming, setConfirming] = useState(false)
 
   async function loadDashboard(silent = false) {
     silent ? setRefreshing(true) : setLoading(true)
@@ -684,16 +686,32 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-  async function removeProduct(product) {
-    if (!window.confirm(`Xóa “${product.name}”? Thao tác này không thể hoàn tác.`)) return
+  function removeProduct(product) {
+    setConfirmation({ kind: 'product', item: product })
+  }
+
+  async function confirmDelete() {
+    const current = confirmation
+    if (!current || confirming) return
+    setConfirming(true)
     try {
-      await api(`/api/admin/products/${product.id}`, { method: 'DELETE' })
-      setProducts(current => current.filter(item => item.id !== product.id))
-      await loadDashboard(true)
-      onProductsChanged()
-      showNotice('Đã xóa sản phẩm')
+      if (current.kind === 'product') {
+        await api(`/api/admin/products/${current.item.id}`, { method: 'DELETE' })
+        setProducts(products => products.filter(item => item.id !== current.item.id))
+        await loadDashboard(true)
+        onProductsChanged()
+        showNotice('Đã xóa sản phẩm')
+      } else {
+        await api(`/api/admin/showrooms/${current.item.id}`, { method: 'DELETE' })
+        setShowrooms(showrooms => showrooms.filter(item => item.id !== current.item.id))
+        await onShowroomsChanged()
+        showNotice('Đã xóa showroom')
+      }
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setConfirming(false)
+      setConfirmation(null)
     }
   }
 
@@ -714,16 +732,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     showNotice(`Đã nhập ${savedProducts.length} sản phẩm`)
   }
 
-  async function removeShowroom(showroom) {
-    if (!window.confirm(`Xóa showroom “${showroom.name}”?`)) return
-    try {
-      await api(`/api/admin/showrooms/${showroom.id}`, { method: 'DELETE' })
-      setShowrooms(current => current.filter(item => item.id !== showroom.id))
-      await onShowroomsChanged()
-      showNotice('Đã xóa showroom')
-    } catch (requestError) {
-      setError(requestError.message)
-    }
+  function removeShowroom(showroom) {
+    setConfirmation({ kind: 'showroom', item: showroom })
   }
 
   async function saveShowroom(saved, isEditing) {
@@ -896,6 +906,18 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     {editorOpen && <ProductEditor product={editor} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
     {bulkImporterOpen && <BulkProductImporter onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
+    {confirmation && <div className="admin-confirm-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !confirming && setConfirmation(null)}>
+      <section className="admin-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-description">
+        <div className="admin-confirm-icon"><Trash2 size={22}/></div>
+        <span className="admin-confirm-kicker">XÁC NHẬN THAO TÁC</span>
+        <h2 id="admin-confirm-title">Xóa {confirmation.kind === 'product' ? 'sản phẩm' : 'showroom'}?</h2>
+        <p id="admin-confirm-description">Bạn có chắc muốn xóa <strong>“{confirmation.item.name}”</strong>? Thao tác này không thể hoàn tác.</p>
+        <footer>
+          <button type="button" className="secondary" onClick={() => setConfirmation(null)} disabled={confirming}>Hủy</button>
+          <button type="button" className="danger" onClick={confirmDelete} disabled={confirming}><Trash2 size={16}/>{confirming ? 'Đang xóa...' : 'Xóa'}</button>
+        </footer>
+      </section>
+    </div>}
     {notice && <div className="admin-notice"><Check size={18}/>{notice}</div>}
   </div>
 }
