@@ -146,6 +146,8 @@ export default function ProductDetail({
   products,
   loading,
   galleryInterval = 5,
+  galleryTransition = "slide",
+  galleryDuration = 480,
   onBack,
   onOpenProduct,
   onAdd,
@@ -271,7 +273,8 @@ export default function ProductDetail({
               )}
               <img
                 key={activeImage || product.image}
-                className="product-gallery-image"
+                className={`product-gallery-image transition-${galleryTransition}`}
+                style={{ "--gallery-transition-duration": `${Math.max(200, Number(galleryDuration) || 480)}ms` }}
                 src={activeImage || product.image}
                 alt={product.name}
               />

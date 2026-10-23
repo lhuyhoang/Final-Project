@@ -581,10 +581,30 @@ function normalizeCategory(body = {}) {
 
 function mapPublicStoreSettings(settings) {
   const parsedInterval = Number(settings.product_gallery_interval_seconds?.value)
+  const galleryTransitionValue = String(settings.product_gallery_transition?.value || 'slide')
+  const galleryDurationValue = Number(settings.product_gallery_duration_ms?.value)
+  const carouselTransitionValue = String(settings.product_carousel_transition?.value || 'slide')
+  const carouselDurationValue = Number(settings.product_carousel_duration_ms?.value)
+  const carouselEasingValue = String(settings.product_carousel_easing?.value || 'smooth')
   return {
     productGalleryIntervalSeconds: Number.isInteger(parsedInterval)
       ? Math.min(Math.max(parsedInterval, 2), 60)
-      : 5
+      : 5,
+    productGalleryTransition: ['fade', 'slide', 'zoom'].includes(galleryTransitionValue)
+      ? galleryTransitionValue
+      : 'slide',
+    productGalleryDurationMs: Number.isInteger(galleryDurationValue)
+      ? Math.min(Math.max(galleryDurationValue, 200), 1500)
+      : 480,
+    productCarouselTransition: ['slide', 'fade'].includes(carouselTransitionValue)
+      ? carouselTransitionValue
+      : 'slide',
+    productCarouselDurationMs: Number.isInteger(carouselDurationValue)
+      ? Math.min(Math.max(carouselDurationValue, 400), 1800)
+      : 860,
+    productCarouselEasing: ['smooth', 'linear', 'soft'].includes(carouselEasingValue)
+      ? carouselEasingValue
+      : 'smooth'
   }
 }
 
@@ -1011,12 +1031,37 @@ app.get('/api/admin/settings', asyncHandler(async (req, res) => {
 }))
 
 app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
-  const rawInterval = Number(req.body?.productGalleryIntervalSeconds)
+  const current = mapPublicStoreSettings(await getStoreSettings())
+  const rawInterval = Number(req.body?.productGalleryIntervalSeconds ?? current.productGalleryIntervalSeconds)
   if (!Number.isInteger(rawInterval) || rawInterval < 2 || rawInterval > 60) {
     throw httpError(400, 'Thời gian tự chuyển ảnh phải từ 2 đến 60 giây')
   }
-  await updateStoreSetting('product_gallery_interval_seconds', String(rawInterval))
-  res.json({ productGalleryIntervalSeconds: rawInterval })
+  const galleryTransition = String(req.body?.productGalleryTransition || current.productGalleryTransition)
+  const galleryDuration = Number(req.body?.productGalleryDurationMs ?? current.productGalleryDurationMs)
+  const carouselTransition = String(req.body?.productCarouselTransition || current.productCarouselTransition)
+  const carouselDuration = Number(req.body?.productCarouselDurationMs ?? current.productCarouselDurationMs)
+  const carouselEasing = String(req.body?.productCarouselEasing || current.productCarouselEasing)
+  if (!['fade', 'slide', 'zoom'].includes(galleryTransition)) throw httpError(400, 'Hiệu ứng ảnh sản phẩm không hợp lệ')
+  if (!Number.isInteger(galleryDuration) || galleryDuration < 200 || galleryDuration > 1500) throw httpError(400, 'Thời lượng chuyển ảnh phải từ 200 đến 1500 mili giây')
+  if (!['slide', 'fade'].includes(carouselTransition)) throw httpError(400, 'Hiệu ứng danh sách sản phẩm không hợp lệ')
+  if (!Number.isInteger(carouselDuration) || carouselDuration < 400 || carouselDuration > 1800) throw httpError(400, 'Thời lượng chuyển sản phẩm phải từ 400 đến 1800 mili giây')
+  if (!['smooth', 'linear', 'soft'].includes(carouselEasing)) throw httpError(400, 'Đường cong chuyển động không hợp lệ')
+  await Promise.all([
+    updateStoreSetting('product_gallery_interval_seconds', String(rawInterval)),
+    updateStoreSetting('product_gallery_transition', galleryTransition),
+    updateStoreSetting('product_gallery_duration_ms', String(galleryDuration)),
+    updateStoreSetting('product_carousel_transition', carouselTransition),
+    updateStoreSetting('product_carousel_duration_ms', String(carouselDuration)),
+    updateStoreSetting('product_carousel_easing', carouselEasing)
+  ])
+  res.json({
+    productGalleryIntervalSeconds: rawInterval,
+    productGalleryTransition: galleryTransition,
+    productGalleryDurationMs: galleryDuration,
+    productCarouselTransition: carouselTransition,
+    productCarouselDurationMs: carouselDuration,
+    productCarouselEasing: carouselEasing
+  })
 }))
 
 app.post('/api/admin/categories', asyncHandler(async (req, res) => {

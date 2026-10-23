@@ -72,6 +72,14 @@ import "./styles.css";
 import "./admin.css";
 
 const THEME_KEY = "quadpro-theme";
+const defaultTransitionSettings = {
+  productGalleryIntervalSeconds: 5,
+  productGalleryTransition: "slide",
+  productGalleryDurationMs: 480,
+  productCarouselTransition: "slide",
+  productCarouselDurationMs: 860,
+  productCarouselEasing: "smooth",
+};
 
 function loadTheme() {
   try {
@@ -440,6 +448,9 @@ function ProductCard({ product, onAdd, onOpen, carousel = false }) {
 function CategoryProductCarousel({
   category,
   products,
+  carouselTransition = "slide",
+  carouselDuration = 860,
+  carouselEasing = "smooth",
   onAdd,
   onOpen,
   onSelectOption,
@@ -452,6 +463,7 @@ function CategoryProductCarousel({
   const [inView, setInView] = useState(false);
   const [paused, setPaused] = useState(false);
   const [canScroll, setCanScroll] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
   const menuOptions = (categoryMenus[category.name]?.options || []).slice(0, 5);
 
   function animateTrackTo(track, target) {
@@ -467,12 +479,15 @@ function CategoryProductCarousel({
 
     const start = track.scrollLeft;
     const distance = target - start;
-    const duration = 860;
+    const duration = Math.max(400, Number(carouselDuration) || 860);
     const startedAt = performance.now();
-    const easeInOut = (progress) =>
-      progress < 0.5
+    const easeInOut = (progress) => {
+      if (carouselEasing === "linear") return progress;
+      if (carouselEasing === "soft") return 1 - Math.pow(1 - progress, 3);
+      return progress < 0.5
         ? 2 * progress * progress
         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    };
 
     const frame = (now) => {
       const progress = Math.min((now - startedAt) / duration, 1);
@@ -481,9 +496,11 @@ function CategoryProductCarousel({
         scrollAnimationRef.current = window.requestAnimationFrame(frame);
       } else {
         scrollAnimationRef.current = null;
+        setTransitioning(false);
       }
     };
 
+    setTransitioning(true);
     scrollAnimationRef.current = window.requestAnimationFrame(frame);
   }
 
@@ -617,7 +634,10 @@ function CategoryProductCarousel({
           </button>
         )}
         <div
-          className="category-product-track"
+          className={`category-product-track${transitioning ? " is-transitioning" : ""}`}
+          data-transition={carouselTransition}
+          data-easing={carouselEasing}
+          style={{ "--carousel-transition-duration": `${Math.max(400, Number(carouselDuration) || 860)}ms` }}
           aria-label={`Sản phẩm ${category.name}`}
           ref={trackRef}
           role="group"
@@ -867,7 +887,7 @@ function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
-  const [galleryInterval, setGalleryInterval] = useState(5);
+  const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Tất cả");
@@ -947,9 +967,7 @@ function App() {
   async function refreshSettings() {
     try {
       const settings = await api("/api/settings");
-      if (Number.isInteger(settings.productGalleryIntervalSeconds)) {
-        setGalleryInterval(Math.min(Math.max(settings.productGalleryIntervalSeconds, 2), 60));
-      }
+      setTransitionSettings({ ...defaultTransitionSettings, ...settings });
     } catch {
       /* The default interval keeps the gallery usable while settings load. */
     }
@@ -1896,7 +1914,9 @@ function App() {
             product={productsLoaded ? selectedProduct : null}
             products={products}
             loading={!productsLoaded}
-            galleryInterval={galleryInterval}
+            galleryInterval={transitionSettings.productGalleryIntervalSeconds}
+            galleryTransition={transitionSettings.productGalleryTransition}
+            galleryDuration={transitionSettings.productGalleryDurationMs}
             onBack={openStorefront}
             onOpenProduct={openProduct}
             onAdd={addToCart}
@@ -2113,6 +2133,9 @@ function App() {
                   key={group.category.name}
                   category={group.category}
                   products={group.products}
+                  carouselTransition={transitionSettings.productCarouselTransition}
+                  carouselDuration={transitionSettings.productCarouselDurationMs}
+                  carouselEasing={transitionSettings.productCarouselEasing}
                   onAdd={addToCart}
                   onOpen={openProduct}
                   onSelectOption={(option) =>
