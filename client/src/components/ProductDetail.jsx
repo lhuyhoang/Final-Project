@@ -149,6 +149,7 @@ export default function ProductDetail({
   galleryTransition = "slide",
   galleryDuration = 480,
   onBack,
+  onOpenCategory,
   onOpenProduct,
   onAdd,
   onBuyNow,
@@ -233,7 +234,13 @@ export default function ProductDetail({
             Trang chủ
           </button>
           <ChevronRight size={15} aria-hidden="true" />
-          <span>{product.category}</span>
+          <button
+            type="button"
+            className="breadcrumb-category"
+            onClick={() => onOpenCategory?.(product.category)}
+          >
+            {product.category}
+          </button>
           <ChevronRight size={15} aria-hidden="true" />
           <strong>{product.name}</strong>
         </nav>

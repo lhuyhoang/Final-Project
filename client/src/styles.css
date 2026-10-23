@@ -95,6 +95,14 @@ html[data-theme="dark"] :where(
   color: #d9dce2;
 }
 
+html[data-theme="dark"] .product-breadcrumb .breadcrumb-category {
+  color: var(--theme-text-secondary);
+}
+
+html[data-theme="dark"] .product-breadcrumb .breadcrumb-category:hover {
+  color: #ff8178;
+}
+
 html[data-theme="dark"] :where(
   .product-body h3,
   .empty h3,
@@ -1926,6 +1934,23 @@ html[data-theme="dark"] .quick-view-rating small {
   font-weight: 700;
   background: transparent;
   border: 0;
+}
+
+.product-breadcrumb .breadcrumb-category {
+  color: #5d6672;
+  font-weight: 700;
+}
+
+.product-breadcrumb .breadcrumb-category:hover {
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.product-breadcrumb button:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 4px;
+  border-radius: 3px;
 }
 
 .product-breadcrumb svg {

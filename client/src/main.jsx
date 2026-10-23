@@ -1918,6 +1918,7 @@ function App() {
             galleryTransition={transitionSettings.productGalleryTransition}
             galleryDuration={transitionSettings.productGalleryDurationMs}
             onBack={openStorefront}
+            onOpenCategory={(category) => openCatalog(category)}
             onOpenProduct={openProduct}
             onAdd={addToCart}
             onBuyNow={buyNow}
