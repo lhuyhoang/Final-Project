@@ -305,7 +305,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '
   res.json({ received: true, ...result })
 }))
 
-app.use(express.json({ limit: '100kb' }))
+app.use(express.json({ limit: '1mb' }))
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }))
 
 app.use('/api', asyncHandler(async (req, res, next) => {
@@ -963,6 +963,23 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
 }))
 
 app.get('/api/admin/products', asyncHandler(async (req, res) => res.json(await listProducts())))
+
+app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {
+  const inputProducts = req.body?.products
+  if (!Array.isArray(inputProducts) || !inputProducts.length) {
+    throw httpError(400, 'File nhập sản phẩm không có dữ liệu hợp lệ')
+  }
+  if (inputProducts.length > 100) {
+    throw httpError(400, 'Mỗi lần chỉ được nhập tối đa 100 sản phẩm')
+  }
+
+  const products = inputProducts.map(product => normalizeProduct(product))
+  const savedProducts = []
+  for (const product of products) {
+    savedProducts.push(await insertProduct(product))
+  }
+  res.status(201).json({ products: savedProducts })
+}))
 
 app.post('/api/admin/products', asyncHandler(async (req, res) => {
   const product = normalizeProduct(req.body)

@@ -37,6 +37,122 @@ const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
 const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
+const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'badge', 'policyText', 'description', 'highlights']
+
+function normalizeImportHeader(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+const importHeaderAliases = {
+  name: ['name', 'ten', 'tensanpham', 'sanpham'],
+  brand: ['brand', 'thuonghieu', 'hang'],
+  category: ['category', 'danhmuc', 'loaisanpham'],
+  price: ['price', 'giaban', 'giabanle'],
+  oldPrice: ['oldprice', 'giacu', 'gianiemyet', 'giagoc'],
+  stock: ['stock', 'tonkho', 'soluongton', 'soluong'],
+  image: ['image', 'hinhanh', 'urlhinhanh', 'imageurl'],
+  badge: ['badge', 'nhannoibat', 'nhan'],
+  policyText: ['policytext', 'chinhsach', 'baohanh'],
+  description: ['description', 'mota', 'motasanpham'],
+  highlights: ['highlights', 'diemnoibat', 'noibat']
+}
+
+function importCellText(value) {
+  return String(value ?? '').trim()
+}
+
+function importMoney(value) {
+  if (typeof value === 'number') return Math.round(value)
+  const cleaned = importCellText(value).replace(/[₫đ\s]/gi, '').replace(/[.,]/g, '')
+  return cleaned ? Number(cleaned) : 0
+}
+
+function parseCsvRows(text) {
+  const rows = []
+  let row = []
+  let cell = ''
+  let quoted = false
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    const nextCharacter = text[index + 1]
+    if (character === '"' && quoted && nextCharacter === '"') {
+      cell += '"'
+      index += 1
+    } else if (character === '"') {
+      quoted = !quoted
+    } else if (character === ',' && !quoted) {
+      row.push(cell)
+      cell = ''
+    } else if ((character === '\n' || character === '\r') && !quoted) {
+      if (character === '\r' && nextCharacter === '\n') index += 1
+      row.push(cell)
+      if (row.some(value => String(value).trim())) rows.push(row)
+      row = []
+      cell = ''
+    } else {
+      cell += character
+    }
+  }
+  row.push(cell)
+  if (row.some(value => String(value).trim())) rows.push(row)
+  return rows
+}
+
+function parseImportedRows(sheetRows) {
+  if (!Array.isArray(sheetRows) || sheetRows.length < 2) {
+    throw new Error('File Excel phải có dòng tiêu đề và ít nhất một sản phẩm.')
+  }
+  const headerIndexes = new Map()
+  sheetRows[0].forEach((header, index) => {
+    const normalized = normalizeImportHeader(header)
+    const key = Object.entries(importHeaderAliases).find(([, aliases]) => aliases.includes(normalized))?.[0]
+    if (key && !headerIndexes.has(key)) headerIndexes.set(key, index)
+  })
+  const required = ['name', 'brand', 'category', 'price', 'stock', 'image']
+  const missing = required.filter(key => !headerIndexes.has(key))
+  if (missing.length) throw new Error(`Thiếu cột bắt buộc: ${missing.join(', ')}`)
+
+  return sheetRows.slice(1).map((cells, index) => {
+    const get = key => headerIndexes.has(key) ? cells[headerIndexes.get(key)] : ''
+    const price = importMoney(get('price'))
+    const oldPrice = importMoney(get('oldPrice')) || price
+    const stock = Number(get('stock'))
+    const image = importCellText(get('image'))
+    const product = {
+      name: importCellText(get('name')),
+      brand: importCellText(get('brand')),
+      category: importCellText(get('category')),
+      price,
+      oldPrice,
+      stock,
+      image,
+      badge: importCellText(get('badge')) || 'Mới',
+      policyText: importCellText(get('policyText')) || defaultPolicyText,
+      description: importCellText(get('description')),
+      highlights: importCellText(get('highlights')).split(/[\n|]/).map(item => item.trim()).filter(Boolean),
+      specifications: []
+    }
+    const errors = []
+    if (!product.name) errors.push('Thiếu tên')
+    if (!product.brand) errors.push('Thiếu thương hiệu')
+    if (!product.category) errors.push('Thiếu danh mục')
+    if (!Number.isSafeInteger(price) || price < 1) errors.push('Giá bán không hợp lệ')
+    if (!Number.isSafeInteger(oldPrice) || oldPrice < price) errors.push('Giá niêm yết không hợp lệ')
+    if (!Number.isInteger(stock) || stock < 0) errors.push('Tồn kho không hợp lệ')
+    try {
+      const url = new URL(image)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
+    } catch {
+      errors.push('URL hình ảnh không hợp lệ')
+    }
+    return { rowNumber: index + 2, product, errors }
+  }).filter(item => item.product.name || item.product.brand || item.product.image || item.product.price)
+}
 
 function loadAdminTab() {
   try {
@@ -266,6 +382,91 @@ function ProductEditor({ product, onClose, onSaved }) {
   </div>
 }
 
+function BulkProductImporter({ onClose, onSaved }) {
+  const [fileName, setFileName] = useState('')
+  const [rows, setRows] = useState([])
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function readFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setError('')
+    setRows([])
+    setFileName(file.name)
+    try {
+      const sheetRows = file.name.toLowerCase().endsWith('.csv')
+        ? parseCsvRows(await file.text())
+        : await (async () => {
+            const { readSheet } = await import('read-excel-file/browser')
+            return readSheet(file)
+          })()
+      setRows(parseImportedRows(sheetRows))
+    } catch (fileError) {
+      setError(fileError.message || 'Không thể đọc file Excel.')
+    }
+  }
+
+  function downloadTemplate() {
+    const sample = [
+      bulkProductHeaders.join(','),
+      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'Hiệu năng ổn định|Bảo hành chính hãng'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
+    ].join('\r\n')
+    const blob = new Blob([`\ufeff${sample}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'quadpro-import-products.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function submit() {
+    const validRows = rows.filter(row => row.errors.length === 0)
+    if (!validRows.length) {
+      setError('Không có dòng hợp lệ để nhập.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api('/api/admin/products/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ products: validRows.map(row => row.product) })
+      })
+      onSaved(result.products || [])
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const validCount = rows.filter(row => row.errors.length === 0).length
+  const invalidCount = rows.length - validCount
+
+  return <div className="admin-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+    <section className="product-editor bulk-product-importer" role="dialog" aria-modal="true" aria-labelledby="bulk-product-title">
+      <header><div><span>NHẬP KHO HÀNG LOẠT</span><h2 id="bulk-product-title">Nhập sản phẩm từ Excel</h2></div><button type="button" onClick={onClose} aria-label="Đóng"><X/></button></header>
+      <div className="bulk-import-body">
+        <div className="bulk-import-actions">
+          <label className="bulk-file-picker"><Upload size={17}/> Chọn file Excel (.xlsx/.csv)<input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={readFile}/></label>
+          <button type="button" className="bulk-template-button" onClick={downloadTemplate}>Tải file mẫu CSV</button>
+          {fileName && <small>{fileName}</small>}
+        </div>
+        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Có thể dùng tên cột tiếng Việt tương ứng trong file mẫu.</p>
+        {error && <div className="admin-form-error" role="alert">{error}</div>}
+        {rows.length > 0 && <>
+          <div className="bulk-import-summary"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><b>{invalidCount}</b> dòng lỗi</span>}</div>
+          <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
+        </>}
+      </div>
+      <footer><button type="button" className="secondary" onClick={onClose}>Hủy</button><button type="button" className="primary" disabled={saving || !validCount} onClick={submit}><Upload size={17}/>{saving ? 'Đang nhập...' : `Nhập ${validCount || ''} sản phẩm`}</button></footer>
+    </section>
+  </div>
+}
+
 function ShowroomEditor({ showroom, onClose, onSaved }) {
   const [form, setForm] = useState(showroom ? {
     name: showroom.name,
@@ -334,6 +535,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [bulkImporterOpen, setBulkImporterOpen] = useState(false)
   const [showroomEditor, setShowroomEditor] = useState(null)
   const [showroomEditorOpen, setShowroomEditorOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -427,6 +629,14 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     await loadDashboard(true)
     onProductsChanged()
     showNotice(isEditing ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm')
+  }
+
+  async function saveBulkProducts(savedProducts) {
+    setBulkImporterOpen(false)
+    setProducts(current => [...savedProducts, ...current])
+    await loadDashboard(true)
+    onProductsChanged()
+    showNotice(`Đã nhập ${savedProducts.length} sản phẩm`)
   }
 
   async function removeShowroom(showroom) {
@@ -552,7 +762,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </>}
 
         {tab === 'products' && <section className="admin-panel admin-list-panel">
-          <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
+          <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
           <div className="admin-table-wrap"><table className="products-table"><thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{visibleProducts.map(product => <tr key={product.id}><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
         </section>}
 
@@ -609,6 +819,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       </div>}
     </main>
     {editorOpen && <ProductEditor product={editor} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
+    {bulkImporterOpen && <BulkProductImporter onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {notice && <div className="admin-notice"><Check size={18}/>{notice}</div>}
   </div>
