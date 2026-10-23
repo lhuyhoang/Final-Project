@@ -37,7 +37,7 @@ const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
 const validAdminTabs = new Set(['overview', 'products', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users'])
-const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description']
+const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
 
 function normalizeImportHeader(value) {
   return String(value || '')
@@ -59,7 +59,8 @@ const importHeaderAliases = {
   gallery: ['gallery', 'anhphu', 'hinhanhphu', 'galleryurl', 'galleryurls'],
   badge: ['badge', 'nhannoibat', 'nhan'],
   policyText: ['policytext', 'chinhsach', 'baohanh'],
-  description: ['description', 'mota', 'motasanpham']
+  description: ['description', 'mota', 'motasanpham'],
+  specifications: ['specifications', 'specification', 'thongsokythuat', 'thongso', 'cauhinh', 'cauhinhkythuat']
 }
 
 function importCellText(value) {
@@ -103,6 +104,14 @@ function parseCsvRows(text) {
   return rows
 }
 
+function parseSpecificationText(value) {
+  return importCellText(value)
+    .split(/[|\r\n]+/)
+    .map(item => item.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .map(description => ({ description, quantity: 1, warranty: '' }))
+}
+
 function parseImportedRows(sheetRows) {
   if (!Array.isArray(sheetRows) || sheetRows.length < 2) {
     throw new Error('File Excel phải có dòng tiêu đề và ít nhất một sản phẩm.')
@@ -124,6 +133,9 @@ function parseImportedRows(sheetRows) {
     const stock = Number(get('stock'))
     const image = importCellText(get('image'))
     const gallery = importCellText(get('gallery')).split(/[\n|;]/).map(item => item.trim()).filter(Boolean)
+    const description = importCellText(get('description'))
+    const specificationText = importCellText(get('specifications')) || (/[|\r\n]/.test(description) ? description : '')
+    const specifications = parseSpecificationText(specificationText)
     const product = {
       name: importCellText(get('name')),
       brand: importCellText(get('brand')),
@@ -135,8 +147,8 @@ function parseImportedRows(sheetRows) {
       gallery,
       badge: importCellText(get('badge')) || 'Mới',
       policyText: importCellText(get('policyText')) || defaultPolicyText,
-      description: importCellText(get('description')),
-      specifications: []
+      description,
+      specifications
     }
     const errors = []
     if (!product.name) errors.push('Thiếu tên')
@@ -145,6 +157,7 @@ function parseImportedRows(sheetRows) {
     if (!Number.isSafeInteger(price) || price < 1) errors.push('Giá bán không hợp lệ')
     if (!Number.isSafeInteger(oldPrice) || oldPrice < price) errors.push('Giá niêm yết không hợp lệ')
     if (!Number.isInteger(stock) || stock < 0) errors.push('Tồn kho không hợp lệ')
+    if (specifications.length > 30) errors.push('Tối đa 30 dòng thông số kỹ thuật')
     try {
       const url = new URL(image)
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
@@ -458,7 +471,7 @@ function BulkProductImporter({ onClose, onSaved }) {
   function downloadTemplate() {
     const sample = [
       bulkProductHeaders.join(','),
-      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
+      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'CPU Intel Core i5-14400F|RAM 16GB DDR5|SSD NVMe 1TB'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
     ].join('\r\n')
     const blob = new Blob([`\ufeff${sample}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -502,11 +515,11 @@ function BulkProductImporter({ onClose, onSaved }) {
           <button type="button" className="bulk-template-button" onClick={downloadTemplate}>Tải file mẫu CSV</button>
           {fileName && <small>{fileName}</small>}
         </div>
-        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Cột gallery là tùy chọn; nhập nhiều URL ảnh phụ, ngăn cách bằng dấu |. Có thể dùng tên cột tiếng Việt tương ứng trong file mẫu.</p>
+        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Cột gallery và specifications là tùy chọn; nhập nhiều giá trị ngăn cách bằng dấu | hoặc xuống dòng. Nếu không có cột specifications, nội dung cột Mô tả sản phẩm có dấu | sẽ tự tách thành từng dòng thông số.</p>
         {error && <div className="admin-form-error" role="alert">{error}</div>}
         {rows.length > 0 && <>
           <div className="bulk-import-summary"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><b>{invalidCount}</b> dòng lỗi</span>}</div>
-          <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
+          <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Thông số</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.product.specifications.length} dòng</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
         </>}
       </div>
       <footer><button type="button" className="secondary" onClick={onClose}>Hủy</button><button type="button" className="primary" disabled={saving || !validCount} onClick={submit}><Upload size={17}/>{saving ? 'Đang nhập...' : `Nhập ${validCount || ''} sản phẩm`}</button></footer>
