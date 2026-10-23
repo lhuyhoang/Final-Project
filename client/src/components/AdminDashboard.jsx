@@ -765,7 +765,7 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, theme, onToggleTheme }) {
+export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
@@ -900,6 +900,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
   function saveTransitionSettings(updated) {
     setTransitionSettings({ ...defaultTransitionSettings, ...updated })
+    onTransitionSettingsChanged?.(updated)
     showNotice('Đã cập nhật hiệu ứng chuyển cảnh')
   }
 

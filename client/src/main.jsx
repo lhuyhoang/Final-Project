@@ -1213,6 +1213,7 @@ function App() {
 
   function leaveAdmin() {
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
+    refreshSettings();
     setAdminView(false);
     setAccountView(false);
     setCheckoutView(false);
@@ -1476,6 +1477,7 @@ function App() {
         onLogout={logout}
         onProductsChanged={refreshProducts}
         onShowroomsChanged={refreshShowrooms}
+        onTransitionSettingsChanged={(updated) => setTransitionSettings({ ...defaultTransitionSettings, ...updated })}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
