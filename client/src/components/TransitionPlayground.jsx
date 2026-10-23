@@ -154,8 +154,8 @@ export default function TransitionPlayground({ products, settings, onSaved }) {
   const variantInfo = category.variants.find(item => item[0] === variant) || category.variants[0]
   return <section className="transition-playground">
     <header className="transition-playground-header">
-      <div className="transition-playground-brand"><span className="transition-brand-icon">✣</span><div><h2>VisualTransitions <b>HTML &amp; CSS Pro</b></h2><p>Bộ sưu tập &amp; Playground hiệu ứng chuyển ảnh mượt mà</p></div></div>
-      <div className="transition-playground-header-actions"><button type="button" className="transition-help">? Hướng dẫn</button><span>⚡ Hiệu ứng Hover</span></div>
+      <div><span className="transition-playground-eyebrow">CẤU HÌNH CỬA HÀNG</span><h2>Thiết lập hiệu ứng chuyển cảnh</h2><p>Xem trước trực tiếp và điều chỉnh chuyển ảnh, chuyển sản phẩm trên toàn bộ cửa hàng.</p></div>
+      <span className="transition-preview-status"><i/> ĐANG XEM TRƯỚC</span>
     </header>
     <div className="transition-playground-workspace">
       <aside className="transition-playground-categories panel-glass">

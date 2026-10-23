@@ -2665,28 +2665,27 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 
 /* Transition playground */
 .transition-playground {
-  --transition-bg: #080d1d;
-  --transition-panel: rgba(15, 23, 42, .86);
-  --transition-border: rgba(148, 163, 184, .18);
-  --transition-muted: #8d9ab5;
-  --transition-blue: #3478ef;
-  background: radial-gradient(circle at 50% -30%, rgba(35, 75, 155, .22), transparent 45%), var(--transition-bg);
-  border: 1px solid #1d2942;
+  --transition-bg: var(--admin-bg, #f3f4f6);
+  --transition-panel: var(--admin-surface, #fff);
+  --transition-border: var(--admin-border, #e7e7e7);
+  --transition-text: var(--admin-text, #1f2228);
+  --transition-muted: var(--admin-muted, #8c8e93);
+  --transition-accent: var(--admin-accent, var(--red));
+  background: var(--transition-bg);
+  border: 1px solid var(--transition-border);
   border-radius: 16px;
-  color: #e8eefb;
+  color: var(--transition-text);
   padding: 15px;
   min-height: 700px;
 }
 .transition-playground button, .transition-playground select, .transition-playground input { font: inherit; }
-.transition-playground-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid #1d2b46; border-radius: 12px; background: rgba(11, 19, 36, .82); }
-.transition-playground-brand { display: flex; align-items: center; gap: 11px; }
-.transition-brand-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #5c6ef8, #19c7df); font-size: 21px; box-shadow: 0 8px 22px rgba(44, 104, 236, .28); }
+.transition-playground-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid var(--transition-border); border-radius: 11px; background: var(--transition-panel); }
 .transition-playground-header h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
-.transition-playground-header h2 b { color: #74a9ff; background: rgba(53, 110, 231, .14); border: 1px solid rgba(77, 132, 242, .35); border-radius: 999px; font-size: 10px; padding: 3px 7px; vertical-align: 2px; }
 .transition-playground-header p { color: var(--transition-muted); margin: 3px 0 0; font-size: 11px; }
-.transition-playground-header-actions { display: flex; align-items: center; gap: 10px; color: #63d5e5; font-size: 11px; }
-.transition-help, .transition-playground-header-actions > span { background: rgba(30, 48, 78, .76); border: 1px solid #29405f; color: #c9d5e9; padding: 7px 10px; border-radius: 8px; font-size: 11px; }
-.transition-playground-header-actions > span { color: #67d9e7; border-color: rgba(35, 172, 195, .42); }
+.transition-playground-eyebrow { display: block; color: var(--transition-accent); font-size: 8px; font-weight: 800; letter-spacing: 1.6px; }
+.transition-playground-header h2 { color: var(--transition-text); }
+.transition-preview-status { display: inline-flex; align-items: center; gap: 6px; color: var(--transition-muted); font-size: 9px; font-weight: 700; letter-spacing: .7px; }
+.transition-preview-status i { width: 7px; height: 7px; border-radius: 50%; background: #19a974; box-shadow: 0 0 0 3px rgba(25,169,116,.12); }
 .transition-playground-workspace { display: grid; grid-template-columns: minmax(206px, .85fr) minmax(400px, 1.7fr) minmax(260px, 1fr); gap: 14px; padding-top: 14px; align-items: start; }
 .panel-glass { background: var(--transition-panel); border: 1px solid var(--transition-border); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.12); }
 .transition-playground-categories { padding: 13px; }
@@ -2762,6 +2761,48 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 .transition-hover-float:hover { transform: translateY(-6px) rotateX(4deg) rotateY(-4deg); border-color: #3b78d8; box-shadow: 0 15px 30px rgba(31,87,186,.22); }
 .transition-hover-shine > div::after { content: ''; position: absolute; inset: 0; width: 42%; background: linear-gradient(110deg, transparent, rgba(255,255,255,.38), transparent); transform: translateX(-180%) skewX(-16deg); transition: transform .8s ease-in-out; pointer-events: none; }
 .transition-hover-shine:hover > div::after { transform: translateX(320%) skewX(-16deg); }
+
+/* Use the same Admin Center tokens in both themes. */
+.admin-shell:not(.admin-theme-dark) .transition-playground .panel-glass {
+  background: #fff;
+  border-color: #e7e7e7;
+  box-shadow: 0 6px 18px #1f283308;
+}
+.admin-shell:not(.admin-theme-dark) .transition-playground :where(.transition-panel-title, .transition-stage-header > span, .transition-category-list strong, .transition-playground-header h2, .transition-stage-controls button, .transition-control-card label, .transition-control-card select) { color: #1f2228; }
+.admin-shell:not(.admin-theme-dark) .transition-playground :where(.transition-panel-title, .transition-playground-header, .transition-thumbnails) { border-color: #ededed; }
+.admin-shell:not(.admin-theme-dark) .transition-playground :where(.transition-panel-title, .transition-panel-title small, .transition-category-list small, .transition-playground-header p, .transition-preview-status) { color: #8c8e93; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-list > button:hover { background: #f7f7f8; border-color: #e4e4e6; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-list > button.active { color: #fff; background: var(--red); border-color: var(--red); box-shadow: 0 8px 20px #e6332a24; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-list .active small,
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-list .active i { color: #ffeceb; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-icon { color: #666a72; background: #f1f2f4; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-category-list .active .transition-category-icon { color: var(--red); background: #fff; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-ratios { background: #f4f5f7; border-color: #e4e5e8; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-ratios em,
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-ratios button { color: #777b83; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-ratios button.active { color: #fff; background: var(--red); }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-stage-viewport { border-color: #e3e5e9; background-color: #f5f6f8; background-image: linear-gradient(90deg, #1f28330d 1px, transparent 1px), linear-gradient(#1f28330d 1px, transparent 1px); }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-effect-chip,
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-index { color: #3b3f47; background: #fffffff2; border-color: #e3e5e9; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-stage-controls button { background: #f6f7f8; border-color: #dedfe3; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-stage-controls button:nth-child(2),
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-control-card > .transition-save-button { color: #fff; background: var(--red); border-color: var(--red); }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-stage-controls button:nth-child(2).playing { background: #ba2922; border-color: #ba2922; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-control-card select { background: #fff; border-color: #dedfe3; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-thumb-grid button { background: #f4f5f7; border-color: transparent; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-thumb-grid button.active { border-color: var(--red); box-shadow: 0 0 0 2px #e6332a1f; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-card { background: #f7f7f8; border-color: #e4e4e6; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-heading { border-color: #ededed; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-heading h3,
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-card h4 { color: #25272d; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-heading p,
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-card p { color: #858990; }
+.admin-shell:not(.admin-theme-dark) .transition-playground .transition-hover-heading > span { color: #777b83; background: #f0f1f3; border-color: #e1e2e5; }
+
+.admin-shell.admin-theme-dark .transition-playground .transition-category-list > button.active,
+.admin-shell.admin-theme-dark .transition-playground .transition-ratios button.active,
+.admin-shell.admin-theme-dark .transition-playground .transition-stage-controls button:nth-child(2),
+.admin-shell.admin-theme-dark .transition-playground .transition-control-card > .transition-save-button { background: var(--admin-accent); border-color: var(--admin-accent); }
 .transition-control-card .transition-panel-title > button { border: 0; background: transparent; color: #8291aa; }
 
 @media (max-width: 1280px) {
@@ -2770,7 +2811,6 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 }
 @media (max-width: 760px) {
   .transition-playground-header, .transition-stage-header { align-items: flex-start; flex-direction: column; }
-  .transition-playground-header-actions { width: 100%; justify-content: space-between; }
   .transition-playground-workspace, .transition-playground-controls { grid-template-columns: 1fr; }
   .transition-playground-controls { grid-column: auto; }
   .transition-stage-controls button { padding: 8px 6px; }
