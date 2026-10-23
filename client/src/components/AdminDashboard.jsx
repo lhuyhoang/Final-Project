@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
+import TransitionPlayground from './TransitionPlayground'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -35,11 +36,21 @@ const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapU
 const defaultTransitionSettings = {
   productGalleryIntervalSeconds: 5,
   productGalleryTransition: 'slide',
+  productGalleryVariant: 'slide-right',
   productGalleryDurationMs: 480,
+  productGalleryEasing: 'cubic-bezier(0.25, 1, 0.5, 1)',
   productCarouselTransition: 'slide',
   productCarouselDurationMs: 860,
   productCarouselEasing: 'smooth'
 }
+const transitionCategories = [
+  { id: 'fade', title: 'Fade & Crossfade', subtitle: 'Mờ dần / Đè hình mượt', variants: [['crossfade', 'Standard Crossfade', 'Mờ chồng hình cổ điển'], ['fade-black', 'Fade Through Black', 'Mờ qua nền tối điện ảnh'], ['fade-zoom', 'Fade with Subtle Zoom', 'Mờ kết hợp phóng nhẹ']] },
+  { id: 'scale', title: 'Scale & Ken Burns', subtitle: 'Phóng to / Thu nhỏ điện ảnh', variants: [['kenburns-in', 'Ken Burns Zoom In', 'Phóng từ từ chuẩn phim'], ['kenburns-out', 'Ken Burns Zoom Out', 'Thu nhỏ tầm nhìn'], ['scale-pulse', 'Pulse Pop Reveal', 'Bật nhẹ thu hút thị giác']] },
+  { id: 'slide', title: 'Slide & Gliding', subtitle: 'Trượt ngang / Trượt dọc / Push', variants: [['slide-right', 'Slide Right to Left', 'Trượt từ phải sang trái'], ['slide-up', 'Slide Up Reveal', 'Trượt đẩy từ dưới lên'], ['slide-push', 'Push Shift Swap', 'Đẩy cả hai lớp ảnh']] },
+  { id: 'flip3d', title: '3D Flip & Rotation', subtitle: 'Lật thẻ 3D / Xoay không gian', variants: [['flip-y', '3D Flip Y-Axis', 'Lật ngang 180 độ'], ['flip-x', '3D Flip X-Axis', 'Lật dọc từ trên xuống'], ['cube-rot', 'Cube Perspective Roll', 'Xoay khối lập phương']] },
+  { id: 'clippath', title: 'Clip-Path & Reveal Mask', subtitle: 'Cắt hình Circle / Spline / Venetian', variants: [['clip-circle', 'Circle Radial Wipe', 'Mở rộng hình tròn từ tâm'], ['clip-diagonal', 'Diagonal Split Wipe', 'Cắt chéo màn hình'], ['clip-diamond', 'Diamond Center Mask', 'Mở rộng hình kim cương']] },
+  { id: 'blur', title: 'Blur & Glassmorphism', subtitle: 'Làm mờ ảo / Frost focus', variants: [['gaussian-dissolve', 'Gaussian Blur Focus', 'Mờ nhòe hóa rõ nét'], ['frost-glass', 'Frost Glass Shift', 'Lớp kính mờ nghệ thuật']] }
+]
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
@@ -1025,7 +1036,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
     { id: 'stripe-dashboard', label: 'Stripe Sandbox', icon: WalletCards },
     { id: 'users', label: 'Khách hàng', icon: Users },
-    { id: 'settings', label: 'Cài đặt', icon: Settings }
+    { id: 'settings', label: 'Hiệu ứng chuyển cảnh', icon: Settings }
   ]
 
   return <div
@@ -1075,7 +1086,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
         {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onRequestDelete={removeCategory}/>}
 
-        {tab === 'settings' && <StoreSettings settings={transitionSettings} onSaved={saveTransitionSettings}/>}
+        {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
 
         {tab === 'showrooms' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>

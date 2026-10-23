@@ -65,6 +65,21 @@ const vnpayPaymentUrl = String(process.env.VNPAY_PAYMENT_URL || 'https://sandbox
 const LEGACY_SESSION_COOKIE_NAME = 'quadpro_session'
 const SESSION_COOKIE_NAME = isProduction ? '__Host-quadpro_session' : LEGACY_SESSION_COOKIE_NAME
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+const galleryVariantIds = new Set([
+  'crossfade', 'fade-black', 'fade-zoom',
+  'kenburns-in', 'kenburns-out', 'scale-pulse',
+  'slide-right', 'slide-up', 'slide-push',
+  'flip-y', 'flip-x', 'cube-rot',
+  'clip-circle', 'clip-diagonal', 'clip-diamond',
+  'gaussian-dissolve', 'frost-glass'
+])
+const galleryEasingValues = new Set([
+  'ease-in-out',
+  'cubic-bezier(0.25, 1, 0.5, 1)',
+  'cubic-bezier(0.68, -0.55, 0.27, 1.55)',
+  'cubic-bezier(0.16, 1, 0.3, 1)',
+  'linear'
+])
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 const httpError = (status, message) => Object.assign(new Error(message), { status })
@@ -582,6 +597,8 @@ function normalizeCategory(body = {}) {
 function mapPublicStoreSettings(settings) {
   const parsedInterval = Number(settings.product_gallery_interval_seconds?.value)
   const galleryTransitionValue = String(settings.product_gallery_transition?.value || 'slide')
+  const galleryVariantValue = String(settings.product_gallery_variant?.value || 'slide-right')
+  const galleryEasingValue = String(settings.product_gallery_easing?.value || 'cubic-bezier(0.25, 1, 0.5, 1)')
   const galleryDurationValue = Number(settings.product_gallery_duration_ms?.value)
   const carouselTransitionValue = String(settings.product_carousel_transition?.value || 'slide')
   const carouselDurationValue = Number(settings.product_carousel_duration_ms?.value)
@@ -593,6 +610,12 @@ function mapPublicStoreSettings(settings) {
     productGalleryTransition: ['fade', 'slide', 'zoom'].includes(galleryTransitionValue)
       ? galleryTransitionValue
       : 'slide',
+    productGalleryVariant: galleryVariantIds.has(galleryVariantValue)
+      ? galleryVariantValue
+      : 'slide-right',
+    productGalleryEasing: galleryEasingValues.has(galleryEasingValue)
+      ? galleryEasingValue
+      : 'cubic-bezier(0.25, 1, 0.5, 1)',
     productGalleryDurationMs: Number.isInteger(galleryDurationValue)
       ? Math.min(Math.max(galleryDurationValue, 200), 1500)
       : 480,
@@ -1037,11 +1060,15 @@ app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
     throw httpError(400, 'Thời gian tự chuyển ảnh phải từ 2 đến 60 giây')
   }
   const galleryTransition = String(req.body?.productGalleryTransition || current.productGalleryTransition)
+  const galleryVariant = String(req.body?.productGalleryVariant || current.productGalleryVariant)
+  const galleryEasing = String(req.body?.productGalleryEasing || current.productGalleryEasing)
   const galleryDuration = Number(req.body?.productGalleryDurationMs ?? current.productGalleryDurationMs)
   const carouselTransition = String(req.body?.productCarouselTransition || current.productCarouselTransition)
   const carouselDuration = Number(req.body?.productCarouselDurationMs ?? current.productCarouselDurationMs)
   const carouselEasing = String(req.body?.productCarouselEasing || current.productCarouselEasing)
   if (!['fade', 'slide', 'zoom'].includes(galleryTransition)) throw httpError(400, 'Hiệu ứng ảnh sản phẩm không hợp lệ')
+  if (!galleryVariantIds.has(galleryVariant)) throw httpError(400, 'Biến thể chuyển ảnh sản phẩm không hợp lệ')
+  if (!galleryEasingValues.has(galleryEasing)) throw httpError(400, 'Đường cong chuyển ảnh sản phẩm không hợp lệ')
   if (!Number.isInteger(galleryDuration) || galleryDuration < 200 || galleryDuration > 1500) throw httpError(400, 'Thời lượng chuyển ảnh phải từ 200 đến 1500 mili giây')
   if (!['slide', 'fade'].includes(carouselTransition)) throw httpError(400, 'Hiệu ứng danh sách sản phẩm không hợp lệ')
   if (!Number.isInteger(carouselDuration) || carouselDuration < 400 || carouselDuration > 1800) throw httpError(400, 'Thời lượng chuyển sản phẩm phải từ 400 đến 1800 mili giây')
@@ -1049,6 +1076,8 @@ app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
   await Promise.all([
     updateStoreSetting('product_gallery_interval_seconds', String(rawInterval)),
     updateStoreSetting('product_gallery_transition', galleryTransition),
+    updateStoreSetting('product_gallery_variant', galleryVariant),
+    updateStoreSetting('product_gallery_easing', galleryEasing),
     updateStoreSetting('product_gallery_duration_ms', String(galleryDuration)),
     updateStoreSetting('product_carousel_transition', carouselTransition),
     updateStoreSetting('product_carousel_duration_ms', String(carouselDuration)),
@@ -1057,6 +1086,8 @@ app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
   res.json({
     productGalleryIntervalSeconds: rawInterval,
     productGalleryTransition: galleryTransition,
+    productGalleryVariant: galleryVariant,
+    productGalleryEasing: galleryEasing,
     productGalleryDurationMs: galleryDuration,
     productCarouselTransition: carouselTransition,
     productCarouselDurationMs: carouselDuration,

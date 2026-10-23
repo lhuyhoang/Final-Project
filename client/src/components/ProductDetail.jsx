@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -80,6 +80,28 @@ function getRelatedProducts(product, products, limit = 4) {
     .map((item) => item.product);
 }
 
+function galleryKeyframes(variant) {
+  switch (variant) {
+    case "fade-black": return { base: [{ opacity: 1 }, { opacity: 0 }], top: [{ opacity: 0 }, { opacity: 1 }] };
+    case "fade-zoom": return { top: [{ opacity: 0, transform: "scale(1.15)" }, { opacity: 1, transform: "scale(1)" }] };
+    case "kenburns-in": return { top: [{ opacity: 0, transform: "scale(1)" }, { opacity: 1, transform: "scale(1.12)" }] };
+    case "kenburns-out": return { top: [{ opacity: 0, transform: "scale(1.2)" }, { opacity: 1, transform: "scale(1)" }] };
+    case "scale-pulse": return { top: [{ opacity: 0, transform: "scale(.85)" }, { opacity: 1, transform: "scale(1)" }] };
+    case "slide-right": return { top: [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }] };
+    case "slide-up": return { top: [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }] };
+    case "slide-push": return { base: [{ transform: "translateX(0)" }, { transform: "translateX(-100%)" }], top: [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }] };
+    case "flip-y": return { base: [{ opacity: 1, transform: "perspective(1000px) rotateY(0)" }, { opacity: 0, transform: "perspective(1000px) rotateY(90deg)" }], top: [{ opacity: 0, transform: "perspective(1000px) rotateY(-90deg)" }, { opacity: 1, transform: "perspective(1000px) rotateY(0)" }] };
+    case "flip-x": return { top: [{ opacity: 0, transform: "perspective(1000px) rotateX(90deg)" }, { opacity: 1, transform: "perspective(1000px) rotateX(0)" }] };
+    case "cube-rot": return { base: [{ transform: "perspective(1000px) rotateY(0) translateZ(0)" }, { transform: "perspective(1000px) rotateY(-90deg) translateZ(200px)" }], top: [{ opacity: 0, transform: "perspective(1000px) rotateY(90deg) translateZ(200px)" }, { opacity: 1, transform: "perspective(1000px) rotateY(0) translateZ(0)" }] };
+    case "clip-circle": return { top: [{ clipPath: "circle(0% at 50% 50%)", opacity: 1 }, { clipPath: "circle(100% at 50% 50%)", opacity: 1 }] };
+    case "clip-diagonal": return { top: [{ clipPath: "polygon(0 0,0 0,0 100%,0 100%)", opacity: 1 }, { clipPath: "polygon(0 0,100% 0,100% 100%,0 100%)", opacity: 1 }] };
+    case "clip-diamond": return { top: [{ clipPath: "polygon(50% 50%,50% 50%,50% 50%,50% 50%)", opacity: 1 }, { clipPath: "polygon(50% -50%,150% 50%,50% 150%,-50% 50%)", opacity: 1 }] };
+    case "gaussian-dissolve": return { top: [{ filter: "blur(20px)", opacity: 0, transform: "scale(1.08)" }, { filter: "blur(0)", opacity: 1, transform: "scale(1)" }] };
+    case "frost-glass": return { top: [{ filter: "blur(15px) grayscale(100%)", opacity: 0 }, { filter: "blur(0) grayscale(0%)", opacity: 1 }] };
+    default: return { top: [{ opacity: 0 }, { opacity: 1 }] };
+  }
+}
+
 function ProductDetailState({ loading, onBack }) {
   return (
     <section className="product-detail-state container" aria-live="polite">
@@ -148,6 +170,8 @@ export default function ProductDetail({
   galleryInterval = 5,
   galleryTransition = "slide",
   galleryDuration = 480,
+  galleryVariant = "slide-right",
+  galleryEasing = "cubic-bezier(0.25, 1, 0.5, 1)",
   onBack,
   onOpenCategory,
   onOpenProduct,
@@ -156,6 +180,10 @@ export default function ProductDetail({
 }) {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState("");
+  const baseImageRef = useRef(null);
+  const incomingImageRef = useRef(null);
+  const previousImageRef = useRef("");
+  const galleryAnimationsRef = useRef([]);
 
   useEffect(() => {
     if (!product) return undefined;
@@ -188,6 +216,42 @@ export default function ProductDetail({
     }, interval);
     return () => window.clearInterval(timer);
   }, [galleryInterval, galleryKey, product?.id]);
+
+  useEffect(() => {
+    if (!product || !baseImageRef.current || !incomingImageRef.current) return undefined;
+    const nextImage = activeImage || product.image;
+    const base = baseImageRef.current;
+    const incoming = incomingImageRef.current;
+    galleryAnimationsRef.current.forEach((animation) => animation.cancel());
+    base.src = previousImageRef.current || nextImage;
+    incoming.src = nextImage;
+    incoming.style.opacity = "0";
+    incoming.style.transform = "none";
+    incoming.style.filter = "none";
+    incoming.style.clipPath = "none";
+    base.style.opacity = "1";
+    base.style.transform = "none";
+    if (!previousImageRef.current || previousImageRef.current === nextImage) {
+      previousImageRef.current = nextImage;
+      return undefined;
+    }
+    const frames = galleryKeyframes(galleryVariant);
+    const options = { duration: Math.max(200, Number(galleryDuration) || 480), easing: galleryEasing, fill: "forwards" };
+    const incomingAnimation = incoming.animate(frames.top, options);
+    const baseAnimation = frames.base ? base.animate(frames.base, options) : null;
+    galleryAnimationsRef.current = [incomingAnimation, baseAnimation].filter(Boolean);
+    incomingAnimation.onfinish = () => {
+      base.src = nextImage;
+      base.style.opacity = "1";
+      base.style.transform = "none";
+      incoming.style.opacity = "0";
+      incoming.style.transform = "none";
+      incoming.style.filter = "none";
+      incoming.style.clipPath = "none";
+      previousImageRef.current = nextImage;
+    };
+    return () => galleryAnimationsRef.current.forEach((animation) => animation.cancel());
+  }, [activeImage, galleryKey, galleryVariant, galleryDuration, galleryEasing, product?.id]);
 
   if (!product) return <ProductDetailState loading={loading} onBack={onBack} />;
 
@@ -278,13 +342,8 @@ export default function ProductDetail({
                   </button>
                 </>
               )}
-              <img
-                key={activeImage || product.image}
-                className={`product-gallery-image transition-${galleryTransition}`}
-                style={{ "--gallery-transition-duration": `${Math.max(200, Number(galleryDuration) || 480)}ms` }}
-                src={activeImage || product.image}
-                alt={product.name}
-              />
+              <img ref={baseImageRef} className="product-gallery-layer base" src={product.image} alt={product.name} />
+              <img ref={incomingImageRef} className="product-gallery-layer incoming" src={product.image} alt="" aria-hidden="true" />
             </div>
             <div className="product-thumbnails" aria-label="Hình ảnh sản phẩm">
               {gallery.map((image, index) => (

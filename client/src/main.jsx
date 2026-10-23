@@ -75,7 +75,9 @@ const THEME_KEY = "quadpro-theme";
 const defaultTransitionSettings = {
   productGalleryIntervalSeconds: 5,
   productGalleryTransition: "slide",
+  productGalleryVariant: "slide-right",
   productGalleryDurationMs: 480,
+  productGalleryEasing: "cubic-bezier(0.25, 1, 0.5, 1)",
   productCarouselTransition: "slide",
   productCarouselDurationMs: 860,
   productCarouselEasing: "smooth",
@@ -1917,6 +1919,8 @@ function App() {
             galleryInterval={transitionSettings.productGalleryIntervalSeconds}
             galleryTransition={transitionSettings.productGalleryTransition}
             galleryDuration={transitionSettings.productGalleryDurationMs}
+            galleryVariant={transitionSettings.productGalleryVariant}
+            galleryEasing={transitionSettings.productGalleryEasing}
             onBack={openStorefront}
             onOpenCategory={(category) => openCatalog(category)}
             onOpenProduct={openProduct}
