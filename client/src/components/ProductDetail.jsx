@@ -245,6 +245,11 @@ export default function ProductDetail({
                 <span className="detail-discount">-{product.discount}%</span>
               )}
               {gallery.length > 1 && (
+                <span className="product-image-counter" aria-live="polite">
+                  {Math.max(0, gallery.indexOf(activeImage || product.image)) + 1} / {gallery.length}
+                </span>
+              )}
+              {gallery.length > 1 && (
                 <>
                   <button
                     type="button"
@@ -285,6 +290,12 @@ export default function ProductDetail({
                 </button>
               ))}
             </div>
+            {gallery.length > 1 && (
+              <div className="product-gallery-meta">
+                <span>Vuốt hoặc bấm mũi tên để xem ảnh</span>
+                <small>Tự động chuyển ảnh</small>
+              </div>
+            )}
             <p>
               <BadgeCheck size={17} /> Hình ảnh sản phẩm được kiểm tra trước khi
               đăng bán
