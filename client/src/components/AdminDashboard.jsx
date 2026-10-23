@@ -365,6 +365,29 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
 
   async function submit(event) {
     event.preventDefault()
+    const requiredFields = [
+      ['Tên sản phẩm', form.name],
+      ['Thương hiệu', form.brand],
+      ['Danh mục', form.category],
+      ['URL hình ảnh chính', form.image]
+    ]
+    const missingField = requiredFields.find(([, value]) => !String(value || '').trim())
+    if (missingField) {
+      setError(`Vui lòng điền ${missingField[0].toLowerCase()}.`)
+      return
+    }
+    if (Number(form.price) < 1 || !Number.isFinite(Number(form.price))) {
+      setError('Giá bán phải lớn hơn 0.')
+      return
+    }
+    if (Number(form.oldPrice || form.price) < Number(form.price)) {
+      setError('Giá niêm yết không được thấp hơn giá bán.')
+      return
+    }
+    if (!/^https?:\/\//i.test(String(form.image).trim())) {
+      setError('URL hình ảnh chính phải bắt đầu bằng http:// hoặc https://.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -396,7 +419,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
   return <div className="admin-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
     <section className="product-editor" role="dialog" aria-modal="true" aria-labelledby="product-editor-title">
       <header><div><span>SẢN PHẨM</span><h2 id="product-editor-title">{product ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}</h2></div><button onClick={onClose} aria-label="Đóng"><X/></button></header>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} noValidate>
         <div className="product-editor-grid">
           <div className="product-form-fields">
             <label className="full"><span>Tên sản phẩm</span><input name="name" value={form.name} onChange={update} required maxLength="160"/></label>
