@@ -447,11 +447,45 @@ function CategoryProductCarousel({
 }) {
   const sectionRef = useRef(null);
   const trackRef = useRef(null);
+  const scrollAnimationRef = useRef(null);
   const titleId = useId();
   const [inView, setInView] = useState(false);
   const [paused, setPaused] = useState(false);
   const [canScroll, setCanScroll] = useState(false);
   const menuOptions = (categoryMenus[category.name]?.options || []).slice(0, 5);
+
+  function animateTrackTo(track, target) {
+    if (scrollAnimationRef.current) {
+      window.cancelAnimationFrame(scrollAnimationRef.current);
+      scrollAnimationRef.current = null;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      track.scrollLeft = target;
+      return;
+    }
+
+    const start = track.scrollLeft;
+    const distance = target - start;
+    const duration = 860;
+    const startedAt = performance.now();
+    const easeInOut = (progress) =>
+      progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    const frame = (now) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      track.scrollLeft = start + distance * easeInOut(progress);
+      if (progress < 1) {
+        scrollAnimationRef.current = window.requestAnimationFrame(frame);
+      } else {
+        scrollAnimationRef.current = null;
+      }
+    };
+
+    scrollAnimationRef.current = window.requestAnimationFrame(frame);
+  }
 
   function scrollProducts(direction) {
     const track = trackRef.current;
@@ -472,15 +506,18 @@ function CategoryProductCarousel({
           ? maxScroll
           : Math.max(track.scrollLeft - step, 0);
 
-    track.scrollTo({
-      left: nextPosition,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-    });
+    animateTrackTo(track, nextPosition);
   }
 
   const advanceProducts = useEffectEvent(() => scrollProducts(1));
+
+  useEffect(() => {
+    return () => {
+      if (scrollAnimationRef.current) {
+        window.cancelAnimationFrame(scrollAnimationRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -531,7 +568,7 @@ function CategoryProductCarousel({
       return undefined;
     }
 
-    const interval = window.setInterval(advanceProducts, 3000);
+    const interval = window.setInterval(advanceProducts, 4000);
     return () => window.clearInterval(interval);
   }, [canScroll, inView, paused, products.length]);
 
