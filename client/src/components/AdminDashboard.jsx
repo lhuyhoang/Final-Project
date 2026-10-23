@@ -55,12 +55,12 @@ const importHeaderAliases = {
   price: ['price', 'giaban', 'giabanle'],
   oldPrice: ['oldprice', 'giacu', 'gianiemyet', 'giagoc'],
   stock: ['stock', 'tonkho', 'soluongton', 'soluong'],
-  image: ['image', 'hinhanh', 'urlhinhanh', 'imageurl'],
-  gallery: ['gallery', 'anhphu', 'hinhanhphu', 'galleryurl', 'galleryurls'],
+  image: ['image', 'hinhanh', 'urlhinhanh', 'urlhinhanhchinh', 'anhchinh', 'imageurl'],
+  gallery: ['gallery', 'anhphu', 'urlanhphu', 'urlanhphumoidongmoturl', 'hinhanhphu', 'galleryurl', 'galleryurls'],
   badge: ['badge', 'nhannoibat', 'nhan'],
   policyText: ['policytext', 'chinhsach', 'baohanh'],
   description: ['description', 'mota', 'motasanpham'],
-  specifications: ['specifications', 'specification', 'thongsokythuat', 'thongso', 'cauhinh', 'cauhinhkythuat']
+  specifications: ['specifications', 'specification', 'thongsokythuat', 'thongso', 'cauhinh', 'cauhinhkythuat', 'cauhinhthongsokythuat']
 }
 
 function importCellText(value) {
@@ -105,11 +105,26 @@ function parseCsvRows(text) {
 }
 
 function parseSpecificationText(value) {
-  return importCellText(value)
-    .split(/[|\r\n]+/)
-    .map(item => item.trim().replace(/\s+/g, ' '))
-    .filter(Boolean)
-    .map(description => ({ description, quantity: 1, warranty: '' }))
+  const lines = importCellText(value).split(/\r?\n/).map(item => item.trim()).filter(Boolean)
+  return lines.flatMap(line => {
+    const cells = line.split('|').map(item => item.trim())
+    const numberedRow = cells.length >= 2 && /^\d+\.?$/.test(cells[0])
+    if (numberedRow) {
+      const description = cells[1].replace(/\s+/g, ' ')
+      if (!description) return []
+      const parsedQuantity = Number(cells[2])
+      return [{
+        description,
+        quantity: Number.isInteger(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1,
+        warranty: cells.slice(3).join(' | ').trim().slice(0, 40)
+      }]
+    }
+
+    return cells
+      .map(item => item.replace(/^\d+\.?\s*/, '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .map(description => ({ description, quantity: 1, warranty: '' }))
+  })
 }
 
 function parseImportedRows(sheetRows) {
@@ -515,7 +530,7 @@ function BulkProductImporter({ onClose, onSaved }) {
           <button type="button" className="bulk-template-button" onClick={downloadTemplate}>Tải file mẫu CSV</button>
           {fileName && <small>{fileName}</small>}
         </div>
-        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Cột gallery và specifications là tùy chọn; nhập nhiều giá trị ngăn cách bằng dấu | hoặc xuống dòng. Nếu không có cột specifications, nội dung cột Mô tả sản phẩm có dấu | sẽ tự tách thành từng dòng thông số.</p>
+        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Hỗ trợ các tên cột URL hình ảnh chính/phụ và Cấu hình / thông số kỹ thuật. Mỗi dòng thông số nên có dạng STT|Mô tả|SL|BH; ảnh phụ nhập nhiều URL, mỗi dòng một URL.</p>
         {error && <div className="admin-form-error" role="alert">{error}</div>}
         {rows.length > 0 && <>
           <div className="bulk-import-summary"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><b>{invalidCount}</b> dòng lỗi</span>}</div>
