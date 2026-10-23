@@ -186,5 +186,14 @@ export default function TransitionPlayground({ products, settings, onSaved }) {
         <div className="panel-glass transition-code-card"><div className="transition-panel-title"><span><Code2 size={15}/> MÃ NGUỒN CSS &amp; HTML</span><button type="button" onClick={() => navigator.clipboard?.writeText(code)}><Copy size={13}/> Sao chép</button></div><div className="transition-code-tabs"><button type="button" className={codeTab === 'css' ? 'active' : ''} onClick={() => setCodeTab('css')}>CSS Keyframes</button><button type="button" className={codeTab === 'html' ? 'active' : ''} onClick={() => setCodeTab('html')}>Cấu trúc HTML</button></div><pre><code>{code}</code></pre></div>
       </aside>
     </div>
+    <section className="transition-hover-showcase panel-glass">
+      <div className="transition-hover-heading"><div><h3>✦ Hiệu Ứng Hover Ảnh Siêu Mượt</h3><p>Rê chuột vào các thẻ để xem các micro-interaction bằng CSS.</p></div><span>60 FPS · tối ưu performance</span></div>
+      <div className="transition-hover-grid">{[
+        ['transition-hover-zoom', 'Cinematic Rotate & Scale', 'Phóng to kết hợp xoay góc nhẹ tạo độ sâu sinh động.'],
+        ['transition-hover-reveal', 'Circle Reveal Mask', 'Lớp phủ mở rộng từ tâm bằng clip-path.'],
+        ['transition-hover-float', '3D Float Card', 'Nâng thẻ và nghiêng phối cảnh khi di chuột.'],
+        ['transition-hover-shine', 'Shine Sweep', 'Vệt sáng quét ngang tạo cảm giác cao cấp.']
+      ].map(([className, title, description], index) => <article className={`transition-hover-card ${className}`} key={title}><div><img src={images[index % images.length]} alt=""/><span className="transition-hover-overlay"/></div><h4>{index + 1}. {title}</h4><p>{description}</p></article>)}</div>
+    </section>
   </section>
 }

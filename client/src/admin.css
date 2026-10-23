@@ -2744,6 +2744,24 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
 .transition-control-card > .transition-save-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 14px; border: 0; border-radius: 9px; padding: 10px; color: #fff; background: linear-gradient(100deg, #2e70e3, #5555e6); font-weight: 700; font-size: 11px; cursor: pointer; }
 .transition-save-button:hover { filter: brightness(1.1); }
 .transition-save-notice { display: flex; align-items: flex-start; gap: 6px; margin-top: 9px; color: #65e1ba; font-size: 10px; line-height: 1.4; }
+.transition-hover-showcase { margin-top: 14px; padding: 16px; }
+.transition-hover-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #1d2940; padding-bottom: 12px; }
+.transition-hover-heading h3 { margin: 0; font-size: 15px; color: #f4f7ff; }
+.transition-hover-heading p { margin: 4px 0 0; color: #8491aa; font-size: 10px; }
+.transition-hover-heading > span { color: #7f91aa; background: #162238; border: 1px solid #263957; border-radius: 8px; padding: 7px 10px; font-size: 10px; }
+.transition-hover-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; padding-top: 14px; }
+.transition-hover-card { overflow: hidden; border: 1px solid #202f49; border-radius: 11px; background: #0c1528; cursor: pointer; transition: border-color .3s ease, transform .5s ease, box-shadow .5s ease; }
+.transition-hover-card > div { position: relative; overflow: hidden; aspect-ratio: 16/9; }
+.transition-hover-card img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .7s cubic-bezier(.25,1,.5,1), filter .5s ease; }
+.transition-hover-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(92,158,255,.25), transparent 58%); pointer-events: none; }
+.transition-hover-card h4 { margin: 11px 11px 4px; color: #e5ecfb; font-size: 11px; }
+.transition-hover-card p { margin: 0 11px 13px; color: #8290a9; font-size: 10px; line-height: 1.45; }
+.transition-hover-zoom:hover img { transform: scale(1.12) rotate(1deg); filter: brightness(1.1); }
+.transition-hover-reveal .transition-hover-overlay { background: linear-gradient(135deg, #2669dd, #08b3d5); clip-path: circle(0% at 50% 50%); transition: clip-path .6s cubic-bezier(.4,0,.2,1); }
+.transition-hover-reveal:hover .transition-hover-overlay { clip-path: circle(140% at 50% 50%); }
+.transition-hover-float:hover { transform: translateY(-6px) rotateX(4deg) rotateY(-4deg); border-color: #3b78d8; box-shadow: 0 15px 30px rgba(31,87,186,.22); }
+.transition-hover-shine > div::after { content: ''; position: absolute; inset: 0; width: 42%; background: linear-gradient(110deg, transparent, rgba(255,255,255,.38), transparent); transform: translateX(-180%) skewX(-16deg); transition: transform .8s ease-in-out; pointer-events: none; }
+.transition-hover-shine:hover > div::after { transform: translateX(320%) skewX(-16deg); }
 .transition-code-card { min-height: 300px; }
 .transition-code-card .transition-panel-title > button, .transition-control-card .transition-panel-title > button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid rgba(48, 181, 148, .45); border-radius: 6px; background: rgba(20, 150, 119, .15); color: #62dfba; padding: 4px 7px; font-size: 9px; cursor: pointer; }
 .transition-control-card .transition-panel-title > button { border: 0; background: transparent; color: #8291aa; }
@@ -2764,6 +2782,8 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
   .transition-stage-controls button { padding: 8px 6px; }
   .transition-stage-controls button span { display: none; }
   .transition-thumb-grid { grid-template-columns: repeat(4, 1fr); }
+  .transition-hover-heading { align-items: flex-start; flex-direction: column; }
+  .transition-hover-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Showroom management */
