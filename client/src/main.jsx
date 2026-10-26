@@ -2259,7 +2259,13 @@ function App() {
         </div>
         <div className="copyright container">
           © 2026 QUADPRO. Thiết kế và phát triển cho đồ án E-commerce Level 3.
-          <span>Visa • Mastercard • Stripe • VNPay</span>
+          <div className="footer-payment-methods" aria-label="Các phương thức thanh toán được hỗ trợ">
+            <span className="footer-payment-label">Thanh toán an toàn:</span>
+            <span className="payment-brand payment-brand-visa" role="img" aria-label="Visa" title="Visa">VISA</span>
+            <span className="payment-brand payment-brand-mastercard" role="img" aria-label="Mastercard" title="Mastercard"><i/><i/></span>
+            <span className="payment-brand payment-brand-stripe" role="img" aria-label="Stripe" title="Stripe">stripe</span>
+            <span className="payment-brand payment-brand-vnpay" role="img" aria-label="VNPay" title="VNPay"><b>VN</b><em>PAY</em></span>
+          </div>
         </div>
       </footer>
 
