@@ -839,6 +839,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [users, setUsers] = useState([])
   const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings)
   const [query, setQuery] = useState('')
+  const [productPage, setProductPage] = useState(1)
   const [onlinePaymentPage, setOnlinePaymentPage] = useState(1)
   const [editor, setEditor] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -941,7 +942,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   }
 
   function toggleVisibleProductSelection() {
-    const visibleIds = visibleProducts.map(product => product.id)
+    const visibleIds = paginatedProducts.map(product => product.id)
     setSelectedProductIds(current => {
       const next = new Set(current)
       const shouldSelect = visibleIds.some(id => !next.has(id))
@@ -1012,6 +1013,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     setEditorOpen(false)
     setEditor(null)
     setProducts(current => isEditing ? current.map(item => item.id === saved.id ? saved : item) : [saved, ...current])
+    if (!isEditing) setProductPage(1)
     await loadDashboard(true)
     onProductsChanged()
     showNotice(isEditing ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm')
@@ -1020,6 +1022,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   async function saveBulkProducts(savedProducts) {
     setBulkImporterOpen(false)
     setProducts(current => [...savedProducts, ...current])
+    setProductPage(1)
     await loadDashboard(true)
     onProductsChanged()
     showNotice(`Đã nhập ${savedProducts.length} sản phẩm`)
@@ -1075,6 +1078,18 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
   const normalizedQuery = query.trim().toLowerCase()
   const visibleProducts = useMemo(() => products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery)), [products, normalizedQuery])
+  const productPageSize = 15
+  const productPageCount = Math.max(1, Math.ceil(visibleProducts.length / productPageSize))
+  const productPages = useMemo(() => {
+    const current = Math.min(Math.max(productPage, 1), productPageCount)
+    const start = Math.max(1, Math.min(current - 3, productPageCount - 6))
+    return Array.from({ length: Math.min(7, productPageCount) }, (_, index) => start + index)
+  }, [productPage, productPageCount])
+  const paginatedProducts = useMemo(() => {
+    const safePage = Math.min(Math.max(productPage, 1), productPageCount)
+    const start = (safePage - 1) * productPageSize
+    return visibleProducts.slice(start, start + productPageSize)
+  }, [productPage, productPageCount, visibleProducts])
   const visibleShowrooms = useMemo(() => showrooms.filter(showroom => `${showroom.name} ${showroom.address} ${showroom.phone}`.toLowerCase().includes(normalizedQuery)), [showrooms, normalizedQuery])
   const visibleOrders = useMemo(() => orders.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email}`.toLowerCase().includes(normalizedQuery)), [orders, normalizedQuery])
   const visibleOnlinePayments = useMemo(() => onlinePayments.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email} ${order.stripePaymentIntentId || ''} ${order.stripeCheckoutSessionId || ''} ${order.vnpayTransactionNo || ''} ${order.vnpayBankCode || ''}`.toLowerCase().includes(normalizedQuery)), [onlinePayments, normalizedQuery])
@@ -1103,8 +1118,13 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const maxStripeRevenue = Math.max(1, ...stripeRevenueSeries.map(item => item.amount))
 
   useEffect(() => {
+    setProductPage(1)
     setOnlinePaymentPage(1)
   }, [normalizedQuery])
+
+  useEffect(() => {
+    setProductPage(current => Math.min(Math.max(current, 1), productPageCount))
+  }, [productPageCount])
 
   useEffect(() => {
     setOnlinePaymentPage(current => Math.min(Math.max(current, 1), onlinePaymentPageCount))
@@ -1161,9 +1181,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </>}
 
     {tab === 'products' && <section className="admin-panel admin-list-panel">
-          <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
+          <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2><small className="pagination-summary">Hiển thị tối đa 15 sản phẩm mỗi trang</small></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
           {selectedProductIds.size > 0 && <div className="admin-bulk-toolbar"><span><Check size={16}/> Đã chọn <b>{selectedProductIds.size}</b> sản phẩm</span><button className="admin-danger-action" onClick={removeSelectedProducts}><Trash2 size={16}/> Xóa đã chọn</button><button className="admin-secondary compact" onClick={() => setSelectedProductIds(new Set())}>Bỏ chọn</button></div>}
-          <div className="admin-table-wrap"><table className="products-table"><thead><tr><th className="admin-select-cell"><input type="checkbox" checked={visibleProducts.length > 0 && visibleProducts.every(product => selectedProductIds.has(product.id))} onChange={toggleVisibleProductSelection} aria-label="Chọn tất cả sản phẩm đang hiển thị"/></th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{visibleProducts.map(product => <tr key={product.id}><td className="admin-select-cell"><input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} aria-label={`Chọn ${product.name}`}/></td><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
+          <div className="admin-table-wrap"><table className="products-table"><thead><tr><th className="admin-select-cell"><input type="checkbox" checked={paginatedProducts.length > 0 && paginatedProducts.every(product => selectedProductIds.has(product.id))} onChange={toggleVisibleProductSelection} aria-label="Chọn tất cả sản phẩm trên trang hiện tại"/></th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{paginatedProducts.map(product => <tr key={product.id}><td className="admin-select-cell"><input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} aria-label={`Chọn ${product.name}`}/></td><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
+          {visibleProducts.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(productPage, productPageCount)} / {productPageCount} · {visibleProducts.length} sản phẩm</span><div><button type="button" onClick={() => setProductPage(current => Math.max(1, current - 1))} disabled={productPage <= 1}>← Trước</button>{productPages.map(page => <button type="button" className={page === productPage ? 'active' : ''} key={page} onClick={() => setProductPage(page)}>{page}</button>)}<button type="button" onClick={() => setProductPage(current => Math.min(productPageCount, current + 1))} disabled={productPage >= productPageCount}>Sau →</button></div></footer>}
         </section>}
 
         {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onRequestDelete={removeCategory}/>}
