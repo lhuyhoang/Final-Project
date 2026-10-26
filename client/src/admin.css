@@ -3757,6 +3757,77 @@ html[data-theme="dark"] .auth-tabs button.active {
   margin-top: 14px;
 }
 
+.online-payments-section {
+  margin-top: 14px;
+}
+
+.pagination-summary {
+  display: block;
+  margin-top: 4px;
+  color: #9a9da4;
+  font-size: 8px;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  color: #858991;
+  font-size: 9px;
+  border-top: 1px solid #ededed;
+}
+
+.admin-pagination > div {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.admin-pagination button {
+  min-width: 29px;
+  height: 29px;
+  padding: 0 8px;
+  color: #62666e;
+  font-size: 9px;
+  font-weight: 700;
+  background: #fff;
+  border: 1px solid #dedfe3;
+  border-radius: 6px;
+}
+
+.admin-pagination button:hover:not(:disabled),
+.admin-pagination button.active {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.admin-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.admin-shell.admin-theme-dark .pagination-summary,
+.admin-shell.admin-theme-dark .admin-pagination {
+  color: var(--admin-muted);
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .admin-pagination button {
+  color: var(--admin-text);
+  background: var(--admin-surface-raised);
+  border-color: var(--admin-border);
+}
+
+.admin-shell.admin-theme-dark .admin-pagination button:hover:not(:disabled),
+.admin-shell.admin-theme-dark .admin-pagination button.active {
+  color: #fff;
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+}
+
 .stripe-dashboard-heading > header {
   border-bottom: 0;
 }

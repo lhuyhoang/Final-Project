@@ -779,6 +779,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [users, setUsers] = useState([])
   const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings)
   const [query, setQuery] = useState('')
+  const [onlinePaymentPage, setOnlinePaymentPage] = useState(1)
   const [editor, setEditor] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [bulkImporterOpen, setBulkImporterOpen] = useState(false)
@@ -1017,6 +1018,18 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const visibleShowrooms = useMemo(() => showrooms.filter(showroom => `${showroom.name} ${showroom.address} ${showroom.phone}`.toLowerCase().includes(normalizedQuery)), [showrooms, normalizedQuery])
   const visibleOrders = useMemo(() => orders.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email}`.toLowerCase().includes(normalizedQuery)), [orders, normalizedQuery])
   const visibleOnlinePayments = useMemo(() => onlinePayments.filter(order => `${order.id} ${order.customer?.name} ${order.customer?.email} ${order.stripePaymentIntentId || ''} ${order.stripeCheckoutSessionId || ''} ${order.vnpayTransactionNo || ''} ${order.vnpayBankCode || ''}`.toLowerCase().includes(normalizedQuery)), [onlinePayments, normalizedQuery])
+  const onlinePaymentPageSize = 10
+  const onlinePaymentPageCount = Math.max(1, Math.ceil(visibleOnlinePayments.length / onlinePaymentPageSize))
+  const onlinePaymentPages = useMemo(() => {
+    const current = Math.min(Math.max(onlinePaymentPage, 1), onlinePaymentPageCount)
+    const start = Math.max(1, Math.min(current - 3, onlinePaymentPageCount - 6))
+    return Array.from({ length: Math.min(7, onlinePaymentPageCount) }, (_, index) => start + index)
+  }, [onlinePaymentPage, onlinePaymentPageCount])
+  const paginatedOnlinePayments = useMemo(() => {
+    const safePage = Math.min(Math.max(onlinePaymentPage, 1), onlinePaymentPageCount)
+    const start = (safePage - 1) * onlinePaymentPageSize
+    return visibleOnlinePayments.slice(start, start + onlinePaymentPageSize)
+  }, [onlinePaymentPage, onlinePaymentPageCount, visibleOnlinePayments])
   const visibleUsers = useMemo(() => users.filter(account => `${account.name} ${account.email} ${account.phone}`.toLowerCase().includes(normalizedQuery)), [users, normalizedQuery])
   const unreadOrders = useMemo(() => orders.filter(order => order.status === 'pending' && isAfterLastRead(order.createdAt, notificationReads.orders)).length, [notificationReads.orders, orders])
   const unreadOnlinePayments = useMemo(() => onlinePayments.filter(order => isAfterLastRead(order.paidAt, notificationReads.onlinePayments)).length, [notificationReads.onlinePayments, onlinePayments])
@@ -1028,6 +1041,14 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     amount: item.amounts.find(amount => amount.currency === stripePrimaryCurrency)?.amount || 0
   }))
   const maxStripeRevenue = Math.max(1, ...stripeRevenueSeries.map(item => item.amount))
+
+  useEffect(() => {
+    setOnlinePaymentPage(1)
+  }, [normalizedQuery])
+
+  useEffect(() => {
+    setOnlinePaymentPage(current => Math.min(Math.max(current, 1), onlinePaymentPageCount))
+  }, [onlinePaymentPageCount])
 
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
@@ -1099,11 +1120,6 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>{visibleOrders.map(order => { const online = ['stripe', 'vnpay'].includes(order.paymentMethod); return <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><select className={`status-select status-${order.status}`} value={order.status} disabled={online && order.paymentStatus !== 'paid'} title={online && order.paymentStatus !== 'paid' ? 'Cổng thanh toán sẽ tự cập nhật trạng thái' : ''} onChange={event => updateOrderStatus(order.id, event.target.value)}>{Object.entries(statusLabels).filter(([value]) => !(online && order.paymentStatus === 'paid' && value === 'cancelled')).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td></tr> })}</tbody></table>{!visibleOrders.length && <div className="table-empty">Không tìm thấy đơn hàng phù hợp.</div>}</div>
         </section>}
 
-        {tab === 'online-payments' && <section className="admin-panel admin-list-panel">
-          <header className="list-header"><div><span>THANH TOÁN TRỰC TUYẾN</span><h2>{onlinePayments.length} đơn đã thanh toán</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng, mã giao dịch..."/></label></div></header>
-          <div className="admin-table-wrap"><table className="online-payments-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Cổng thanh toán</th><th>Mã giao dịch</th><th>Thanh toán lúc</th><th>Doanh thu</th><th>Trạng thái đơn</th></tr></thead><tbody>{visibleOnlinePayments.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td><span className={`payment-provider-badge ${order.paymentMethod}`}>{order.paymentMethod === 'vnpay' ? 'VNPay' : 'Stripe'}</span></td><td><code>{order.vnpayTransactionNo || order.stripePaymentIntentId || order.stripeCheckoutSessionId}</code><span className="payment-paid-badge">Đã thanh toán</span></td><td>{formatDate(order.paidAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table>{!visibleOnlinePayments.length && <div className="table-empty">Chưa có đơn thanh toán online phù hợp.</div>}</div>
-        </section>}
-
         {tab === 'online-payments' && <div className="stripe-admin-dashboard payment-center-stripe-section">
           <section className="admin-panel stripe-dashboard-heading">
             <header><div><span>STRIPE COMMERCE</span><h2>Tổng quan thanh toán Stripe</h2></div><div className="stripe-heading-actions"><span className={stripeOverview?.livemode ? 'live' : 'sandbox'}>{stripeOverview?.livemode ? 'LIVE MODE' : 'SANDBOX'}</span><a href="https://dashboard.stripe.com/test/dashboard" target="_blank" rel="noreferrer">Mở Stripe Dashboard <ExternalLink size={14}/></a></div></header>
@@ -1134,6 +1150,12 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
             </section>
           </>}
         </div>}
+
+        {tab === 'online-payments' && <section className="admin-panel admin-list-panel online-payments-section">
+          <header className="list-header"><div><span>THANH TOÁN TRỰC TUYẾN</span><h2>{visibleOnlinePayments.length} đơn đã thanh toán</h2><small className="pagination-summary">Hiển thị tối đa 10 giao dịch mỗi trang</small></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng, mã giao dịch..."/></label></div></header>
+          <div className="admin-table-wrap"><table className="online-payments-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Cổng thanh toán</th><th>Mã giao dịch</th><th>Thanh toán lúc</th><th>Doanh thu</th><th>Trạng thái đơn</th></tr></thead><tbody>{paginatedOnlinePayments.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td><span className={`payment-provider-badge ${order.paymentMethod}`}>{order.paymentMethod === 'vnpay' ? 'VNPay' : 'Stripe'}</span></td><td><code>{order.vnpayTransactionNo || order.stripePaymentIntentId || order.stripeCheckoutSessionId}</code><span className="payment-paid-badge">Đã thanh toán</span></td><td>{formatDate(order.paidAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table>{!visibleOnlinePayments.length && <div className="table-empty">Chưa có đơn thanh toán online phù hợp.</div>}</div>
+          {visibleOnlinePayments.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(onlinePaymentPage, onlinePaymentPageCount)} / {onlinePaymentPageCount}</span><div><button type="button" onClick={() => setOnlinePaymentPage(current => Math.max(1, current - 1))} disabled={onlinePaymentPage <= 1}>← Trước</button>{onlinePaymentPages.map(page => <button type="button" className={page === onlinePaymentPage ? 'active' : ''} key={page} onClick={() => setOnlinePaymentPage(page)}>{page}</button>)}<button type="button" onClick={() => setOnlinePaymentPage(current => Math.min(onlinePaymentPageCount, current + 1))} disabled={onlinePaymentPage >= onlinePaymentPageCount}>Sau →</button></div></footer>}
+        </section>}
 
         {tab === 'users' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>THÀNH VIÊN</span><h2>{users.length} tài khoản</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, email, số điện thoại..."/></label></div></header>
