@@ -213,6 +213,7 @@ function parseImportedRows(sheetRows) {
 function loadAdminTab() {
   try {
     const savedTab = sessionStorage.getItem(adminTabStorageKey)
+    if (savedTab === 'stripe-dashboard') return 'online-payments'
     return validAdminTabs.has(savedTab) ? savedTab : 'overview'
   } catch {
     return 'overview'
@@ -1034,8 +1035,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     { id: 'categories', label: 'Danh mục', icon: ClipboardList },
     { id: 'showrooms', label: 'Showroom', icon: MapPinned },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
-    { id: 'online-payments', label: 'Thanh toán online', icon: CreditCard },
-    { id: 'stripe-dashboard', label: 'Stripe Sandbox', icon: WalletCards },
+    { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
     { id: 'users', label: 'Khách hàng', icon: Users },
     { id: 'settings', label: 'Hiệu ứng chuyển cảnh', icon: Settings }
   ]
@@ -1104,7 +1104,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <div className="admin-table-wrap"><table className="online-payments-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Cổng thanh toán</th><th>Mã giao dịch</th><th>Thanh toán lúc</th><th>Doanh thu</th><th>Trạng thái đơn</th></tr></thead><tbody>{visibleOnlinePayments.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td><div className="customer-cell"><b>{order.customer?.name}</b><small>{order.customer?.email}</small></div></td><td><span className={`payment-provider-badge ${order.paymentMethod}`}>{order.paymentMethod === 'vnpay' ? 'VNPay' : 'Stripe'}</span></td><td><code>{order.vnpayTransactionNo || order.stripePaymentIntentId || order.stripeCheckoutSessionId}</code><span className="payment-paid-badge">Đã thanh toán</span></td><td>{formatDate(order.paidAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table>{!visibleOnlinePayments.length && <div className="table-empty">Chưa có đơn thanh toán online phù hợp.</div>}</div>
         </section>}
 
-        {tab === 'stripe-dashboard' && <div className="stripe-admin-dashboard">
+        {tab === 'online-payments' && <div className="stripe-admin-dashboard payment-center-stripe-section">
           <section className="admin-panel stripe-dashboard-heading">
             <header><div><span>STRIPE COMMERCE</span><h2>Tổng quan thanh toán Stripe</h2></div><div className="stripe-heading-actions"><span className={stripeOverview?.livemode ? 'live' : 'sandbox'}>{stripeOverview?.livemode ? 'LIVE MODE' : 'SANDBOX'}</span><a href="https://dashboard.stripe.com/test/dashboard" target="_blank" rel="noreferrer">Mở Stripe Dashboard <ExternalLink size={14}/></a></div></header>
           </section>
