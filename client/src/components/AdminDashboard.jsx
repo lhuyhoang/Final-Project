@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, ExternalLink, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, Download, ExternalLink, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -505,14 +505,22 @@ function BulkProductImporter({ onClose, onSaved }) {
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
-  async function readFile(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  async function parseFile(file) {
     if (!file) return
+    if (!/\.(xlsx|csv)$/i.test(file.name)) {
+      setFileName('')
+      setRows([])
+      setError('Định dạng chưa được hỗ trợ. Vui lòng chọn file .xlsx hoặc .csv.')
+      return
+    }
+
     setError('')
     setRows([])
     setFileName(file.name)
+    setParsing(true)
     try {
       const sheetRows = file.name.toLowerCase().endsWith('.csv')
         ? parseCsvRows(await file.text())
@@ -520,10 +528,26 @@ function BulkProductImporter({ onClose, onSaved }) {
             const { readSheet } = await import('read-excel-file/browser')
             return readSheet(file)
           })()
-      setRows(parseImportedRows(sheetRows))
+      const importedRows = parseImportedRows(sheetRows)
+      setRows(importedRows)
+      if (!importedRows.length) setError('File chưa có dữ liệu sản phẩm để nhập.')
     } catch (fileError) {
       setError(fileError.message || 'Không thể đọc file Excel.')
+    } finally {
+      setParsing(false)
     }
+  }
+
+  async function readFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    await parseFile(file)
+  }
+
+  function handleDrop(event) {
+    event.preventDefault()
+    setIsDragging(false)
+    void parseFile(event.dataTransfer.files?.[0])
   }
 
   function downloadTemplate() {
@@ -566,21 +590,57 @@ function BulkProductImporter({ onClose, onSaved }) {
 
   return <div className="admin-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
     <section className="product-editor bulk-product-importer" role="dialog" aria-modal="true" aria-labelledby="bulk-product-title">
-      <header><div><span>NHẬP KHO HÀNG LOẠT</span><h2 id="bulk-product-title">Nhập sản phẩm từ Excel</h2></div><button type="button" onClick={onClose} aria-label="Đóng"><X/></button></header>
-      <div className="bulk-import-body">
-        <div className="bulk-import-actions">
-          <label className="bulk-file-picker"><Upload size={17}/> Chọn file Excel (.xlsx/.csv)<input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={readFile}/></label>
-          <button type="button" className="bulk-template-button" onClick={downloadTemplate}>Tải file mẫu CSV</button>
-          {fileName && <small>{fileName}</small>}
+      <header>
+        <div className="bulk-import-heading">
+          <span>NHẬP KHO HÀNG LOẠT</span>
+          <h2 id="bulk-product-title">Nhập sản phẩm từ Excel</h2>
+          <p>Tạo nhiều sản phẩm trong một lần từ file dữ liệu có sẵn.</p>
         </div>
-        <p className="bulk-import-help">Cột bắt buộc: name, brand, category, price, stock, image. Hỗ trợ các tên cột URL hình ảnh chính/phụ và Cấu hình / thông số kỹ thuật. Mỗi dòng thông số nên có dạng STT|Mô tả|SL|BH; ảnh phụ nhập nhiều URL, mỗi dòng một URL.</p>
-        {error && <div className="admin-form-error" role="alert">{error}</div>}
+        <button type="button" onClick={onClose} aria-label="Đóng"><X/></button>
+      </header>
+      <div className="bulk-import-body">
+        <div
+          className={`bulk-upload-zone${isDragging ? ' is-dragging' : ''}${fileName ? ' has-file' : ''}`}
+          onDragEnter={event => { event.preventDefault(); setIsDragging(true) }}
+          onDragOver={event => event.preventDefault()}
+          onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setIsDragging(false) }}
+          onDrop={handleDrop}
+        >
+          <span className="bulk-upload-icon"><FileSpreadsheet size={25}/></span>
+          <div className="bulk-upload-copy">
+            <strong>{parsing ? 'Đang đọc dữ liệu...' : fileName || 'Chọn file danh sách sản phẩm'}</strong>
+            <small>{fileName && !parsing ? `${rows.length} dòng dữ liệu đã được đọc` : 'Kéo thả file vào đây hoặc chọn file từ máy · XLSX, CSV'}</small>
+          </div>
+          <label className="bulk-file-picker">
+            <Upload size={16}/>{fileName ? 'Chọn file khác' : 'Chọn file'}
+            <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={readFile}/>
+          </label>
+        </div>
+
+        <div className="bulk-import-guide">
+          <div>
+            <span className="bulk-guide-icon"><Info size={16}/></span>
+            <div>
+              <strong>Chuẩn bị dữ liệu đúng định dạng</strong>
+              <p>Cột bắt buộc: <b>name, brand, category, price, stock, image</b>. Thông số dùng dạng <b>STT|Mô tả|SL|BH</b>; mỗi URL ảnh phụ đặt trên một dòng.</p>
+            </div>
+          </div>
+          <button type="button" className="bulk-template-button" onClick={downloadTemplate}><Download size={15}/>Tải file mẫu CSV</button>
+        </div>
+
+        {error && <div className="admin-form-error" role="alert"><AlertTriangle size={16}/><span>{error}</span></div>}
         {rows.length > 0 && <>
-          <div className="bulk-import-summary"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><b>{invalidCount}</b> dòng lỗi</span>}</div>
+          <div className="bulk-import-summary" aria-live="polite"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><Check size={14}/><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><AlertTriangle size={14}/><b>{invalidCount}</b> dòng cần sửa</span>}</div>
           <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Thông số</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.product.specifications.length} dòng</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
         </>}
       </div>
-      <footer><button type="button" className="secondary" onClick={onClose}>Hủy</button><button type="button" className="primary" disabled={saving || !validCount} onClick={submit}><Upload size={17}/>{saving ? 'Đang nhập...' : `Nhập ${validCount || ''} sản phẩm`}</button></footer>
+      <footer className="bulk-import-footer">
+        <p>{rows.length ? `${validCount} sản phẩm hợp lệ sẽ được thêm vào cửa hàng.` : 'Chọn file để kiểm tra dữ liệu trước khi nhập.'}</p>
+        <div>
+          <button type="button" className="secondary" onClick={onClose}>Hủy</button>
+          <button type="button" className="primary" disabled={saving || parsing || !validCount} onClick={submit}><Upload size={17}/>{saving ? 'Đang nhập...' : validCount ? `Nhập ${validCount} sản phẩm` : 'Nhập sản phẩm'}</button>
+        </div>
+      </footer>
     </section>
   </div>
 }
