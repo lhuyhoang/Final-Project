@@ -249,6 +249,10 @@ export function mapCategoryRow(row) {
     name: row.name,
     icon: row.icon || 'Box',
     color: row.color || '#edf0ff',
+    parentId: row.parent_id === null || row.parent_id === undefined ? null : numberValue(row.parent_id),
+    isVisible: row.is_visible === undefined ? true : Boolean(row.is_visible),
+    showInShowcase: row.show_in_showcase === undefined ? true : Boolean(row.show_in_showcase),
+    sortOrder: row.sort_order === undefined ? 0 : numberValue(row.sort_order),
     createdAt: timestampValue(row.created_at),
     updatedAt: timestampValue(row.updated_at || row.created_at)
   }
@@ -471,18 +475,71 @@ export async function listUsers({ role, status } = {}) {
 export async function listCategories() {
   const result = await query(`
     SELECT * FROM product_categories
-    ORDER BY created_at ASC, id ASC
+    ORDER BY sort_order ASC, created_at ASC, id ASC
   `)
   return result.rows.map(mapCategoryRow)
 }
 
-export async function createCategory({ name, icon = 'Box', color = '#edf0ff' }) {
-  const result = await query(`
-    INSERT INTO product_categories (name, icon, color)
-    VALUES ($1, $2, $3)
-    RETURNING *
-  `, [name, icon, color])
+export async function findCategoryById(id) {
+  const result = await query('SELECT * FROM product_categories WHERE id = $1', [id])
   return mapCategoryRow(result.rows[0])
+}
+
+export async function createCategory({
+  name,
+  icon = 'Box',
+  color = '#edf0ff',
+  parentId = null,
+  isVisible = true,
+  showInShowcase = true,
+  sortOrder = 0
+}) {
+  const result = await query(`
+    INSERT INTO product_categories (
+      name, icon, color, parent_id, is_visible, show_in_showcase, sort_order
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `, [name, icon, color, parentId, isVisible, showInShowcase, sortOrder])
+  return mapCategoryRow(result.rows[0])
+}
+
+export async function updateCategory(id, {
+  name,
+  icon,
+  color,
+  parentId,
+  isVisible,
+  showInShowcase,
+  sortOrder
+}) {
+  return withTransaction(async client => {
+    const currentResult = await client.query('SELECT * FROM product_categories WHERE id = $1 FOR UPDATE', [id])
+    const current = currentResult.rows[0]
+    if (!current) return null
+
+    const result = await client.query(`
+      UPDATE product_categories
+      SET name = $1,
+          icon = $2,
+          color = $3,
+          parent_id = $4,
+          is_visible = $5,
+          show_in_showcase = $6,
+          sort_order = $7,
+          updated_at = NOW()
+      WHERE id = $8
+      RETURNING *
+    `, [name, icon, color, parentId, isVisible, showInShowcase, sortOrder, id])
+
+    if (current.name !== name) {
+      await client.query(
+        'UPDATE products SET category = $1, updated_at = NOW() WHERE BTRIM(category) = BTRIM($2)',
+        [name, current.name]
+      )
+    }
+    return mapCategoryRow(result.rows[0])
+  })
 }
 
 export async function deleteCategory(id) {
@@ -492,6 +549,10 @@ export async function deleteCategory(id) {
       AND NOT EXISTS (
         SELECT 1 FROM products
         WHERE BTRIM(products.category) = BTRIM(category.name)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM product_categories AS child
+        WHERE child.parent_id = category.id
       )
     RETURNING *
   `, [id])

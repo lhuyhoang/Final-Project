@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, Download, ExternalLink, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -57,6 +57,15 @@ const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
 const validAdminTabs = new Set(['overview', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
 const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
+const compareAdminCategories = (left, right) =>
+  (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) || left.name.localeCompare(right.name, 'vi')
+const orderAdminCategoryTree = categoryList => {
+  const roots = categoryList.filter(category => category.parentId === null || category.parentId === undefined).sort(compareAdminCategories)
+  const rootIds = new Set(roots.map(category => category.id))
+  const children = parent => categoryList.filter(category => category.parentId === parent.id).sort(compareAdminCategories)
+  const orphans = categoryList.filter(category => category.parentId !== null && category.parentId !== undefined && !rootIds.has(category.parentId)).sort(compareAdminCategories)
+  return [...roots.flatMap(root => [root, ...children(root)]), ...orphans]
+}
 
 function normalizeImportHeader(value) {
   return String(value || '')
@@ -444,7 +453,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
           <div className="product-form-fields">
             <label className="full"><span>Tên sản phẩm</span><input name="name" value={form.name} onChange={update} required maxLength="160"/></label>
             <label><span>Thương hiệu</span><input name="brand" value={form.brand} onChange={update} required maxLength="50"/></label>
-            <label><span>Danh mục</span><select name="category" value={form.category} onChange={update}>{categories.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}{form.category && !categories.some(item => item.name === form.category) && <option value={form.category}>{form.category}</option>}</select></label>
+            <label><span>Danh mục</span><select name="category" value={form.category} onChange={update}>{orderAdminCategoryTree(categories).map(item => <option key={item.id || item.name} value={item.name}>{item.parentId !== null && item.parentId !== undefined ? `↳ ${item.name}` : item.name}</option>)}{form.category && !categories.some(item => item.name === form.category) && <option value={form.category}>{form.category}</option>}</select></label>
             <label><span>Giá bán</span><input type="number" name="price" value={form.price} onChange={update} min="1" required/></label>
             <label><span>Giá niêm yết</span><input type="number" name="oldPrice" value={form.oldPrice} onChange={update} min="1" required/></label>
             <label><span>Tồn kho</span><input type="number" name="stock" value={form.stock} onChange={update} min="0" required/></label>
@@ -700,13 +709,42 @@ function ShowroomEditor({ showroom, onClose, onSaved }) {
   </div>
 }
 
-function CategoryManager({ categories, onCreated, onRequestDelete }) {
-  const [form, setForm] = useState({ name: '', icon: 'Box', color: '#edf0ff' })
+function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) {
+  const emptyForm = { name: '', parentId: '', icon: 'Box', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: false }
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [updatingId, setUpdatingId] = useState('')
   const [error, setError] = useState('')
+  const orderedCategories = orderAdminCategoryTree(categories)
+  const rootCategories = categories.filter(category => category.parentId === null || category.parentId === undefined).sort(compareAdminCategories)
+  const editingCategory = categories.find(category => category.id === editingId)
+  const editingHasChildren = editingId !== null && categories.some(category => category.parentId === editingId)
 
   function update(event) {
-    setForm(current => ({ ...current, [event.target.name]: event.target.value }))
+    const { name, type, checked, value } = event.target
+    setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
+  }
+
+  function resetForm() {
+    setForm(emptyForm)
+    setEditingId(null)
+    setError('')
+  }
+
+  function startEditing(category) {
+    setEditingId(category.id)
+    setForm({
+      name: category.name,
+      parentId: category.parentId ?? '',
+      icon: category.icon || 'Box',
+      color: category.color || '#edf0ff',
+      sortOrder: category.sortOrder || 0,
+      isVisible: category.isVisible !== false,
+      showInShowcase: category.showInShowcase !== false
+    })
+    setError('')
+    window.requestAnimationFrame(() => document.querySelector('.category-create-form input[name="name"]')?.focus())
   }
 
   async function submit(event) {
@@ -714,12 +752,18 @@ function CategoryManager({ categories, onCreated, onRequestDelete }) {
     setSaving(true)
     setError('')
     try {
-      const created = await api('/api/admin/categories', {
-        method: 'POST',
-        body: JSON.stringify(form)
+      const payload = {
+        ...form,
+        parentId: form.parentId === '' ? null : Number(form.parentId),
+        sortOrder: Number(form.sortOrder)
+      }
+      const saved = await api(editingId ? `/api/admin/categories/${editingId}` : '/api/admin/categories', {
+        method: editingId ? 'PATCH' : 'POST',
+        body: JSON.stringify(payload)
       })
-      onCreated(created)
-      setForm({ name: '', icon: 'Box', color: '#edf0ff' })
+      if (editingId) onUpdated(saved, editingCategory?.name)
+      else onCreated(saved)
+      resetForm()
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -727,24 +771,53 @@ function CategoryManager({ categories, onCreated, onRequestDelete }) {
     }
   }
 
+  async function toggleCategory(category, field) {
+    const requestId = `${category.id}:${field}`
+    setUpdatingId(requestId)
+    setError('')
+    try {
+      const updated = await api(`/api/admin/categories/${category.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ [field]: !category[field] })
+      })
+      onUpdated(updated, category.name)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setUpdatingId('')
+    }
+  }
+
   return <section className="admin-panel category-manager">
     <header>
-      <div><span>PHÂN LOẠI SẢN PHẨM</span><h2>Danh mục sản phẩm</h2></div>
-      <small>{categories.length} danh mục</small>
+      <div><span>PHÂN LOẠI SẢN PHẨM</span><h2>Danh mục cha và danh mục con</h2><p>Quản lý cấu trúc 2 cấp và vị trí xuất hiện của từng danh mục trên cửa hàng.</p></div>
+      <small>{rootCategories.length} danh mục lớn · {categories.length - rootCategories.length} danh mục con</small>
     </header>
     <form className="category-create-form" onSubmit={submit}>
-      <label><span>Tên danh mục mới</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder="Ví dụ: Webcam"/></label>
+      <div className="category-form-heading"><span>{editingId ? 'CHỈNH SỬA DANH MỤC' : 'THÊM DANH MỤC MỚI'}</span><b>{editingId ? editingCategory?.name : 'Tạo danh mục lớn hoặc danh mục con'}</b></div>
+      <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder="Ví dụ: Laptop văn phòng"/></label>
+      <label className="category-parent-field"><span>Danh mục cha</span><select name="parentId" value={form.parentId} onChange={update} disabled={editingHasChildren}><option value="">Không có — Danh mục lớn</option>{rootCategories.filter(category => category.id !== editingId).map(category => <option key={category.id || category.name} value={category.id}>{category.name}</option>)}</select><small>{editingHasChildren ? 'Danh mục đang có danh mục con nên phải giữ ở cấp lớn.' : 'Chọn một danh mục lớn để tạo danh mục con.'}</small></label>
       <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
+      <label><span>Thứ tự</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
       <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
-      <button className="admin-primary" disabled={saving}><Plus size={17}/>{saving ? 'Đang thêm...' : 'Thêm danh mục'}</button>
+      <div className="category-form-visibility">
+        <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu và khối danh mục nổi bật.</small></span></label>
+        <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trên trang chủ.</small></span></label>
+      </div>
+      <div className="category-form-actions">{editingId && <button type="button" className="admin-secondary" onClick={resetForm}>Hủy sửa</button>}<button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Thêm danh mục'}</button></div>
     </form>
     {error && <div className="admin-form-error" role="alert">{error}</div>}
     <div className="category-manager-list">
-      {categories.map(category => <div className="category-manager-item" key={category.id || category.name}>
+      {orderedCategories.map(category => { const parent = categories.find(item => item.id === category.parentId); const isChild = Boolean(parent); return <div className={`category-manager-item${isChild ? ' child' : ' parent'}`} key={category.id || category.name}>
+        <i className="category-tree-connector" aria-hidden="true"/>
         <span className="category-manager-swatch" style={{ background: category.color }}/>
-        <span><b>{category.name}</b><small>{category.icon || 'Box'}</small></span>
-        {category.id && <button type="button" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`}><Trash2 size={16}/></button>}
-      </div>)}
+        <span className="category-manager-name"><b>{category.name}</b><small>{isChild ? `Danh mục con của ${parent.name}` : 'Danh mục lớn'} · Thứ tự {category.sortOrder || 0}</small></span>
+        <div className="category-manager-toggles">
+          <button type="button" className={category.isVisible !== false ? 'active' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:isVisible`} onClick={() => toggleCategory(category, 'isVisible')} aria-pressed={category.isVisible !== false}>{category.isVisible !== false ? <Eye size={15}/> : <EyeOff size={15}/>}<span><b>Danh mục</b><small>{category.isVisible !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+          <button type="button" className={category.showInShowcase !== false ? 'active showcase' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:showInShowcase`} onClick={() => toggleCategory(category, 'showInShowcase')} aria-pressed={category.showInShowcase !== false}>{category.showInShowcase !== false ? <Eye size={15}/> : <EyeOff size={15}/>}<span><b>Show sản phẩm</b><small>{category.showInShowcase !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+        </div>
+        {typeof category.id === 'number' && <div className="category-manager-actions"><button type="button" onClick={() => startEditing(category)} aria-label={`Sửa danh mục ${category.name}`}><Pencil size={16}/></button><button type="button" className="danger" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`}><Trash2 size={16}/></button></div>}
+      </div>})}
     </div>
   </section>
 }
@@ -826,7 +899,7 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
+export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
   const [tab, setTab] = useState(loadAdminTab)
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
@@ -957,8 +1030,19 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   }
 
   function saveCategory(category) {
-    setCategories(current => [...current, category].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
+    setCategories(current => [...current, category].sort(compareAdminCategories))
+    onCategoriesChanged?.()
     showNotice(`Đã thêm danh mục “${category.name}”`)
+  }
+
+  function updateCategoryState(category, previousName) {
+    setCategories(current => current.map(item => item.id === category.id ? category : item).sort(compareAdminCategories))
+    if (previousName && previousName !== category.name) {
+      setProducts(current => current.map(product => product.category === previousName ? { ...product, category: category.name } : product))
+      onProductsChanged()
+    }
+    onCategoriesChanged?.()
+    showNotice(`Đã cập nhật danh mục “${category.name}”`)
   }
 
   function saveTransitionSettings(updated) {
@@ -994,6 +1078,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       } else if (current.kind === 'category') {
         await api(`/api/admin/categories/${current.item.id}`, { method: 'DELETE' })
         setCategories(categories => categories.filter(item => item.id !== current.item.id))
+        onCategoriesChanged?.()
         showNotice('Đã xóa danh mục')
       } else {
         await api(`/api/admin/showrooms/${current.item.id}`, { method: 'DELETE' })
@@ -1187,7 +1272,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           {visibleProducts.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(productPage, productPageCount)} / {productPageCount} · {visibleProducts.length} sản phẩm</span><div><button type="button" onClick={() => setProductPage(current => Math.max(1, current - 1))} disabled={productPage <= 1}>← Trước</button>{productPages.map(page => <button type="button" className={page === productPage ? 'active' : ''} key={page} onClick={() => setProductPage(page)}>{page}</button>)}<button type="button" onClick={() => setProductPage(current => Math.min(productPageCount, current + 1))} disabled={productPage >= productPageCount}>Sau →</button></div></footer>}
         </section>}
 
-        {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onRequestDelete={removeCategory}/>}
+        {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory}/>}
 
         {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
 

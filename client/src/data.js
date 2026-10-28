@@ -1,16 +1,24 @@
 export const categories = [
-  { name: 'PC Gaming', icon: 'Monitor', color: '#ffe8e5' },
-  { name: 'Laptop', icon: 'Laptop', color: '#e8f2ff' },
-  { name: 'Màn hình', icon: 'MonitorUp', color: '#e7f8ef' },
-  { name: 'VGA - Card đồ họa', icon: 'Cpu', color: '#f2eaff' },
-  { name: 'CPU - Bộ vi xử lý', icon: 'Microchip', color: '#fff2d9' },
-  { name: 'Mainboard', icon: 'CircuitBoard', color: '#e8f7f7' },
-  { name: 'RAM', icon: 'MemoryStick', color: '#ffeaf2' },
-  { name: 'SSD - HDD', icon: 'HardDrive', color: '#edf0ff' },
-  { name: 'Bàn phím', icon: 'Keyboard', color: '#f6eddf' },
-  { name: 'Chuột gaming', icon: 'Mouse', color: '#e8f4ff' },
-  { name: 'Tai nghe', icon: 'Headphones', color: '#f0edff' },
-  { name: 'Ghế gaming', icon: 'Armchair', color: '#fcebe8' }
+  { id: 'default-pc', name: 'PC', icon: 'Monitor', color: '#ffe8e5', parentId: null, isVisible: true, showInShowcase: true, sortOrder: 10 },
+  { id: 'default-pc-gaming', name: 'PC Gaming', icon: 'Monitor', color: '#ffe8e5', parentId: 'default-pc', isVisible: true, showInShowcase: false, sortOrder: 10 },
+  { id: 'default-pc-office', name: 'PC văn phòng', icon: 'Monitor', color: '#edf4ff', parentId: 'default-pc', isVisible: false, showInShowcase: false, sortOrder: 20 },
+  { id: 'default-pc-workstation', name: 'PC Workstation', icon: 'Monitor', color: '#f2eaff', parentId: 'default-pc', isVisible: false, showInShowcase: false, sortOrder: 30 },
+  { id: 'default-laptop', name: 'Laptop', icon: 'Laptop', color: '#e8f2ff', parentId: null, isVisible: true, showInShowcase: true, sortOrder: 20 },
+  { id: 'default-laptop-gaming', name: 'Laptop Gaming', icon: 'Laptop', color: '#ffe8e5', parentId: 'default-laptop', isVisible: false, showInShowcase: false, sortOrder: 10 },
+  { id: 'default-laptop-office', name: 'Laptop văn phòng', icon: 'Laptop', color: '#e8f2ff', parentId: 'default-laptop', isVisible: false, showInShowcase: false, sortOrder: 20 },
+  { id: 'default-laptop-graphics', name: 'Laptop đồ họa', icon: 'Laptop', color: '#f2eaff', parentId: 'default-laptop', isVisible: false, showInShowcase: false, sortOrder: 30 },
+  { id: 'default-components', name: 'Linh kiện điện tử', icon: 'CircuitBoard', color: '#e8f7f7', parentId: null, isVisible: true, showInShowcase: true, sortOrder: 30 },
+  { id: 'default-vga', name: 'VGA - Card đồ họa', icon: 'Cpu', color: '#f2eaff', parentId: 'default-components', isVisible: true, showInShowcase: false, sortOrder: 10 },
+  { id: 'default-cpu', name: 'CPU - Bộ vi xử lý', icon: 'Microchip', color: '#fff2d9', parentId: 'default-components', isVisible: true, showInShowcase: false, sortOrder: 20 },
+  { id: 'default-mainboard', name: 'Mainboard', icon: 'CircuitBoard', color: '#e8f7f7', parentId: 'default-components', isVisible: true, showInShowcase: false, sortOrder: 30 },
+  { id: 'default-ram', name: 'RAM', icon: 'MemoryStick', color: '#ffeaf2', parentId: 'default-components', isVisible: true, showInShowcase: false, sortOrder: 40 },
+  { id: 'default-storage', name: 'SSD - HDD', icon: 'HardDrive', color: '#edf0ff', parentId: 'default-components', isVisible: true, showInShowcase: false, sortOrder: 50 },
+  { id: 'default-monitor', name: 'Màn hình', icon: 'MonitorUp', color: '#e7f8ef', parentId: null, isVisible: true, showInShowcase: true, sortOrder: 40 },
+  { id: 'default-gear', name: 'Gaming Gear', icon: 'Headphones', color: '#f0edff', parentId: null, isVisible: true, showInShowcase: true, sortOrder: 50 },
+  { id: 'default-keyboard', name: 'Bàn phím', icon: 'Keyboard', color: '#f6eddf', parentId: 'default-gear', isVisible: true, showInShowcase: false, sortOrder: 10 },
+  { id: 'default-mouse', name: 'Chuột gaming', icon: 'Mouse', color: '#e8f4ff', parentId: 'default-gear', isVisible: true, showInShowcase: false, sortOrder: 20 },
+  { id: 'default-headphones', name: 'Tai nghe', icon: 'Headphones', color: '#f0edff', parentId: 'default-gear', isVisible: true, showInShowcase: false, sortOrder: 30 },
+  { id: 'default-chair', name: 'Ghế gaming', icon: 'Armchair', color: '#fcebe8', parentId: 'default-gear', isVisible: true, showInShowcase: false, sortOrder: 40 }
 ]
 
 export const categoryMenus = {

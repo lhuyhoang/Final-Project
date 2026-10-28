@@ -204,6 +204,31 @@ const categoryIcons = {
   MonitorUp,
   Mouse,
 };
+const compareCategories = (left, right) =>
+  (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) ||
+  left.name.localeCompare(right.name, "vi");
+const getCategoryChildren = (category, categoryList) =>
+  categoryList.filter((item) => item.parentId === category.id).sort(compareCategories);
+const getCategoryScopeNames = (category, categoryList) => {
+  const names = new Set([category.name]);
+  let parentIds = new Set([category.id]);
+
+  while (parentIds.size) {
+    const children = categoryList.filter((item) => parentIds.has(item.parentId));
+    if (!children.length) break;
+    children.forEach((item) => names.add(item.name));
+    parentIds = new Set(children.map((item) => item.id));
+  }
+  return names;
+};
+const categoryIncludesProduct = (category, product, categoryList) =>
+  getCategoryScopeNames(category, categoryList).has(product.category);
+const orderCategoryTree = (categoryList) => {
+  const roots = categoryList.filter((item) => item.parentId === null || item.parentId === undefined).sort(compareCategories);
+  const rootIds = new Set(roots.map((item) => item.id));
+  const orphans = categoryList.filter((item) => item.parentId !== null && item.parentId !== undefined && !rootIds.has(item.parentId)).sort(compareCategories);
+  return [...roots.flatMap((root) => [root, ...getCategoryChildren(root, categoryList)]), ...orphans];
+};
 const loadCart = () => {
   try {
     return JSON.parse(localStorage.getItem("quadpro-cart") || "[]");
@@ -450,6 +475,7 @@ function ProductCard({ product, onAdd, onOpen, carousel = false }) {
 function CategoryProductCarousel({
   category,
   products,
+  subcategories = [],
   carouselTransition = "slide",
   carouselDuration = 860,
   carouselEasing = "smooth",
@@ -466,7 +492,9 @@ function CategoryProductCarousel({
   const [paused, setPaused] = useState(false);
   const [canScroll, setCanScroll] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
-  const menuOptions = (categoryMenus[category.name]?.options || []).slice(0, 5);
+  const menuOptions = subcategories.length
+    ? subcategories.slice(0, 5).map((item) => ({ label: item.name, category: item.name }))
+    : (categoryMenus[category.name]?.options || []).slice(0, 5).map((item) => ({ label: item, option: item }));
 
   function animateTrackTo(track, target) {
     if (scrollAnimationRef.current) {
@@ -616,9 +644,9 @@ function CategoryProductCarousel({
               <button
                 type="button"
                 onClick={() => onSelectOption(option)}
-                key={option}
+                key={option.label}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>
@@ -1117,20 +1145,32 @@ function App() {
     [],
   );
 
+  const orderedCategories = orderCategoryTree(categories);
+  const visibleCategories = orderedCategories.filter((category) => category.isVisible !== false);
+  const visibleCategoryIds = new Set(visibleCategories.map((category) => category.id));
+  const navigationCategories = visibleCategories.filter(
+    (category) => category.parentId === null || category.parentId === undefined || !visibleCategoryIds.has(category.parentId),
+  );
   const normalizedQuery = normalizeSearchText(query.trim());
   const filtered = products.filter((product) => {
     const matchesSearch = [product.name, product.brand, product.category].some(
       (value) => normalizeSearchText(value).includes(normalizedQuery),
     );
+    const selectedCategory = categories.find((category) => category.name === activeCategory);
     return (
       matchesSearch &&
-      (activeCategory === "Tất cả" || product.category === activeCategory)
+      (activeCategory === "Tất cả" ||
+        (selectedCategory
+          ? categoryIncludesProduct(selectedCategory, product, categories)
+          : product.category === activeCategory))
     );
   });
-  const productGroups = categories
+  const productGroups = orderedCategories
+    .filter((category) => category.showInShowcase !== false)
     .map((category) => ({
       category,
-      products: filtered.filter((product) => product.category === category.name),
+      subcategories: getCategoryChildren(category, categories).filter((item) => item.isVisible !== false),
+      products: filtered.filter((product) => categoryIncludesProduct(category, product, categories)),
     }))
     .filter((group) => group.products.length > 0);
   const searchSuggestions = normalizedQuery ? filtered.slice(0, 5) : [];
@@ -1145,21 +1185,33 @@ function App() {
   const catalogProducts = selectedCatalogCategory
     ? products.filter(
         (product) =>
-          product.category === selectedCatalogCategory.name &&
+          categoryIncludesProduct(selectedCatalogCategory, product, categories) &&
           matchesCategoryOption(product, catalogSelection.option),
       )
     : [];
-  const menuDetails = menuCategory ? categoryMenus[menuCategory] : null;
-  const menuBrands = menuDetails
+  const menuCategoryData = menuCategory
+    ? categories.find((category) => category.name === menuCategory)
+    : null;
+  const menuSubcategories = menuCategoryData
+    ? getCategoryChildren(menuCategoryData, categories).filter((category) => category.isVisible !== false)
+    : [];
+  const menuTagOptions = menuCategory && !menuSubcategories.length
+    ? categoryMenus[menuCategory]?.options || []
+    : [];
+  const menuOptions = menuSubcategories.length
+    ? menuSubcategories.map((category) => ({ label: category.name, category: category.name }))
+    : menuTagOptions.map((option) => ({ label: option, option }));
+  const menuBrands = menuCategoryData
     ? [
         ...new Set([
-          ...menuDetails.brands,
+          ...(categoryMenus[menuCategory]?.brands || []),
           ...products
-            .filter((product) => product.category === menuCategory)
+            .filter((product) => categoryIncludesProduct(menuCategoryData, product, categories))
             .map((product) => product.brand),
         ]),
       ].slice(0, 8)
     : [];
+  const menuDetails = menuCategoryData && (menuOptions.length || menuBrands.length);
 
   function addToCart(product, quantity = 1) {
     const amount = Math.max(1, Math.floor(quantity));
@@ -1480,6 +1532,7 @@ function App() {
         onBack={leaveAdmin}
         onLogout={logout}
         onProductsChanged={refreshProducts}
+        onCategoriesChanged={refreshCategories}
         onShowroomsChanged={refreshShowrooms}
         onTransitionSettingsChanged={(updated) => setTransitionSettings({ ...defaultTransitionSettings, ...updated })}
         theme={theme}
@@ -1786,7 +1839,7 @@ function App() {
                 id="category-flyout"
               >
                 <aside className="category-menu" aria-label="Danh mục sản phẩm">
-                  {categories.slice(0, 9).map((category) => {
+                  {navigationCategories.slice(0, 9).map((category) => {
                     const Icon = categoryIcons[category.icon] || Box;
                     const active = category.name === menuCategory;
                     return (
@@ -1830,15 +1883,17 @@ function App() {
                       </div>
 
                       <div className="category-option-grid">
-                        {menuDetails.options.map((option) => (
+                        {menuOptions.map((option) => (
                           <button
                             type="button"
-                            key={option}
+                            key={option.label}
                             onClick={(event) =>
-                              openMenuSelection(event, menuCategory, option)
+                              option.category
+                                ? openMenuSelection(event, option.category)
+                                : openMenuSelection(event, menuCategory, option.option)
                             }
                           >
-                            <span>{option}</span>
+                            <span>{option.label}</span>
                             <ArrowUpRight size={15} />
                           </button>
                         ))}
@@ -1871,46 +1926,17 @@ function App() {
             >
               <Zap size={17} /> Flash Sale
             </a>
-            <a
-              href="/#products"
-              onClick={(event) =>
-                openStorefrontSection(event, "#products", "PC Gaming")
-              }
-            >
-              PC Gaming
-            </a>
-            <a
-              href="/#products"
-              onClick={(event) =>
-                openStorefrontSection(event, "#products", "Laptop")
-              }
-            >
-              Laptop
-            </a>
-            <a
-              href="/#products"
-              onClick={(event) =>
-                openStorefrontSection(event, "#products", "Tất cả")
-              }
-            >
-              Linh kiện
-            </a>
-            <a
-              href="/#products"
-              onClick={(event) =>
-                openStorefrontSection(event, "#products", "Màn hình")
-              }
-            >
-              Màn hình
-            </a>
-            <a
-              href="/#products"
-              onClick={(event) =>
-                openStorefrontSection(event, "#products", "Tất cả")
-              }
-            >
-              Gaming Gear
-            </a>
+            {navigationCategories.slice(0, 5).map((category) => (
+              <a
+                href="/#products"
+                key={category.id || category.name}
+                onClick={(event) =>
+                  openStorefrontSection(event, "#products", category.name)
+                }
+              >
+                {category.name}
+              </a>
+            ))}
             <a href="#support">Dịch vụ</a>
           </div>
         </nav>
@@ -2050,21 +2076,24 @@ function App() {
             </a>
           </div>
           <div className="category-grid">
-            {categories.map((category) => {
+            {visibleCategories.map((category) => {
               const Icon = categoryIcons[category.icon] || Box;
+              const parent = categories.find((item) => item.id === category.parentId);
               return (
                 <button
-                  key={category.name}
+                  className={parent ? "is-subcategory" : "is-parent-category"}
+                  key={category.id || category.name}
                   onClick={() => openCatalog(category.name)}
                 >
                   <span style={{ background: category.color }}>
                     <Icon size={31} />
                   </span>
+                  <em>{parent ? parent.name : "Danh mục chính"}</em>
                   <b>{category.name}</b>
                   <small>
                     {
                       products.filter(
-                        (product) => product.category === category.name,
+                        (product) => categoryIncludesProduct(category, product, categories),
                       ).length
                     }{" "}
                     sản phẩm
@@ -2143,14 +2172,17 @@ function App() {
                 <CategoryProductCarousel
                   key={group.category.name}
                   category={group.category}
+                  subcategories={group.subcategories}
                   products={group.products}
                   carouselTransition={transitionSettings.productCarouselTransition}
                   carouselDuration={transitionSettings.productCarouselDurationMs}
                   carouselEasing={transitionSettings.productCarouselEasing}
                   onAdd={addToCart}
                   onOpen={openProduct}
-                  onSelectOption={(option) =>
-                    openCatalog(group.category.name, option)
+                  onSelectOption={(selection) =>
+                    selection.category
+                      ? openCatalog(selection.category)
+                      : openCatalog(group.category.name, selection.option)
                   }
                   onViewAll={() => openCatalog(group.category.name)}
                 />

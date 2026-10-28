@@ -27,6 +27,7 @@ import {
   deleteCategory,
   deleteShowroom,
   deleteUserSession,
+  findCategoryById,
   findProductById,
   findShowroomById,
   findUserByEmail,
@@ -43,6 +44,7 @@ import {
   listUsers,
   processStripeWebhookEvent,
   registerUserWithPassword,
+  updateCategory,
   updateOrderStatus,
   updateProduct as saveProduct,
   updateShowroom,
@@ -582,16 +584,57 @@ function normalizeProduct(body = {}, current = {}) {
   }
 }
 
-function normalizeCategory(body = {}) {
-  const name = String(body.name || '').trim().replace(/\s+/g, ' ')
+function normalizeCategory(body = {}, current = {}) {
+  const name = String(body.name ?? current.name ?? '').trim().replace(/\s+/g, ' ')
   if (name.length < 2 || name.length > 80) {
     throw httpError(400, 'Tên danh mục phải có từ 2 đến 80 ký tự')
   }
 
-  const icon = String(body.icon || 'Box').trim().slice(0, 40) || 'Box'
-  const color = String(body.color || '#edf0ff').trim().slice(0, 20) || '#edf0ff'
+  const icon = String(body.icon ?? current.icon ?? 'Box').trim().slice(0, 40) || 'Box'
+  const color = String(body.color ?? current.color ?? '#edf0ff').trim().slice(0, 20) || '#edf0ff'
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw httpError(400, 'Màu danh mục không hợp lệ')
-  return { name, icon, color }
+
+  const rawParentId = body.parentId !== undefined ? body.parentId : current.parentId
+  const parentId = rawParentId === '' || rawParentId === null || rawParentId === undefined
+    ? null
+    : Number(rawParentId)
+  if (parentId !== null && (!Number.isInteger(parentId) || parentId < 1)) {
+    throw httpError(400, 'Danh mục cha không hợp lệ')
+  }
+
+  const booleanValue = (field, fallback) => {
+    const value = body[field] === undefined ? current[field] ?? fallback : body[field]
+    if (typeof value !== 'boolean') throw httpError(400, `${field} phải là true hoặc false`)
+    return value
+  }
+  const sortOrder = Number(body.sortOrder ?? current.sortOrder ?? 0)
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 10000) {
+    throw httpError(400, 'Thứ tự danh mục phải từ 0 đến 10000')
+  }
+
+  return {
+    name,
+    icon,
+    color,
+    parentId,
+    isVisible: booleanValue('isVisible', true),
+    showInShowcase: booleanValue('showInShowcase', true),
+    sortOrder
+  }
+}
+
+async function validateCategoryParent(parentId, categoryId = null) {
+  if (parentId === null) return
+  if (parentId === categoryId) throw httpError(400, 'Danh mục không thể là cha của chính nó')
+  if (categoryId !== null) {
+    const categories = await listCategories()
+    if (categories.some(category => category.parentId === categoryId)) {
+      throw httpError(400, 'Danh mục đang có danh mục con nên không thể chuyển thành danh mục con')
+    }
+  }
+  const parent = await findCategoryById(parentId)
+  if (!parent) throw httpError(400, 'Không tìm thấy danh mục cha')
+  if (parent.parentId !== null) throw httpError(400, 'Hệ thống chỉ hỗ trợ tối đa 2 cấp danh mục')
 }
 
 function mapPublicStoreSettings(settings) {
@@ -1097,9 +1140,29 @@ app.patch('/api/admin/settings', asyncHandler(async (req, res) => {
 
 app.post('/api/admin/categories', asyncHandler(async (req, res) => {
   try {
-    res.status(201).json(await createCategory(normalizeCategory(req.body)))
+    const category = normalizeCategory(req.body)
+    await validateCategoryParent(category.parentId)
+    res.status(201).json(await createCategory(category))
   } catch (error) {
     if (error.code === '23505') throw httpError(409, 'Danh mục này đã tồn tại')
+    throw error
+  }
+}))
+
+app.patch('/api/admin/categories/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id < 1) throw httpError(400, 'Mã danh mục không hợp lệ')
+  const current = await findCategoryById(id)
+  if (!current) throw httpError(404, 'Không tìm thấy danh mục')
+
+  try {
+    const category = normalizeCategory(req.body, current)
+    await validateCategoryParent(category.parentId, id)
+    const updated = await updateCategory(id, category)
+    res.json(updated)
+  } catch (error) {
+    if (error.code === '23505') throw httpError(409, 'Tên danh mục này đã tồn tại')
+    if (error.code === '23503') throw httpError(409, 'Không thể thay đổi cấp của danh mục đang được sử dụng')
     throw error
   }
 }))
@@ -1111,7 +1174,7 @@ app.delete('/api/admin/categories/:id', asyncHandler(async (req, res) => {
   if (category) return res.json({ message: 'Đã xóa danh mục', category })
   const categories = await listCategories()
   if (!categories.some(item => item.id === id)) throw httpError(404, 'Không tìm thấy danh mục')
-  throw httpError(409, 'Không thể xóa danh mục đang có sản phẩm')
+  throw httpError(409, 'Không thể xóa danh mục đang có sản phẩm hoặc danh mục con')
 }))
 
 app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {
