@@ -25,6 +25,7 @@ import {
   deleteProduct as removeProduct,
   deleteProducts as removeProducts,
   deleteCategory,
+  deleteCategories,
   deleteShowroom,
   deleteUserSession,
   findCategoryById,
@@ -1175,6 +1176,27 @@ app.delete('/api/admin/categories/:id', asyncHandler(async (req, res) => {
   const categories = await listCategories()
   if (!categories.some(item => item.id === id)) throw httpError(404, 'Không tìm thấy danh mục')
   throw httpError(409, 'Không thể xóa danh mục đang có sản phẩm hoặc danh mục con')
+}))
+
+app.delete('/api/admin/categories', asyncHandler(async (req, res) => {
+  const rawIds = req.body?.ids
+  if (!Array.isArray(rawIds) || !rawIds.length || rawIds.length > 100) {
+    throw httpError(400, 'Danh sách danh mục cần xóa không hợp lệ')
+  }
+  const ids = [...new Set(rawIds.map(Number))]
+  if (ids.some(id => !Number.isInteger(id) || id < 1)) {
+    throw httpError(400, 'Mã danh mục cần xóa không hợp lệ')
+  }
+
+  const result = await deleteCategories(ids)
+  if (result.missingIds.length) throw httpError(404, 'Có danh mục không còn tồn tại, vui lòng tải lại trang')
+  if (result.blocked.length) {
+    const parentBlocked = result.blocked.some(category => category.hasChildren)
+    throw httpError(409, parentBlocked
+      ? 'Hãy xóa toàn bộ danh mục con trước khi xóa danh mục cha'
+      : 'Hãy chuyển hoặc xóa sản phẩm trong danh mục trước')
+  }
+  res.json({ message: 'Đã xóa các danh mục', categories: result.categories })
 }))
 
 app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {

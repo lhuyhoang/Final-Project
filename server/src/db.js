@@ -559,6 +559,58 @@ export async function deleteCategory(id) {
   return mapCategoryRow(result.rows[0])
 }
 
+export async function deleteCategories(ids) {
+  return withTransaction(async client => {
+    const lockedResult = await client.query(`
+      SELECT *
+      FROM product_categories
+      WHERE id = ANY($1::int[])
+      FOR UPDATE
+    `, [ids])
+    const foundIds = new Set(lockedResult.rows.map(row => row.id))
+    const missingIds = ids.filter(id => !foundIds.has(id))
+    if (missingIds.length) return { categories: [], blocked: [], missingIds }
+
+    const blockerResult = await client.query(`
+      SELECT
+        category.id,
+        category.name,
+        EXISTS (
+          SELECT 1
+          FROM products
+          WHERE BTRIM(products.category) = BTRIM(category.name)
+        ) AS has_products,
+        EXISTS (
+          SELECT 1
+          FROM product_categories AS child
+          WHERE child.parent_id = category.id
+        ) AS has_children
+      FROM product_categories AS category
+      WHERE category.id = ANY($1::int[])
+    `, [ids])
+    const blocked = blockerResult.rows
+      .filter(row => row.has_products || row.has_children)
+      .map(row => ({
+        id: row.id,
+        name: row.name,
+        hasProducts: row.has_products,
+        hasChildren: row.has_children
+      }))
+    if (blocked.length) return { categories: [], blocked, missingIds: [] }
+
+    const deletedResult = await client.query(`
+      DELETE FROM product_categories
+      WHERE id = ANY($1::int[])
+      RETURNING *
+    `, [ids])
+    return {
+      categories: deletedResult.rows.map(mapCategoryRow),
+      blocked: [],
+      missingIds: []
+    }
+  }, { isolationLevel: 'SERIALIZABLE' })
+}
+
 export async function listProducts({ search, category, limit, offset = 0 } = {}) {
   const conditions = []
   const values = []

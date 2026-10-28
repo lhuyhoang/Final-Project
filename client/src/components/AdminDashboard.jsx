@@ -709,7 +709,7 @@ function ShowroomEditor({ showroom, onClose, onSaved }) {
   </div>
 }
 
-function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) {
+function CategoryManager({ categories, products, onCreated, onUpdated, onRequestDelete, onRequestBulkDelete }) {
   const createEmptyForm = (parentId = '') => ({ name: '', parentId, icon: 'Box', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: parentId === '' })
   const [form, setForm] = useState(() => createEmptyForm())
   const [editingId, setEditingId] = useState(null)
@@ -718,11 +718,32 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
   const [saving, setSaving] = useState(false)
   const [updatingId, setUpdatingId] = useState('')
   const [error, setError] = useState('')
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState(() => new Set())
   const categoryIds = new Set(categories.map(category => category.id))
   const rootCategories = categories.filter(category => category.parentId === null || category.parentId === undefined || !categoryIds.has(category.parentId)).sort(compareAdminCategories)
   const editingCategory = categories.find(category => category.id === editingId)
   const editingHasChildren = editingId !== null && categories.some(category => category.parentId === editingId)
   const selectedParent = rootCategories.find(category => String(category.id) === String(form.parentId))
+  const productCounts = useMemo(() => products.reduce((counts, product) => {
+    const name = String(product.category || '').trim()
+    counts.set(name, (counts.get(name) || 0) + 1)
+    return counts
+  }, new Map()), [products])
+  const deletionBlockReason = category => {
+    if (typeof category.id !== 'number') return 'Danh mục mặc định chưa thể xóa'
+    const childCount = categories.filter(item => item.parentId === category.id).length
+    if (childCount) return `Hãy xóa ${childCount} danh mục con trước`
+    const productCount = productCounts.get(String(category.name || '').trim()) || 0
+    if (productCount) return `Hãy chuyển hoặc xóa ${productCount} sản phẩm trong danh mục trước`
+    return ''
+  }
+  const deletableCategories = categories.filter(category => !deletionBlockReason(category))
+  const allDeletableSelected = deletableCategories.length > 0 && deletableCategories.every(category => selectedCategoryIds.has(category.id))
+
+  useEffect(() => {
+    const deletableIds = new Set(categories.filter(category => !deletionBlockReason(category)).map(category => category.id))
+    setSelectedCategoryIds(current => new Set([...current].filter(id => deletableIds.has(id))))
+  }, [categories, productCounts])
 
   useEffect(() => {
     if (!editorOpen) return undefined
@@ -791,6 +812,36 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
     })
   }
 
+  function toggleCategorySelection(category) {
+    if (deletionBlockReason(category)) return
+    setSelectedCategoryIds(current => {
+      const next = new Set(current)
+      if (next.has(category.id)) next.delete(category.id)
+      else next.add(category.id)
+      return next
+    })
+  }
+
+  function toggleAllDeletableCategories() {
+    setSelectedCategoryIds(current => {
+      if (allDeletableSelected) return new Set()
+      return new Set([...current, ...deletableCategories.map(category => category.id)])
+    })
+  }
+
+  function requestBulkDelete() {
+    const selected = categories.filter(category => selectedCategoryIds.has(category.id) && !deletionBlockReason(category))
+    if (selected.length) onRequestBulkDelete(selected)
+  }
+
+  function renderSelection(category) {
+    const blockReason = deletionBlockReason(category)
+    return <label className={`category-select-control${blockReason ? ' disabled' : ''}`} title={blockReason || `Chọn ${category.name}`}>
+      <input type="checkbox" checked={selectedCategoryIds.has(category.id)} disabled={Boolean(blockReason)} onChange={() => toggleCategorySelection(category)} aria-label={blockReason || `Chọn danh mục ${category.name}`}/>
+      <span aria-hidden="true"/>
+    </label>
+  }
+
   async function submit(event) {
     event.preventDefault()
     setSaving(true)
@@ -837,14 +888,15 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
 
   function renderCategoryToggles(category) {
     return <div className="category-manager-toggles">
-      <button type="button" className={category.isVisible !== false ? 'active' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:isVisible`} onClick={() => toggleCategory(category, 'isVisible')} aria-pressed={category.isVisible !== false} title="Hiển thị trong menu và khối danh mục"><span className="category-toggle-icon">{category.isVisible !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Danh mục</b><small>{category.isVisible !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
-      <button type="button" className={category.showInShowcase !== false ? 'active showcase' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:showInShowcase`} onClick={() => toggleCategory(category, 'showInShowcase')} aria-pressed={category.showInShowcase !== false} title="Hiển thị thành dải sản phẩm trên trang chủ"><span className="category-toggle-icon">{category.showInShowcase !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Show sản phẩm</b><small>{category.showInShowcase !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+      <button type="button" className={category.isVisible !== false ? 'active' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:isVisible`} onClick={() => toggleCategory(category, 'isVisible')} aria-pressed={category.isVisible !== false} title="Hiển thị danh mục trong menu cửa hàng"><span className="category-toggle-icon">{category.isVisible !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Danh mục</b><small>{category.isVisible !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+      <button type="button" className={category.showInShowcase !== false ? 'active showcase' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:showInShowcase`} onClick={() => toggleCategory(category, 'showInShowcase')} aria-pressed={category.showInShowcase !== false} title="Hiển thị sản phẩm của danh mục này trong khu Show sản phẩm ở trang chủ"><span className="category-toggle-icon">{category.showInShowcase !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Show trang chủ</b><small>{category.showInShowcase !== false ? 'Đang hiển thị' : 'Đang ẩn'}</small></span></button>
     </div>
   }
 
   function renderCategoryActions(category) {
     if (typeof category.id !== 'number') return null
-    return <div className="category-manager-actions"><button type="button" onClick={() => startEditing(category)} aria-label={`Sửa danh mục ${category.name}`} title="Chỉnh sửa"><Pencil size={16}/></button><button type="button" className="danger" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`} title="Xóa"><Trash2 size={16}/></button></div>
+    const blockReason = deletionBlockReason(category)
+    return <div className="category-manager-actions"><button type="button" onClick={() => startEditing(category)} aria-label={`Sửa danh mục ${category.name}`} title="Chỉnh sửa"><Pencil size={16}/></button><button type="button" className="danger" disabled={Boolean(blockReason)} onClick={() => onRequestDelete(category)} aria-label={blockReason || `Xóa danh mục ${category.name}`} title={blockReason || 'Xóa danh mục'}><Trash2 size={16}/></button></div>
   }
 
   return <section className="admin-panel category-manager">
@@ -853,12 +905,17 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
       <div className="category-manager-heading-actions"><small>{rootCategories.length} danh mục cha · {categories.length - rootCategories.length} danh mục con</small><button type="button" className="admin-primary" onClick={openCreateParent}><Plus size={16}/> Thêm danh mục cha</button></div>
     </header>
     {!editorOpen && error && <div className="admin-form-error" role="alert">{error}</div>}
+    <div className="category-bulk-toolbar">
+      <label className="category-bulk-select"><input type="checkbox" checked={allDeletableSelected} disabled={!deletableCategories.length} onChange={toggleAllDeletableCategories}/><span><b>Chọn các danh mục có thể xóa</b><small>Danh mục cha có con hoặc danh mục đang có sản phẩm sẽ được khóa để bảo vệ dữ liệu.</small></span></label>
+      <div><span>{selectedCategoryIds.size ? `Đã chọn ${selectedCategoryIds.size} danh mục` : `${deletableCategories.length} danh mục có thể xóa`}</span>{selectedCategoryIds.size > 0 && <button type="button" className="admin-secondary compact" onClick={() => setSelectedCategoryIds(new Set())}>Bỏ chọn</button>}<button type="button" className="admin-danger-action" disabled={!selectedCategoryIds.size} onClick={requestBulkDelete}><Trash2 size={16}/> Xóa đã chọn</button></div>
+    </div>
     <div className="category-tree-list">
       {rootCategories.map(parent => {
         const children = categories.filter(category => category.parentId === parent.id).sort(compareAdminCategories)
         const expanded = expandedParentIds.has(parent.id)
         return <article className={`category-tree-card${expanded ? ' expanded' : ''}`} key={parent.id || parent.name}>
           <div className="category-tree-parent-row">
+            {renderSelection(parent)}
             <button type="button" className="category-tree-main" onClick={() => toggleParent(parent.id)} aria-expanded={expanded} aria-controls={`category-children-${parent.id}`} aria-label={`${expanded ? 'Thu gọn' : 'Mở'} danh mục ${parent.name}`}>
               <ChevronRight size={18}/><span className="category-manager-swatch" style={{ background: parent.color }}/><span className="category-manager-name"><b>{parent.name}</b><small>Danh mục cha · Thứ tự {parent.sortOrder || 0}</small></span><span className="category-child-count">{children.length} danh mục con</span>
             </button>
@@ -871,6 +928,7 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
           {expanded && <div className="category-tree-children" id={`category-children-${parent.id}`}>
             {children.length ? children.map(child => <div className="category-manager-item child" key={child.id || child.name}>
               <i className="category-tree-connector" aria-hidden="true"/>
+              {renderSelection(child)}
               <span className="category-manager-swatch" style={{ background: child.color }}/>
               <span className="category-manager-name"><b>{child.name}</b><small>Danh mục con của {parent.name} · Thứ tự {child.sortOrder || 0}</small></span>
               {renderCategoryToggles(child)}
@@ -891,8 +949,8 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
           <label><span>Thứ tự</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
           <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
           <div className="category-form-visibility">
-            <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu và khối danh mục nổi bật.</small></span></label>
-            <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trên trang chủ.</small></span></label>
+            <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu điều hướng của cửa hàng.</small></span></label>
+            <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trong khu sản phẩm trang chủ.</small></span></label>
           </div>
           {error && <div className="admin-form-error" role="alert">{error}</div>}
           <div className="category-form-actions"><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div>
@@ -1135,6 +1193,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     setConfirmation({ kind: 'category', item: category })
   }
 
+  function removeCategories(items) {
+    setConfirmation({ kind: 'categories', items })
+  }
+
   async function confirmDelete() {
     const current = confirmation
     if (!current || confirming) return
@@ -1160,6 +1222,15 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         setCategories(categories => categories.filter(item => item.id !== current.item.id))
         onCategoriesChanged?.()
         showNotice('Đã xóa danh mục')
+      } else if (current.kind === 'categories') {
+        const deleted = await api('/api/admin/categories', {
+          method: 'DELETE',
+          body: JSON.stringify({ ids: current.items.map(item => item.id) })
+        })
+        const deletedIds = new Set(deleted.categories.map(category => category.id))
+        setCategories(categories => categories.filter(item => !deletedIds.has(item.id)))
+        onCategoriesChanged?.()
+        showNotice(`Đã xóa ${deleted.categories.length} danh mục`)
       } else {
         await api(`/api/admin/showrooms/${current.item.id}`, { method: 'DELETE' })
         setShowrooms(showrooms => showrooms.filter(item => item.id !== current.item.id))
@@ -1352,7 +1423,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           {visibleProducts.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(productPage, productPageCount)} / {productPageCount} · {visibleProducts.length} sản phẩm</span><div><button type="button" onClick={() => setProductPage(current => Math.max(1, current - 1))} disabled={productPage <= 1}>← Trước</button>{productPages.map(page => <button type="button" className={page === productPage ? 'active' : ''} key={page} onClick={() => setProductPage(page)}>{page}</button>)}<button type="button" onClick={() => setProductPage(current => Math.min(productPageCount, current + 1))} disabled={productPage >= productPageCount}>Sau →</button></div></footer>}
         </section>}
 
-        {tab === 'categories' && <CategoryManager categories={categories} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory}/>}
+        {tab === 'categories' && <CategoryManager categories={categories} products={products} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory} onRequestBulkDelete={removeCategories}/>}
 
         {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
 
@@ -1416,8 +1487,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       <section className="admin-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-description">
         <div className="admin-confirm-icon"><Trash2 size={22}/></div>
         <span className="admin-confirm-kicker">XÁC NHẬN THAO TÁC</span>
-        <h2 id="admin-confirm-title">Xóa {confirmation.kind === 'products' ? 'sản phẩm đã chọn' : confirmation.kind === 'category' ? 'danh mục' : confirmation.kind === 'product' ? 'sản phẩm' : 'showroom'}?</h2>
-        <p id="admin-confirm-description">Bạn có chắc muốn xóa <strong>“{confirmation.kind === 'products' ? `${confirmation.items.length} sản phẩm đã chọn` : confirmation.item.name}”</strong>? Thao tác này không thể hoàn tác.</p>
+        <h2 id="admin-confirm-title">Xóa {confirmation.kind === 'products' ? 'sản phẩm đã chọn' : confirmation.kind === 'categories' ? 'danh mục đã chọn' : confirmation.kind === 'category' ? 'danh mục' : confirmation.kind === 'product' ? 'sản phẩm' : 'showroom'}?</h2>
+        <p id="admin-confirm-description">Bạn có chắc muốn xóa <strong>“{confirmation.kind === 'products' ? `${confirmation.items.length} sản phẩm đã chọn` : confirmation.kind === 'categories' ? `${confirmation.items.length} danh mục đã chọn` : confirmation.item.name}”</strong>? Thao tác này không thể hoàn tác.</p>
         <footer>
           <button type="button" className="secondary" onClick={() => setConfirmation(null)} disabled={confirming}>Hủy</button>
           <button type="button" className="danger" onClick={confirmDelete} disabled={confirming}><Trash2 size={16}/>{confirming ? 'Đang xóa...' : 'Xóa'}</button>

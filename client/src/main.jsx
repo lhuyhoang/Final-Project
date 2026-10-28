@@ -2065,45 +2065,6 @@ function App() {
           </div>
         </section>
 
-        <section className="category-section container">
-          <div className="section-heading">
-            <div>
-              <span>KHÁM PHÁ</span>
-              <h2>Danh mục nổi bật</h2>
-            </div>
-            <a href="#products">
-              Xem tất cả <ArrowRight size={17} />
-            </a>
-          </div>
-          <div className="category-grid">
-            {visibleCategories.map((category) => {
-              const Icon = categoryIcons[category.icon] || Box;
-              const parent = categories.find((item) => item.id === category.parentId);
-              return (
-                <button
-                  className={parent ? "is-subcategory" : "is-parent-category"}
-                  key={category.id || category.name}
-                  onClick={() => openCatalog(category.name)}
-                >
-                  <span style={{ background: category.color }}>
-                    <Icon size={31} />
-                  </span>
-                  <em>{parent ? parent.name : "Danh mục chính"}</em>
-                  <b>{category.name}</b>
-                  <small>
-                    {
-                      products.filter(
-                        (product) => categoryIncludesProduct(category, product, categories),
-                      ).length
-                    }{" "}
-                    sản phẩm
-                  </small>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         <section className="deal-section" id="deals">
           <div className="container">
             <div className="deal-header">

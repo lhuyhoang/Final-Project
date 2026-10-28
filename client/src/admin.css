@@ -1235,6 +1235,79 @@
   font-size: 9px;
 }
 
+.category-bulk-toolbar {
+  display: flex;
+  min-height: 64px;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-top: 14px;
+  background: #f8f9fb;
+  border: 1px solid #e5e8ec;
+  border-radius: 10px;
+}
+
+.category-bulk-select {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.category-bulk-select input,
+.category-select-control input {
+  accent-color: var(--red);
+}
+
+.category-bulk-select input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+}
+
+.category-bulk-select b,
+.category-bulk-select small {
+  display: block;
+}
+
+.category-bulk-select b {
+  color: #3b3f46;
+  font-size: 9px;
+}
+
+.category-bulk-select small {
+  margin-top: 4px;
+  color: #8a9099;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.category-bulk-toolbar > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.category-bulk-toolbar > div > span {
+  margin-right: 3px;
+  color: #777e88;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.category-bulk-toolbar .admin-danger-action:disabled {
+  color: #a7abb2;
+  background: #eef0f2;
+  border-color: #e0e3e7;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .category-create-form {
   display: grid;
   grid-template-columns: minmax(190px, 1.3fr) minmax(190px, 1.2fr) 150px 90px 80px;
@@ -1518,6 +1591,14 @@
   border-color: #c42b24;
 }
 
+.category-manager-actions button:disabled,
+.category-manager-actions button:disabled:hover {
+  color: #b5b9bf;
+  background: #f2f3f5;
+  border-color: #e4e6e9;
+  cursor: not-allowed;
+}
+
 .category-manager-heading-actions {
   display: flex;
   flex: 0 0 auto;
@@ -1553,9 +1634,71 @@
 
 .category-tree-parent-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto;
+  grid-template-columns: 44px minmax(260px, 1fr) auto;
   align-items: stretch;
   background: #fafbfc;
+}
+
+.category-select-control {
+  position: relative;
+  display: grid;
+  width: 44px;
+  min-height: 44px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.category-select-control input {
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  opacity: 0;
+}
+
+.category-select-control > span {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  background: #fff;
+  border: 1px solid #cfd4db;
+  border-radius: 5px;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.category-select-control > span::after {
+  width: 8px;
+  height: 4px;
+  content: '';
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  opacity: 0;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.category-select-control input:checked + span {
+  background: var(--red);
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px #e6332a14;
+}
+
+.category-select-control input:checked + span::after {
+  opacity: 1;
+}
+
+.category-select-control input:focus-visible + span {
+  outline: 2px solid #ee6b64;
+  outline-offset: 2px;
+}
+
+.category-select-control.disabled {
+  cursor: not-allowed;
+}
+
+.category-select-control.disabled > span {
+  background: #eef0f2;
+  border-color: #e0e3e7;
 }
 
 .category-tree-main {
@@ -1660,6 +1803,12 @@
   margin-left: 0;
   background: #fafbfc;
   border-color: #e7eaee;
+}
+
+.category-tree-children .category-select-control {
+  flex: 0 0 36px;
+  width: 36px;
+  margin-left: -5px;
 }
 
 .category-tree-children .category-manager-item.child .category-tree-connector {
@@ -3947,6 +4096,26 @@ html[data-theme="dark"] .category-create-form label > small {
   color: var(--admin-muted);
 }
 
+html[data-theme="dark"] .category-bulk-toolbar {
+  background: var(--admin-surface-soft);
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] .category-bulk-select b {
+  color: var(--admin-text);
+}
+
+html[data-theme="dark"] .category-bulk-select small,
+html[data-theme="dark"] .category-bulk-toolbar > div > span {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .category-bulk-toolbar .admin-danger-action:disabled {
+  color: #707680;
+  background: #25292f;
+  border-color: var(--admin-border);
+}
+
 html[data-theme="dark"] .category-form-heading {
   border-color: var(--admin-border);
 }
@@ -4031,6 +4200,13 @@ html[data-theme="dark"] .category-manager-actions button:hover {
   border-color: #754146;
 }
 
+html[data-theme="dark"] .category-manager-actions button:disabled,
+html[data-theme="dark"] .category-manager-actions button:disabled:hover {
+  color: #666c75;
+  background: #24282e;
+  border-color: var(--admin-border);
+}
+
 html[data-theme="dark"] .category-manager-heading-actions > small {
   color: var(--admin-muted);
 }
@@ -4057,6 +4233,22 @@ html[data-theme="dark"] .category-tree-main {
 
 html[data-theme="dark"] .category-tree-main:hover {
   background: #24282f;
+}
+
+html[data-theme="dark"] .category-select-control > span {
+  background: var(--admin-surface-raised);
+  border-color: #50555e;
+}
+
+html[data-theme="dark"] .category-select-control input:checked + span {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px #ff6b6322;
+}
+
+html[data-theme="dark"] .category-select-control.disabled > span {
+  background: #24282e;
+  border-color: #3b4048;
 }
 
 html[data-theme="dark"] .category-child-count {
@@ -4983,10 +5175,11 @@ html[data-theme="dark"] .auth-tabs button.active {
 
 @media (max-width: 1100px) {
   .category-tree-parent-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
   }
 
   .category-tree-parent-controls {
+    grid-column: 1 / -1;
     flex-wrap: wrap;
     padding: 9px 12px 11px 54px;
     border-top: 1px solid #eceef1;
@@ -5052,6 +5245,21 @@ html[data-theme="dark"] .auth-tabs button.active {
   }
 
   .category-manager-heading-actions .admin-primary {
+    justify-content: center;
+  }
+
+  .category-bulk-toolbar,
+  .category-bulk-toolbar > div {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .category-bulk-toolbar > div > span {
+    margin: 0;
+  }
+
+  .category-bulk-toolbar > div > button {
     justify-content: center;
   }
 
