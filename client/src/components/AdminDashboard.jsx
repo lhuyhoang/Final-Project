@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -710,16 +710,28 @@ function ShowroomEditor({ showroom, onClose, onSaved }) {
 }
 
 function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) {
-  const emptyForm = { name: '', parentId: '', icon: 'Box', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: false }
-  const [form, setForm] = useState(emptyForm)
+  const createEmptyForm = (parentId = '') => ({ name: '', parentId, icon: 'Box', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: parentId === '' })
+  const [form, setForm] = useState(() => createEmptyForm())
   const [editingId, setEditingId] = useState(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [expandedParentIds, setExpandedParentIds] = useState(() => new Set())
   const [saving, setSaving] = useState(false)
   const [updatingId, setUpdatingId] = useState('')
   const [error, setError] = useState('')
-  const orderedCategories = orderAdminCategoryTree(categories)
-  const rootCategories = categories.filter(category => category.parentId === null || category.parentId === undefined).sort(compareAdminCategories)
+  const categoryIds = new Set(categories.map(category => category.id))
+  const rootCategories = categories.filter(category => category.parentId === null || category.parentId === undefined || !categoryIds.has(category.parentId)).sort(compareAdminCategories)
   const editingCategory = categories.find(category => category.id === editingId)
   const editingHasChildren = editingId !== null && categories.some(category => category.parentId === editingId)
+  const selectedParent = rootCategories.find(category => String(category.id) === String(form.parentId))
+
+  useEffect(() => {
+    if (!editorOpen) return undefined
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') resetForm()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [editorOpen])
 
   function update(event) {
     const { name, type, checked, value } = event.target
@@ -727,9 +739,31 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
   }
 
   function resetForm() {
-    setForm(emptyForm)
+    setForm(createEmptyForm())
     setEditingId(null)
+    setEditorOpen(false)
     setError('')
+  }
+
+  function focusCategoryName() {
+    window.requestAnimationFrame(() => document.querySelector('.category-editor-dialog input[name="name"]')?.focus())
+  }
+
+  function openCreateParent() {
+    setEditingId(null)
+    setForm(createEmptyForm())
+    setError('')
+    setEditorOpen(true)
+    focusCategoryName()
+  }
+
+  function openCreateChild(parent) {
+    setEditingId(null)
+    setForm(createEmptyForm(parent.id))
+    setExpandedParentIds(current => new Set(current).add(parent.id))
+    setError('')
+    setEditorOpen(true)
+    focusCategoryName()
   }
 
   function startEditing(category) {
@@ -744,7 +778,17 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
       showInShowcase: category.showInShowcase !== false
     })
     setError('')
-    window.requestAnimationFrame(() => document.querySelector('.category-create-form input[name="name"]')?.focus())
+    setEditorOpen(true)
+    focusCategoryName()
+  }
+
+  function toggleParent(parentId) {
+    setExpandedParentIds(current => {
+      const next = new Set(current)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
   }
 
   async function submit(event) {
@@ -761,6 +805,9 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
         method: editingId ? 'PATCH' : 'POST',
         body: JSON.stringify(payload)
       })
+      if (saved.parentId !== null && saved.parentId !== undefined) {
+        setExpandedParentIds(current => new Set(current).add(saved.parentId))
+      }
       if (editingId) onUpdated(saved, editingCategory?.name)
       else onCreated(saved)
       resetForm()
@@ -788,37 +835,70 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
     }
   }
 
+  function renderCategoryToggles(category) {
+    return <div className="category-manager-toggles">
+      <button type="button" className={category.isVisible !== false ? 'active' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:isVisible`} onClick={() => toggleCategory(category, 'isVisible')} aria-pressed={category.isVisible !== false} title="Hiển thị trong menu và khối danh mục"><span className="category-toggle-icon">{category.isVisible !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Danh mục</b><small>{category.isVisible !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+      <button type="button" className={category.showInShowcase !== false ? 'active showcase' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:showInShowcase`} onClick={() => toggleCategory(category, 'showInShowcase')} aria-pressed={category.showInShowcase !== false} title="Hiển thị thành dải sản phẩm trên trang chủ"><span className="category-toggle-icon">{category.showInShowcase !== false ? <Eye size={15}/> : <EyeOff size={15}/>}</span><span><b>Show sản phẩm</b><small>{category.showInShowcase !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
+    </div>
+  }
+
+  function renderCategoryActions(category) {
+    if (typeof category.id !== 'number') return null
+    return <div className="category-manager-actions"><button type="button" onClick={() => startEditing(category)} aria-label={`Sửa danh mục ${category.name}`} title="Chỉnh sửa"><Pencil size={16}/></button><button type="button" className="danger" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`} title="Xóa"><Trash2 size={16}/></button></div>
+  }
+
   return <section className="admin-panel category-manager">
     <header>
-      <div><span>PHÂN LOẠI SẢN PHẨM</span><h2>Danh mục cha và danh mục con</h2><p>Quản lý cấu trúc 2 cấp và vị trí xuất hiện của từng danh mục trên cửa hàng.</p></div>
-      <small>{rootCategories.length} danh mục lớn · {categories.length - rootCategories.length} danh mục con</small>
+      <div><span>PHÂN LOẠI SẢN PHẨM</span><h2>Quản lý cây danh mục</h2><p>Bấm vào danh mục cha để xem, thêm và quản lý các danh mục con trực thuộc.</p></div>
+      <div className="category-manager-heading-actions"><small>{rootCategories.length} danh mục cha · {categories.length - rootCategories.length} danh mục con</small><button type="button" className="admin-primary" onClick={openCreateParent}><Plus size={16}/> Thêm danh mục cha</button></div>
     </header>
-    <form className="category-create-form" onSubmit={submit}>
-      <div className="category-form-heading"><span>{editingId ? 'CHỈNH SỬA DANH MỤC' : 'THÊM DANH MỤC MỚI'}</span><b>{editingId ? editingCategory?.name : 'Tạo danh mục lớn hoặc danh mục con'}</b></div>
-      <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder="Ví dụ: Laptop văn phòng"/></label>
-      <label className="category-parent-field"><span>Danh mục cha</span><select name="parentId" value={form.parentId} onChange={update} disabled={editingHasChildren}><option value="">Không có — Danh mục lớn</option>{rootCategories.filter(category => category.id !== editingId).map(category => <option key={category.id || category.name} value={category.id}>{category.name}</option>)}</select><small>{editingHasChildren ? 'Danh mục đang có danh mục con nên phải giữ ở cấp lớn.' : 'Chọn một danh mục lớn để tạo danh mục con.'}</small></label>
-      <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
-      <label><span>Thứ tự</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
-      <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
-      <div className="category-form-visibility">
-        <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu và khối danh mục nổi bật.</small></span></label>
-        <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trên trang chủ.</small></span></label>
-      </div>
-      <div className="category-form-actions">{editingId && <button type="button" className="admin-secondary" onClick={resetForm}>Hủy sửa</button>}<button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Thêm danh mục'}</button></div>
-    </form>
-    {error && <div className="admin-form-error" role="alert">{error}</div>}
-    <div className="category-manager-list">
-      {orderedCategories.map(category => { const parent = categories.find(item => item.id === category.parentId); const isChild = Boolean(parent); return <div className={`category-manager-item${isChild ? ' child' : ' parent'}`} key={category.id || category.name}>
-        <i className="category-tree-connector" aria-hidden="true"/>
-        <span className="category-manager-swatch" style={{ background: category.color }}/>
-        <span className="category-manager-name"><b>{category.name}</b><small>{isChild ? `Danh mục con của ${parent.name}` : 'Danh mục lớn'} · Thứ tự {category.sortOrder || 0}</small></span>
-        <div className="category-manager-toggles">
-          <button type="button" className={category.isVisible !== false ? 'active' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:isVisible`} onClick={() => toggleCategory(category, 'isVisible')} aria-pressed={category.isVisible !== false}>{category.isVisible !== false ? <Eye size={15}/> : <EyeOff size={15}/>}<span><b>Danh mục</b><small>{category.isVisible !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
-          <button type="button" className={category.showInShowcase !== false ? 'active showcase' : ''} disabled={typeof category.id !== 'number' || updatingId === `${category.id}:showInShowcase`} onClick={() => toggleCategory(category, 'showInShowcase')} aria-pressed={category.showInShowcase !== false}>{category.showInShowcase !== false ? <Eye size={15}/> : <EyeOff size={15}/>}<span><b>Show sản phẩm</b><small>{category.showInShowcase !== false ? 'Đang hiện' : 'Đang ẩn'}</small></span></button>
-        </div>
-        {typeof category.id === 'number' && <div className="category-manager-actions"><button type="button" onClick={() => startEditing(category)} aria-label={`Sửa danh mục ${category.name}`}><Pencil size={16}/></button><button type="button" className="danger" onClick={() => onRequestDelete(category)} aria-label={`Xóa danh mục ${category.name}`}><Trash2 size={16}/></button></div>}
-      </div>})}
+    {!editorOpen && error && <div className="admin-form-error" role="alert">{error}</div>}
+    <div className="category-tree-list">
+      {rootCategories.map(parent => {
+        const children = categories.filter(category => category.parentId === parent.id).sort(compareAdminCategories)
+        const expanded = expandedParentIds.has(parent.id)
+        return <article className={`category-tree-card${expanded ? ' expanded' : ''}`} key={parent.id || parent.name}>
+          <div className="category-tree-parent-row">
+            <button type="button" className="category-tree-main" onClick={() => toggleParent(parent.id)} aria-expanded={expanded} aria-controls={`category-children-${parent.id}`} aria-label={`${expanded ? 'Thu gọn' : 'Mở'} danh mục ${parent.name}`}>
+              <ChevronRight size={18}/><span className="category-manager-swatch" style={{ background: parent.color }}/><span className="category-manager-name"><b>{parent.name}</b><small>Danh mục cha · Thứ tự {parent.sortOrder || 0}</small></span><span className="category-child-count">{children.length} danh mục con</span>
+            </button>
+            <div className="category-tree-parent-controls">
+              <button type="button" className="category-add-child" onClick={() => openCreateChild(parent)}><Plus size={15}/> Thêm con</button>
+              {renderCategoryToggles(parent)}
+              {renderCategoryActions(parent)}
+            </div>
+          </div>
+          {expanded && <div className="category-tree-children" id={`category-children-${parent.id}`}>
+            {children.length ? children.map(child => <div className="category-manager-item child" key={child.id || child.name}>
+              <i className="category-tree-connector" aria-hidden="true"/>
+              <span className="category-manager-swatch" style={{ background: child.color }}/>
+              <span className="category-manager-name"><b>{child.name}</b><small>Danh mục con của {parent.name} · Thứ tự {child.sortOrder || 0}</small></span>
+              {renderCategoryToggles(child)}
+              {renderCategoryActions(child)}
+            </div>) : <button type="button" className="category-tree-empty" onClick={() => openCreateChild(parent)}><Plus size={18}/><span><b>Chưa có danh mục con</b><small>Bấm để thêm danh mục con đầu tiên cho {parent.name}.</small></span></button>}
+          </div>}
+        </article>
+      })}
+      {!rootCategories.length && <button type="button" className="category-tree-empty root" onClick={openCreateParent}><Plus size={20}/><span><b>Chưa có danh mục cha</b><small>Bấm để tạo danh mục cha đầu tiên.</small></span></button>}
     </div>
+    {editorOpen && <div className="admin-modal-backdrop category-editor-backdrop" onMouseDown={event => event.target === event.currentTarget && resetForm()}>
+      <section className="category-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
+        <header><div><span>{editingId ? 'CHỈNH SỬA DANH MỤC' : form.parentId === '' ? 'DANH MỤC CHA' : 'DANH MỤC CON'}</span><h2 id="category-editor-title">{editingId ? `Chỉnh sửa ${editingCategory?.name || 'danh mục'}` : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</h2><p>{form.parentId === '' ? 'Danh mục này sẽ đứng ở cấp cao nhất.' : `Danh mục trực thuộc ${selectedParent?.name || 'danh mục cha đã chọn'}.`}</p></div><button type="button" onClick={resetForm} aria-label="Đóng"><X size={20}/></button></header>
+        <form className="category-create-form" onSubmit={submit}>
+          <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder={form.parentId === '' ? 'Ví dụ: Laptop' : 'Ví dụ: Laptop văn phòng'}/></label>
+          <label className="category-parent-field"><span>Danh mục cha</span><select name="parentId" value={form.parentId} onChange={update} disabled={editingHasChildren}><option value="">Không có — Danh mục cha</option>{rootCategories.filter(category => category.id !== editingId).map(category => <option key={category.id || category.name} value={category.id}>{category.name}</option>)}</select><small>{editingHasChildren ? 'Danh mục đang có danh mục con nên phải giữ ở cấp cha.' : 'Có thể đổi vị trí danh mục trước khi lưu.'}</small></label>
+          <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
+          <label><span>Thứ tự</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
+          <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
+          <div className="category-form-visibility">
+            <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu và khối danh mục nổi bật.</small></span></label>
+            <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trên trang chủ.</small></span></label>
+          </div>
+          {error && <div className="admin-form-error" role="alert">{error}</div>}
+          <div className="category-form-actions"><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div>
+        </form>
+      </section>
+    </div>}
   </section>
 }
 
