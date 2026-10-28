@@ -723,7 +723,6 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
   const editingCategory = categories.find(category => category.id === editingId)
   const editingHasChildren = editingId !== null && categories.some(category => category.parentId === editingId)
   const selectedParent = rootCategories.find(category => String(category.id) === String(form.parentId))
-  const isCreatingParent = editorOpen && editingId === null && form.parentId === ''
 
   useEffect(() => {
     if (!editorOpen) return undefined
@@ -883,7 +882,7 @@ function CategoryManager({ categories, onCreated, onUpdated, onRequestDelete }) 
       {!rootCategories.length && <button type="button" className="category-tree-empty root" onClick={openCreateParent}><Plus size={20}/><span><b>Chưa có danh mục cha</b><small>Bấm để tạo danh mục cha đầu tiên.</small></span></button>}
     </div>
     {editorOpen && <div className="admin-modal-backdrop category-editor-backdrop" onMouseDown={event => event.target === event.currentTarget && resetForm()}>
-      <section className={`category-editor-dialog${isCreatingParent ? ' parent-create-dialog' : ''}`} role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
+      <section className="category-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
         <header><div><span>{editingId ? 'CHỈNH SỬA DANH MỤC' : form.parentId === '' ? 'DANH MỤC CHA' : 'DANH MỤC CON'}</span><h2 id="category-editor-title">{editingId ? `Chỉnh sửa ${editingCategory?.name || 'danh mục'}` : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</h2><p>{form.parentId === '' ? 'Danh mục này sẽ đứng ở cấp cao nhất.' : `Danh mục trực thuộc ${selectedParent?.name || 'danh mục cha đã chọn'}.`}</p></div><button type="button" onClick={resetForm} aria-label="Đóng"><X size={20}/></button></header>
         <form className="category-create-form" onSubmit={submit}>
           <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder={form.parentId === '' ? 'Ví dụ: Laptop' : 'Ví dụ: Laptop văn phòng'}/></label>

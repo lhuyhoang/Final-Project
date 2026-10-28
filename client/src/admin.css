@@ -1777,100 +1777,6 @@
   margin: 0;
 }
 
-/* Chỉ áp dụng cho luồng "Thêm danh mục cha". Modal thêm con và chỉnh sửa giữ nguyên. */
-.category-editor-dialog.parent-create-dialog {
-  width: min(720px, 100%);
-}
-
-.parent-create-dialog > header {
-  min-height: 86px;
-  padding: 18px 22px;
-}
-
-.parent-create-dialog > header h2 {
-  font-size: 17px;
-}
-
-.parent-create-dialog > header p {
-  margin-top: 5px;
-  font-size: 8px;
-}
-
-.parent-create-dialog .category-create-form {
-  grid-template-columns: minmax(220px, 1.6fr) 100px 116px;
-  gap: 14px;
-  align-items: start;
-  padding: 20px;
-  background: #f5f6f8;
-}
-
-.parent-create-dialog .category-name-field {
-  grid-column: 1 / -1;
-}
-
-.parent-create-dialog .category-parent-field {
-  display: none;
-}
-
-.parent-create-dialog .category-create-form > label {
-  align-content: start;
-}
-
-.parent-create-dialog .category-create-form > label > span {
-  color: #51565e;
-  font-size: 9px;
-}
-
-.parent-create-dialog .category-create-form input,
-.parent-create-dialog .category-create-form select {
-  height: 42px;
-  background: #fff;
-  border-radius: 8px;
-}
-
-.parent-create-dialog .category-create-form input[type="color"] {
-  width: 100%;
-  min-width: 0;
-  padding: 5px;
-}
-
-.parent-create-dialog .category-form-visibility {
-  grid-column: 1 / -1;
-  gap: 10px;
-  padding-top: 2px;
-}
-
-.parent-create-dialog .category-form-visibility > label {
-  min-height: 62px;
-  padding: 11px 12px;
-  background: #fff;
-  border-radius: 9px;
-  transition: border-color .18s ease, box-shadow .18s ease;
-}
-
-.parent-create-dialog .category-form-visibility > label:hover {
-  border-color: #d5d9df;
-  box-shadow: 0 4px 12px #20252c0a;
-}
-
-.parent-create-dialog .category-form-visibility input {
-  width: 18px;
-  height: 18px;
-}
-
-.parent-create-dialog .category-form-actions {
-  grid-column: 1 / -1;
-  padding-top: 14px;
-  border-top: 1px solid #dfe3e8;
-}
-
-.parent-create-dialog .category-form-actions button {
-  min-height: 42px;
-  padding: 0 16px;
-  justify-content: center;
-  border-radius: 8px;
-}
-
 .store-settings-panel {
   max-width: 760px;
   padding: 22px;
@@ -4072,23 +3978,6 @@ html[data-theme="dark"] .category-create-form select:focus {
   box-shadow: 0 0 0 3px #ff6b6322;
 }
 
-html[data-theme="dark"] .parent-create-dialog .category-create-form {
-  background: var(--admin-surface-soft);
-}
-
-html[data-theme="dark"] .parent-create-dialog .category-create-form > label > span {
-  color: var(--admin-text);
-}
-
-html[data-theme="dark"] .parent-create-dialog .category-form-visibility > label {
-  background: var(--admin-surface-raised);
-  border-color: var(--admin-border);
-}
-
-html[data-theme="dark"] .parent-create-dialog .category-form-actions {
-  border-color: var(--admin-border);
-}
-
 html[data-theme="dark"] .category-manager-item,
 html[data-theme="dark"] .category-manager-item.parent,
 html[data-theme="dark"] .category-manager-item.child {
@@ -5207,23 +5096,6 @@ html[data-theme="dark"] .auth-tabs button.active {
 
   .category-editor-dialog {
     max-height: calc(100vh - 20px);
-  }
-
-  .parent-create-dialog > header {
-    min-height: 76px;
-    padding: 14px;
-  }
-
-  .parent-create-dialog .category-create-form {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 13px;
-  }
-
-  .parent-create-dialog .category-name-field,
-  .parent-create-dialog .category-form-visibility,
-  .parent-create-dialog .category-form-actions {
-    grid-column: 1 / -1;
   }
 
   .category-create-form {
