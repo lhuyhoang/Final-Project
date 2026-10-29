@@ -943,17 +943,32 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
       <section className="category-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
         <header><div><span>{editingId ? 'CHỈNH SỬA DANH MỤC' : form.parentId === '' ? 'DANH MỤC CHA' : 'DANH MỤC CON'}</span><h2 id="category-editor-title">{editingId ? `Chỉnh sửa ${editingCategory?.name || 'danh mục'}` : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</h2><p>{form.parentId === '' ? 'Danh mục này sẽ đứng ở cấp cao nhất.' : `Danh mục trực thuộc ${selectedParent?.name || 'danh mục cha đã chọn'}.`}</p></div><button type="button" onClick={resetForm} aria-label="Đóng"><X size={20}/></button></header>
         <form className="category-create-form" onSubmit={submit}>
-          <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" placeholder={form.parentId === '' ? 'Ví dụ: Laptop' : 'Ví dụ: Laptop văn phòng'}/></label>
-          <label className="category-parent-field"><span>Danh mục cha</span><select name="parentId" value={form.parentId} onChange={update} disabled={editingHasChildren}><option value="">Không có — Danh mục cha</option>{rootCategories.filter(category => category.id !== editingId).map(category => <option key={category.id || category.name} value={category.id}>{category.name}</option>)}</select><small>{editingHasChildren ? 'Danh mục đang có danh mục con nên phải giữ ở cấp cha.' : 'Có thể đổi vị trí danh mục trước khi lưu.'}</small></label>
-          <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
-          <label><span>Thứ tự</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/></label>
-          <label className="category-color-field"><span>Màu nhận diện</span><input type="color" name="color" value={form.color} onChange={update}/></label>
-          <div className="category-form-visibility">
-            <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu điều hướng của cửa hàng.</small></span></label>
-            <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trong khu sản phẩm trang chủ.</small></span></label>
+          <div className="category-form-section">
+            <div className="category-form-section-heading"><span>1</span><div><b>Thông tin danh mục</b><small>Đặt tên và xác định vị trí trong cây danh mục.</small></div></div>
+            <div className="category-form-main-grid">
+              <label className="category-name-field"><span>Tên danh mục</span><input name="name" value={form.name} onChange={update} required minLength="2" maxLength="80" autoComplete="off" placeholder={form.parentId === '' ? 'Ví dụ: Laptop' : 'Ví dụ: Laptop văn phòng'}/><small>Tên ngắn gọn, dễ nhận biết và không trùng danh mục khác.</small></label>
+              {editingId !== null ? <label className="category-parent-field"><span>Vị trí trong cây</span><select name="parentId" value={form.parentId} onChange={update} disabled={editingHasChildren}><option value="">Không có — Danh mục cha</option>{rootCategories.filter(category => category.id !== editingId).map(category => <option key={category.id || category.name} value={category.id}>{category.name}</option>)}</select><small>{editingHasChildren ? 'Danh mục đang có danh mục con nên phải giữ ở cấp cha.' : 'Có thể chuyển danh mục sang một nhóm cha khác.'}</small></label> : <div className={`category-parent-summary${form.parentId === '' ? ' root' : ''}`}><span className="category-parent-summary-icon">{form.parentId === '' ? <Boxes size={19}/> : <ChevronRight size={19}/>}</span><span><small>{form.parentId === '' ? 'CẤP DANH MỤC' : 'TRỰC THUỘC DANH MỤC CHA'}</small><b>{form.parentId === '' ? 'Danh mục cha' : selectedParent?.name || 'Danh mục cha đã chọn'}</b><em>{form.parentId === '' ? 'Hiển thị ở cấp cao nhất trong cây.' : 'Danh mục con sẽ được gắn đúng vào nhóm này.'}</em></span></div>}
+            </div>
+          </div>
+
+          <div className="category-form-section">
+            <div className="category-form-section-heading"><span>2</span><div><b>Nhận diện và sắp xếp</b><small>Thiết lập biểu tượng, màu sắc và vị trí hiển thị.</small></div></div>
+            <div className="category-form-style-grid">
+              <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
+              <label><span>Thứ tự hiển thị</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/><small>Số nhỏ đứng trước.</small></label>
+              <label className="category-color-field"><span>Màu nhận diện</span><span className="category-color-control"><input type="color" name="color" value={form.color} onChange={update}/><b>{form.color.toUpperCase()}</b></span></label>
+            </div>
+          </div>
+
+          <div className="category-form-section category-form-display-section">
+            <div className="category-form-section-heading"><span>3</span><div><b>Hiển thị trên cửa hàng</b><small>Có thể thay đổi lại bất cứ lúc nào.</small></div></div>
+            <div className="category-form-visibility">
+              <label><input type="checkbox" name="isVisible" checked={form.isVisible} onChange={update}/><span><b>Hiển thị danh mục</b><small>Xuất hiện trong menu điều hướng của cửa hàng.</small></span></label>
+              <label><input type="checkbox" name="showInShowcase" checked={form.showInShowcase} onChange={update}/><span><b>Hiển thị ở Show sản phẩm</b><small>Tạo một dải sản phẩm riêng trong khu sản phẩm trang chủ.</small></span></label>
+            </div>
           </div>
           {error && <div className="admin-form-error" role="alert">{error}</div>}
-          <div className="category-form-actions"><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div>
+          <div className="category-form-actions"><span>Kiểm tra lại thông tin trước khi lưu.</span><div><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div></div>
         </form>
       </section>
     </div>}
