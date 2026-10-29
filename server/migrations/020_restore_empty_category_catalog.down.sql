@@ -1,0 +1,1 @@
+-- Data repair migration. Intentionally does not delete categories on rollback.

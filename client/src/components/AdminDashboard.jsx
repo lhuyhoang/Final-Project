@@ -1042,7 +1042,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState(defaultCategories)
+  const [categories, setCategories] = useState([])
   const [showrooms, setShowrooms] = useState([])
   const [orders, setOrders] = useState([])
   const [onlinePayments, setOnlinePayments] = useState([])
@@ -1086,7 +1086,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
       setStats(statsData)
       setProducts(productData)
-      setCategories(categoryData.length ? categoryData : defaultCategories)
+      setCategories(categoryData)
       setShowrooms(showroomData)
       setOrders(orderData)
       setOnlinePayments(paymentData)
