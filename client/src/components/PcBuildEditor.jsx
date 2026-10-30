@@ -45,7 +45,7 @@ function BuildDialog({ titleId, className = '', onClose, suspended = false, chil
   </div>, document.body)
 }
 
-function BuildComponentPicker({ row, products, categories, onSelect, onClose }) {
+export function BuildComponentPicker({ row, products, categories, onSelect, onClose }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('newest')
   const [brands, setBrands] = useState([])

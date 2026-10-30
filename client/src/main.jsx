@@ -70,6 +70,8 @@ import AuthModal from "./components/AuthModal";
 import CheckoutPage from "./components/CheckoutPage";
 import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
+import PcBuilderPage from "./components/PcBuilderPage";
+import { mergePcBuildCart } from "./pc-builder.mjs";
 import "./styles.css";
 import "./admin.css";
 
@@ -960,6 +962,7 @@ function App() {
     window.location.pathname.startsWith("/admin"),
   );
   const [productId, setProductId] = useState(productIdFromPath);
+  const [builderView, setBuilderView] = useState(() => /^\/build-pc\/?$/.test(window.location.pathname));
   const [catalogSelection, setCatalogSelection] = useState(
     () => catalogSelectionFromLocation(window.location.pathname, window.location.search, defaultCategories),
   );
@@ -1148,6 +1151,7 @@ function App() {
       setAdminView(isAdminRoute);
       setAccountView(isAccountRoute);
       setCheckoutView(isCheckoutRoute);
+      setBuilderView(/^\/build-pc\/?$/.test(window.location.pathname));
       setProductId(productIdFromPath());
       setCatalogSelection(catalogSelectionFromLocation(window.location.pathname, window.location.search, categories));
       if (sessionReady && (isAdminRoute || isAccountRoute || isCheckoutRoute) && !session) openAuth("login");
@@ -1277,6 +1281,29 @@ function App() {
     );
   }
 
+  function addPcBuildToCart(rows) {
+    const nextCart = mergePcBuildCart(cart, rows);
+    setCart(nextCart);
+    setCartOpen(true);
+    setToast(`Đã thêm cấu hình gồm ${rows.reduce((sum, row) => sum + Number(row.quantity), 0)} linh kiện vào giỏ`);
+    setTimeout(() => setToast(""), 2600);
+  }
+
+  function openPcBuilder() {
+    window.history.pushState({}, "", "/build-pc");
+    setBuilderView(true);
+    setProductId(null);
+    setCatalogSelection(null);
+    setAdminView(false);
+    setAccountView(false);
+    setCheckoutView(false);
+    setAccountOpen(false);
+    setSearchOpen(false);
+    setMenuOpen(false);
+    setCategoryMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function openAuth(mode = "login") {
     setAuthMode(mode);
     setAuthOpen(true);
@@ -1293,6 +1320,7 @@ function App() {
   }
 
   function openAdmin() {
+    setBuilderView(false);
     if (!window.location.pathname.startsWith("/admin"))
       window.history.pushState({}, "", "/admin");
     setAdminView(true);
@@ -1304,6 +1332,7 @@ function App() {
   }
 
   function leaveAdmin() {
+    setBuilderView(false);
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     refreshSettings();
     setAdminView(false);
@@ -1318,6 +1347,7 @@ function App() {
       openAuth("login");
       return;
     }
+    setBuilderView(false);
     if (!window.location.pathname.startsWith("/account")) {
       window.history.pushState({}, "", "/account");
     }
@@ -1331,6 +1361,7 @@ function App() {
   }
 
   function openOrderTracking() {
+    setBuilderView(false);
     if (window.location.pathname !== "/account/orders") {
       window.history.pushState({}, "", "/account/orders");
     }
@@ -1346,6 +1377,7 @@ function App() {
   }
 
   function leaveAccountSettings() {
+    setBuilderView(false);
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setAccountView(false);
     setCheckoutView(false);
@@ -1354,6 +1386,7 @@ function App() {
   }
 
   function openProduct(product) {
+    setBuilderView(false);
     window.history.pushState({}, "", productPath(product));
     setProductId(product.id);
     setCatalogSelection(null);
@@ -1366,6 +1399,7 @@ function App() {
   }
 
   function openStorefront(event) {
+    setBuilderView(false);
     event?.preventDefault();
     if (window.location.pathname !== "/" || window.location.hash) {
       window.history.pushState({}, "", "/");
@@ -1380,6 +1414,7 @@ function App() {
   }
 
   function openStorefrontSection(event, selector, category) {
+    setBuilderView(false);
     event.preventDefault();
     if (category) setActiveCategory(category);
     window.history.pushState({}, "", `/${selector}`);
@@ -1429,6 +1464,7 @@ function App() {
   }
 
   function openCatalog(category, option = "", brand = "") {
+    setBuilderView(false);
     window.history.pushState({}, "", catalogPath(category, option, brand));
     setCatalogSelection({ category, option, brand });
     setQuery("");
@@ -1460,6 +1496,7 @@ function App() {
       return;
     }
     if (!cart.length) return;
+    setBuilderView(false);
     window.history.pushState({}, "", "/checkout");
     setCheckoutView(true);
     setAdminView(false);
@@ -1471,6 +1508,7 @@ function App() {
   }
 
   function leaveCheckout() {
+    setBuilderView(false);
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     setCheckoutView(false);
     setCartOpen(true);
@@ -1979,7 +2017,9 @@ function App() {
       </header>
 
       <main>
-        {productId ? (
+        {builderView ? (
+          <PcBuilderPage products={products} categories={categories} loading={!productsLoaded} onBack={openStorefront} onAddBuild={addPcBuildToCart} />
+        ) : productId ? (
           <ProductDetail
             product={productsLoaded ? selectedProduct : null}
             products={products}
@@ -2149,10 +2189,10 @@ function App() {
             <span>PC BUILDER THÔNG MINH</span>
             <h2>Tự build cấu hình trong 5 phút</h2>
             <p>
-              Kiểm tra tương thích tự động, dự toán hiệu năng và tối ưu cấu hình
+              Chọn linh kiện từ kho hàng, xem tổng chi phí và lưu cấu hình
               theo ngân sách của bạn.
             </p>
-            <button>
+            <button type="button" onClick={openPcBuilder}>
               Bắt đầu build PC <ArrowRight size={18} />
             </button>
           </div>
