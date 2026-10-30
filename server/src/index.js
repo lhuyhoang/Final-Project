@@ -54,6 +54,7 @@ import {
   updateUser as saveUser
 } from './db.js'
 import { hashPassword, verifyPassword } from './password.js'
+import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -513,6 +514,12 @@ function normalizeProduct(body = {}, current = {}) {
     if (value.length > max) throw httpError(400, `${key} không được vượt quá ${max} ký tự`)
     return value
   }
+  let pcComponents
+  try {
+    pcComponents = normalizePcComponents(body.pcComponents ?? current.pcComponents ?? [])
+  } catch (error) {
+    throw httpError(400, error.message)
+  }
   const rawSpecifications = body.specifications ?? current.specifications ?? []
   if (!Array.isArray(rawSpecifications) || rawSpecifications.length > 30) {
     throw httpError(400, 'Thông số kỹ thuật phải là danh sách tối đa 30 dòng')
@@ -635,10 +642,30 @@ function normalizeProduct(body = {}, current = {}) {
     policyText: text('policyText', 120, DEFAULT_PRODUCT_POLICY_TEXT),
     description: optionalText('description', 2000),
     specifications,
+    pcComponents,
     upgradeOptions,
     promotions,
     gallery,
     image
+  }
+}
+
+async function resolvePcBuildProduct(product, currentProductId = null, catalog = null) {
+  if (!product.pcComponents.length) return product
+  const { products, categories } = catalog || {
+    products: await listProducts(),
+    categories: await listCategories(),
+  }
+  try {
+    const totals = validatePcBuild(product.pcComponents, products, categories, product.category, currentProductId)
+    return {
+      ...product,
+      price: totals.price,
+      oldPrice: totals.oldPrice,
+      discount: totals.oldPrice > totals.price ? Math.round((1 - totals.price / totals.oldPrice) * 100) : 0,
+    }
+  } catch (error) {
+    throw httpError(400, error.message)
   }
 }
 
@@ -1270,7 +1297,11 @@ app.post('/api/admin/products/bulk', asyncHandler(async (req, res) => {
     throw httpError(400, 'Mỗi lần chỉ được nhập tối đa 100 sản phẩm')
   }
 
-  const products = inputProducts.map(product => normalizeProduct(product))
+  const normalizedProducts = inputProducts.map(product => normalizeProduct(product))
+  const catalog = normalizedProducts.some(product => product.pcComponents.length)
+    ? { products: await listProducts(), categories: await listCategories() }
+    : null
+  const products = await Promise.all(normalizedProducts.map(product => resolvePcBuildProduct(product, null, catalog)))
   const savedProducts = []
   for (const product of products) {
     savedProducts.push(await insertProduct(product))
@@ -1292,7 +1323,7 @@ app.delete('/api/admin/products', asyncHandler(async (req, res) => {
 }))
 
 app.post('/api/admin/products', asyncHandler(async (req, res) => {
-  const product = normalizeProduct(req.body)
+  const product = await resolvePcBuildProduct(normalizeProduct(req.body))
   res.status(201).json(await insertProduct(product))
 }))
 
@@ -1300,7 +1331,7 @@ app.put('/api/admin/products/:id', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const existing = await findProductById(id)
   if (!existing) throw httpError(404, 'Không tìm thấy sản phẩm')
-  const updated = await saveProduct(id, normalizeProduct(req.body, existing))
+  const updated = await saveProduct(id, await resolvePcBuildProduct(normalizeProduct(req.body, existing), id))
   res.json(updated)
 }))
 

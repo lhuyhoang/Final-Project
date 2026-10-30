@@ -225,6 +225,7 @@ export function mapProductRow(row) {
     policyText: row.policy_text,
     description: row.description || '',
     specifications: Array.isArray(row.specifications) ? row.specifications : [],
+    pcComponents: Array.isArray(row.pc_components) ? row.pc_components : [],
     upgradeOptions: Array.isArray(row.upgrade_options) ? row.upgrade_options : [],
     promotions: Array.isArray(row.promotions) ? row.promotions : [],
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
@@ -662,9 +663,9 @@ export async function createProduct(input) {
     INSERT INTO products (
       name, category, brand, price, old_price, stock, rating, reviews,
       discount, badge, policy_text, description, specifications,
-      upgrade_options, promotions, gallery, image, created_at, updated_at
+      upgrade_options, promotions, gallery, image, created_at, updated_at, pc_components
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
     RETURNING *
   `, [
     input.name,
@@ -685,7 +686,8 @@ export async function createProduct(input) {
     JSON.stringify(input.gallery || []),
     input.image,
     createdAt,
-    input.updatedAt || createdAt
+    input.updatedAt || createdAt,
+    JSON.stringify(input.pcComponents || [])
   ])
   return mapProductRow(result.rows[0])
 }
@@ -705,6 +707,7 @@ export async function updateProduct(id, updates = {}) {
     policyText: 'policy_text',
     description: 'description',
     specifications: 'specifications',
+    pcComponents: 'pc_components',
     upgradeOptions: 'upgrade_options',
     promotions: 'promotions',
     gallery: 'gallery',
@@ -717,7 +720,7 @@ export async function updateProduct(id, updates = {}) {
 
   for (const [field, column] of Object.entries(columnMap)) {
     if (updates[field] === undefined) continue
-    values.push(['specifications', 'upgradeOptions', 'promotions', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
+    values.push(['specifications', 'pcComponents', 'upgradeOptions', 'promotions', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
     assignments.push(`${column} = $${values.length}`)
   }
 

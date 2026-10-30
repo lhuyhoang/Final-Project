@@ -3,6 +3,8 @@ import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, Clipbo
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
+import PcBuildEditor from './PcBuildEditor'
+import { isPcBuildCategory } from '../../../shared/pcBuild.mjs'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -350,7 +352,7 @@ function UpgradeProductPicker({ group, products, categories, selectedIds, onSele
   </div>
 }
 
-function ProductEditor({ product, products = [], categories = defaultCategories, onClose, onSaved }) {
+function ProductEditor({ product, products = [], categories = defaultCategories, initialCategory, onClose, onSaved }) {
   const [form, setForm] = useState(product ? {
     name: product.name,
     brand: product.brand,
@@ -364,6 +366,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
     badge: product.badge,
     policyText: product.policyText || defaultPolicyText,
     description: product.description || '',
+    pcComponents: Array.isArray(product.pcComponents) ? product.pcComponents : [],
     specifications: Array.isArray(product.specifications)
       ? product.specifications.map(item => ({
           description: item.description || '',
@@ -379,15 +382,14 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
         }))
       : [],
     promotions: Array.isArray(product.promotions) ? [...product.promotions] : [...defaultPromotions]
-  } : emptyProduct)
+  } : { ...emptyProduct, category: initialCategory || (categories.some(category => category.name === emptyProduct.category) ? emptyProduct.category : categories[0]?.name || ''), pcComponents: [] })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [upgradePickerGroupIndex, setUpgradePickerGroupIndex] = useState(null)
+  const [pcBuildOpen, setPcBuildOpen] = useState(false)
 
-  const selectedProductCategory = categories.find(category => category.name === form.category)
-  const selectedProductRoot = getAdminCategoryRoot(selectedProductCategory, categories)
-  const usesComponentUpgrades = normalizeAdminCategoryName(selectedProductRoot?.name) === 'pc'
+  const usesComponentUpgrades = isPcBuildCategory(form.category, categories)
   const componentRoot = categories.find(category => {
     const name = normalizeAdminCategoryName(category.name)
     return (name === 'linh kien' || name === 'linh kien dien tu') && (category.parentId === null || category.parentId === undefined)
@@ -397,7 +399,20 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
     : categories.filter(category => category.parentId !== null && category.parentId !== undefined).sort(compareAdminCategories)
 
   function update(event) {
-    setForm(current => ({ ...current, [event.target.name]: event.target.value }))
+    const { name, value } = event.target
+    setForm(current => ({ ...current, [name]: value, ...(name === 'category' && !isPcBuildCategory(value, categories) ? { pcComponents: [] } : {}) }))
+  }
+
+  function applyPcBuild(pcComponents, totals) {
+    setForm(current => ({
+      ...current,
+      pcComponents,
+      price: totals.price,
+      oldPrice: totals.oldPrice,
+      specifications: totals.specifications,
+    }))
+    setError('')
+    setPcBuildOpen(false)
   }
 
   function addSpecification() {
@@ -634,8 +649,14 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
             <label className="full"><span>Tên sản phẩm</span><input name="name" value={form.name} onChange={update} required maxLength="160"/></label>
             <label><span>Thương hiệu</span><input name="brand" value={form.brand} onChange={update} required maxLength="50"/></label>
             <label><span>Danh mục</span><select name="category" value={form.category} onChange={update}>{orderAdminCategoryTree(categories).map(item => <option key={item.id || item.name} value={item.name}>{item.parentId !== null && item.parentId !== undefined ? `↳ ${item.name}` : item.name}</option>)}{form.category && !categories.some(item => item.name === form.category) && <option value={form.category}>{form.category}</option>}</select></label>
-            <label><span>Giá bán</span><input type="number" name="price" value={form.price} onChange={update} min="1" required/></label>
-            <label><span>Giá niêm yết</span><input type="number" name="oldPrice" value={form.oldPrice} onChange={update} min="1" required/></label>
+            {usesComponentUpgrades && <section className="pc-build-launcher full">
+              <span className="product-content-icon upgrade"><Settings size={20}/></span>
+              <div><b>Xây dựng cấu hình PC</b><small>{form.pcComponents.length ? `${form.pcComponents.length} nhóm linh kiện · Tự tính giá từ cấu hình đã chọn` : 'Chọn CPU, Mainboard, RAM… từ kho để tự tính giá và điền thông số.'}</small></div>
+              <button type="button" className="admin-primary" onClick={() => setPcBuildOpen(true)}><Plus size={16}/>{form.pcComponents.length ? 'Sửa cấu hình' : 'Build cấu hình'}</button>
+              {form.pcComponents.length > 0 && <button type="button" className="pc-build-detach" onClick={() => setForm(current => ({ ...current, pcComponents: [] }))}>Bỏ liên kết cấu hình để nhập giá thủ công</button>}
+            </section>}
+            <label><span>Giá bán{form.pcComponents.length > 0 ? ' · Tự tính từ cấu hình' : ''}</span><input type="number" name="price" value={form.price} onChange={update} min="1" readOnly={form.pcComponents.length > 0} required/></label>
+            <label><span>Giá niêm yết{form.pcComponents.length > 0 ? ' · Tự tính từ cấu hình' : ''}</span><input type="number" name="oldPrice" value={form.oldPrice} onChange={update} min="1" readOnly={form.pcComponents.length > 0} required/></label>
             <label><span>Tồn kho</span><input type="number" name="stock" value={form.stock} onChange={update} min="0" required/></label>
             <label><span>Nhãn nổi bật</span><input name="badge" value={form.badge} onChange={update} maxLength="40"/></label>
             <label className="full"><span>Thông tin trả góp / bảo hành</span><input name="policyText" value={form.policyText} onChange={update} maxLength="120" required/></label>
@@ -732,6 +753,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
       </form>
     </section>
     {upgradePickerGroupIndex !== null && form.upgradeOptions[upgradePickerGroupIndex] && <UpgradeProductPicker group={form.upgradeOptions[upgradePickerGroupIndex]} products={products.filter(item => item.id !== product?.id)} categories={categories} selectedIds={new Set(form.upgradeOptions[upgradePickerGroupIndex].options.map(option => Number(option.productId)).filter(Boolean))} onSelect={item => addUpgradeProduct(upgradePickerGroupIndex, item)} onClose={() => setUpgradePickerGroupIndex(null)}/>}
+    {pcBuildOpen && <PcBuildEditor components={form.pcComponents} categories={categories} products={products.filter(item => item.id !== product?.id)} pcCategory={form.category} onApply={applyPcBuild} onClose={() => setPcBuildOpen(false)}/>}
   </div>
 }
 
@@ -1865,7 +1887,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </section>}
       </div>}
     </main>
-    {editorOpen && <ProductEditor product={editor} products={products} categories={categories} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
+    {editorOpen && <ProductEditor product={editor} products={products} categories={categories} initialCategory={activeProductFolder?.subcategories[0]?.name || categories.find(category => category.id === activeProductFolder?.categoryId)?.name} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
     {bulkImporterOpen && <BulkProductImporter categories={categories} onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {confirmation && <div className="admin-confirm-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !confirming && setConfirmation(null)}>
