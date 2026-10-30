@@ -4,7 +4,7 @@ import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
-import { isPcBuildCategory } from '../../../shared/pcBuild.mjs'
+import { getBuildCategoryScope, isPcBuildCategory, normalizeBuildText } from '../../../shared/pcBuild.mjs'
 import { buildProductFolders, getProductFolderPath } from '../product-folders'
 import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/productImage.mjs'
 
@@ -330,29 +330,13 @@ function ProductFolderCards({ folders, onOpen }) {
   </div>
 }
 
-function getAdminCategoryDescendantNames(categoryId, categories) {
-  const names = new Set()
-  let parentIds = new Set([categoryId])
-  while (parentIds.size) {
-    const children = categories.filter(category => parentIds.has(category.parentId))
-    parentIds = new Set()
-    children.forEach(category => {
-      names.add(category.name)
-      parentIds.add(category.id)
-    })
-  }
-  const category = categories.find(item => item.id === categoryId)
-  if (category) names.add(category.name)
-  return names
-}
-
 function UpgradeProductPicker({ group, products, categories, selectedIds, onSelect, onClose }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('newest')
-  const categoryNames = getAdminCategoryDescendantNames(group.categoryId, categories)
+  const categoryNames = getBuildCategoryScope(group.categoryId, categories)
   const normalizedQuery = query.trim().toLocaleLowerCase('vi')
   const visibleProducts = products
-    .filter(item => categoryNames.has(item.category) && item.stock !== 0 && !selectedIds.has(item.id))
+    .filter(item => categoryNames.has(normalizeBuildText(item.category)) && Number(item.stock) > 0 && !selectedIds.has(Number(item.id)))
     .filter(item => !normalizedQuery || `${item.name} ${item.brand} ${item.category}`.toLocaleLowerCase('vi').includes(normalizedQuery))
     .sort((left, right) => {
       if (sort === 'price-asc') return left.price - right.price

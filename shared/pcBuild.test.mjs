@@ -47,6 +47,22 @@ test('accepts descendants of PC and monitor categories', () => {
   const monitor = { slotId: 'monitor', categoryId: 7, productId: 12, quantity: 1, warranty: '' }
   assert.equal(validatePcBuild([monitor], products, categories, 'PC Gaming').price, 2000000)
 })
+
+test('resolves dropdown string IDs and saved numeric IDs to the same category and descendants', () => {
+  const categoryList = [
+    { id: 1, name: 'Linh kiện điện tử', parentId: null },
+    { id: 2, name: 'Ổ Cứng (SSD, HDD)', parentId: 1 },
+    { id: 3, name: 'SSD', parentId: 2 },
+    { id: 4, name: 'NVMe', parentId: '3' },
+    { id: '5', name: 'HDD', parentId: '2' },
+    { id: 6, name: 'RAM', parentId: 1 },
+  ]
+  const expected = new Set(['o cung ssd hdd', 'ssd', 'nvme', 'hdd'])
+  assert.deepEqual(getBuildCategoryScope('2', categoryList), expected)
+  assert.deepEqual(getBuildCategoryScope(2, categoryList), expected)
+  assert.deepEqual(getBuildCategoryScope('', categoryList), new Set())
+  assert.deepEqual(getBuildCategoryScope('missing', categoryList), new Set())
+})
 test('rejects mismatched categories, missing inventory, non-PC products and self references', () => {
   assert.throws(() => validatePcBuild([{ ...components[0], categoryId: 5 }], products, categories, 'PC Gaming'), /không thuộc/)
   assert.throws(() => validatePcBuild([{ ...components[0], productId: 999 }], products, categories, 'PC Gaming'), /không còn/)
