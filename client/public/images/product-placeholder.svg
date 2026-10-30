@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <rect width="600" height="600" fill="#f5f6f8"/>
+  <circle cx="300" cy="256" r="104" fill="#e9edf2"/>
+  <g fill="none" stroke="#8793a4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m300 189 60 34v69l-60 35-60-35v-69z"/>
+    <path d="m240 223 60 35 60-35m-60 35v69m-31-120 61 35"/>
+  </g>
+  <text x="300" y="417" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#64748b">Ảnh đang cập nhật</text>
+</svg>

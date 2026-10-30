@@ -55,6 +55,7 @@ import {
 } from './db.js'
 import { hashPassword, verifyPassword } from './password.js'
 import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs'
+import { normalizeProductImage } from '../../shared/productImage.mjs'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -603,12 +604,11 @@ function normalizeProduct(body = {}, current = {}) {
   const reviews = Number(body.reviews ?? current.reviews ?? 0)
   if (!Number.isFinite(rating) || rating < 0 || rating > 5) throw httpError(400, 'rating phải nằm trong khoảng 0 đến 5')
   if (!Number.isInteger(reviews) || reviews < 0) throw httpError(400, 'reviews không hợp lệ')
-  const image = text('image', 500)
+  let image
   try {
-    const url = new URL(image)
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
-  } catch {
-    throw httpError(400, 'URL hình ảnh không hợp lệ')
+    image = normalizeProductImage(body.image ?? current.image ?? '')
+  } catch (error) {
+    throw httpError(400, error.message)
   }
 
   const rawGallery = body.gallery ?? current.gallery ?? []

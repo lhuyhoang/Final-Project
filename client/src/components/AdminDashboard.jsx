@@ -6,6 +6,7 @@ import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
 import { isPcBuildCategory } from '../../../shared/pcBuild.mjs'
 import { buildProductFolders, getProductFolderPath } from '../product-folders'
+import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/productImage.mjs'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -210,7 +211,7 @@ function parseImportedRows(sheetRows) {
     const key = Object.entries(importHeaderAliases).find(([, aliases]) => aliases.includes(normalized))?.[0]
     if (key && !headerIndexes.has(key)) headerIndexes.set(key, index)
   })
-  const required = ['name', 'brand', 'category', 'price', 'stock', 'image']
+  const required = ['name', 'brand', 'category', 'price', 'stock']
   const missing = required.filter(key => !headerIndexes.has(key))
   if (missing.length) throw new Error(`Thiếu cột bắt buộc: ${missing.join(', ')}`)
 
@@ -247,10 +248,9 @@ function parseImportedRows(sheetRows) {
     if (!Number.isInteger(stock) || stock < 0) errors.push('Tồn kho không hợp lệ')
     if (specifications.length > 30) errors.push('Tối đa 30 dòng thông số kỹ thuật')
     try {
-      const url = new URL(image)
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
-    } catch {
-      errors.push('URL hình ảnh không hợp lệ')
+      normalizeProductImage(image)
+    } catch (error) {
+      errors.push(error.message)
     }
     gallery.forEach((url, galleryIndex) => {
       try {
@@ -377,7 +377,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
     price: product.price,
     oldPrice: product.oldPrice,
     stock: product.stock,
-    image: product.image,
+    image: product.image === DEFAULT_PRODUCT_IMAGE ? '' : product.image || '',
     gallery: Array.isArray(product.gallery) ? product.gallery : [],
     galleryText: Array.isArray(product.gallery) ? product.gallery.join('\n') : '',
     badge: product.badge,
@@ -592,8 +592,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
     const requiredFields = [
       ['Tên sản phẩm', form.name],
       ['Thương hiệu', form.brand],
-      ['Danh mục', form.category],
-      ['URL hình ảnh chính', form.image]
+      ['Danh mục', form.category]
     ]
     const missingField = requiredFields.find(([, value]) => !String(value || '').trim())
     if (missingField) {
@@ -608,7 +607,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
       setError('Giá niêm yết không được thấp hơn giá bán.')
       return
     }
-    if (!/^https?:\/\//i.test(String(form.image).trim())) {
+    if (String(form.image).trim() && !/^https?:\/\//i.test(String(form.image).trim())) {
       setError('URL hình ảnh chính phải bắt đầu bằng http:// hoặc https://.')
       return
     }
@@ -739,7 +738,7 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
                 </div>)}
               </div> : <div className="product-spec-empty">Chưa có cấu hình chi tiết. Trang sản phẩm sẽ tạm hiển thị thông tin cơ bản.</div>}
             </div>
-            <label className="full"><span>URL hình ảnh chính</span><input type="url" name="image" value={form.image} onChange={update} placeholder="https://..." required/></label>
+            <label className="full"><span>URL hình ảnh chính (không bắt buộc)</span><input type="url" name="image" value={form.image} onChange={update} placeholder="Để trống để bổ sung ảnh sau"/></label>
             <div className="product-image-upload full">
               <span>Tải nhiều ảnh góc sản phẩm từ máy</span>
               <label className={uploading ? 'uploading' : ''}>
@@ -827,7 +826,7 @@ function BulkProductImporter({ categories = defaultCategories, onClose, onSaved 
   function downloadTemplate() {
     const sample = [
       bulkProductHeaders.join(','),
-      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', 'https://example.com/product.jpg', 'https://example.com/product-side.jpg|https://example.com/product-back.jpg', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'CPU Intel Core i5-14400F|RAM 16GB DDR5|SSD NVMe 1TB'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
+      ['Tên sản phẩm mẫu', 'QUADPRO', 'PC Gaming', '10000000', '12000000', '10', '', '', 'Mới', defaultPolicyText, 'Mô tả sản phẩm mẫu', 'CPU Intel Core i5-14400F|RAM 16GB DDR5|SSD NVMe 1TB'].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
     ].join('\r\n')
     const blob = new Blob([`\ufeff${sample}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -896,7 +895,7 @@ function BulkProductImporter({ categories = defaultCategories, onClose, onSaved 
             <span className="bulk-guide-icon"><Info size={16}/></span>
             <div>
               <strong>Chuẩn bị dữ liệu đúng định dạng</strong>
-              <p>Cột bắt buộc: <b>name, brand, category, price, stock, image</b>. Tên category phải trùng danh mục cha hoặc con; hệ thống sẽ tự xếp sản phẩm vào thư mục cha tương ứng.</p>
+              <p>Cột bắt buộc: <b>name, brand, category, price, stock</b>. Cột <b>image</b> và <b>gallery</b> không bắt buộc; có thể bỏ cột hoặc để trống rồi bổ sung ảnh sau trong Admin. Sản phẩm tự xếp vào đúng thư mục danh mục.</p>
             </div>
           </div>
           <button type="button" className="bulk-template-button" onClick={downloadTemplate}><Download size={15}/>Tải file mẫu CSV</button>

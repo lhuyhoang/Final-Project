@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
 
 const { Pool } = pg
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -229,7 +230,7 @@ export function mapProductRow(row) {
     upgradeOptions: Array.isArray(row.upgrade_options) ? row.upgrade_options : [],
     promotions: Array.isArray(row.promotions) ? row.promotions : [],
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    image: row.image
+    image: row.image || DEFAULT_PRODUCT_IMAGE
   }
 }
 
@@ -684,7 +685,7 @@ export async function createProduct(input) {
     JSON.stringify(input.upgradeOptions || []),
     JSON.stringify(input.promotions ?? DEFAULT_PRODUCT_PROMOTIONS),
     JSON.stringify(input.gallery || []),
-    input.image,
+    input.image || DEFAULT_PRODUCT_IMAGE,
     createdAt,
     input.updatedAt || createdAt,
     JSON.stringify(input.pcComponents || [])
