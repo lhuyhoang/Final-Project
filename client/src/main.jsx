@@ -13,6 +13,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Box,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -37,6 +38,7 @@ import {
   MonitorUp,
   Moon,
   Mouse,
+  Printer,
   RefreshCcw,
   Search,
   SearchX,
@@ -192,6 +194,8 @@ const matchesCategoryOption = (product, option = "") => {
 };
 const categoryIcons = {
   Armchair,
+  Box,
+  Camera,
   CircuitBoard,
   Cpu,
   HardDrive,
@@ -203,7 +207,21 @@ const categoryIcons = {
   Monitor,
   MonitorUp,
   Mouse,
+  Printer,
 };
+function CategoryIcon({ category, size = 18 }) {
+  const [customIconFailed, setCustomIconFailed] = useState(false);
+  const Icon = categoryIcons[category.icon] || Box;
+
+  useEffect(() => {
+    setCustomIconFailed(false);
+  }, [category.iconUrl]);
+
+  if (category.iconUrl && !customIconFailed) {
+    return <img className="category-custom-icon" src={category.iconUrl} alt="" onError={() => setCustomIconFailed(true)} />;
+  }
+  return <Icon size={size} />;
+}
 const compareCategories = (left, right) =>
   (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) ||
   left.name.localeCompare(right.name, "vi");
@@ -1840,7 +1858,6 @@ function App() {
               >
                 <aside className="category-menu" aria-label="Danh mục sản phẩm">
                   {navigationCategories.slice(0, 9).map((category) => {
-                    const Icon = categoryIcons[category.icon] || Box;
                     const active = category.name === menuCategory;
                     return (
                       <button
@@ -1853,7 +1870,7 @@ function App() {
                           openMenuSelection(event, category.name)
                         }
                       >
-                        <Icon size={18} />
+                        <CategoryIcon category={category} size={18} />
                         <span>{category.name}</span>
                         <ChevronRight size={15} />
                       </button>

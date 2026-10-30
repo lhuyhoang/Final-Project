@@ -552,6 +552,13 @@ html[data-theme="dark"] .showroom-list > a > svg:first-child {
   flex: 0 0 auto;
 }
 
+.category-dropdown .category-menu .category-custom-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .category-dropdown .category-menu button:hover,
 .category-dropdown .category-menu button.active {
   color: var(--red);

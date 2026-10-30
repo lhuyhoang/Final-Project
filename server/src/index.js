@@ -592,6 +592,10 @@ function normalizeCategory(body = {}, current = {}) {
   }
 
   const icon = String(body.icon ?? current.icon ?? 'Box').trim().slice(0, 40) || 'Box'
+  const iconUrl = String(body.iconUrl ?? current.iconUrl ?? '').trim().slice(0, 1000)
+  if (iconUrl && !/^https?:\/\//i.test(iconUrl)) {
+    throw httpError(400, 'URL biểu tượng danh mục phải bắt đầu bằng http:// hoặc https://')
+  }
   const color = String(body.color ?? current.color ?? '#edf0ff').trim().slice(0, 20) || '#edf0ff'
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw httpError(400, 'Màu danh mục không hợp lệ')
 
@@ -616,6 +620,7 @@ function normalizeCategory(body = {}, current = {}) {
   return {
     name,
     icon,
+    iconUrl,
     color,
     parentId,
     isVisible: booleanValue('isVisible', true),

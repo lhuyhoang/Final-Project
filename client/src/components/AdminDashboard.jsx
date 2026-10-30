@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -710,8 +710,10 @@ function ShowroomEditor({ showroom, onClose, onSaved }) {
 }
 
 function CategoryManager({ categories, products, onCreated, onUpdated, onRequestDelete, onRequestBulkDelete }) {
-  const createEmptyForm = (parentId = '') => ({ name: '', parentId, icon: 'Box', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: parentId === '' })
+  const createEmptyForm = (parentId = '') => ({ name: '', parentId, icon: 'Box', iconUrl: '', color: '#edf0ff', sortOrder: 0, isVisible: true, showInShowcase: parentId === '' })
   const [form, setForm] = useState(() => createEmptyForm())
+  const [iconSource, setIconSource] = useState('preset')
+  const [uploadingIcon, setUploadingIcon] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [expandedParentIds, setExpandedParentIds] = useState(() => new Set())
@@ -761,6 +763,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
 
   function resetForm() {
     setForm(createEmptyForm())
+    setIconSource('preset')
     setEditingId(null)
     setEditorOpen(false)
     setError('')
@@ -773,6 +776,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
   function openCreateParent() {
     setEditingId(null)
     setForm(createEmptyForm())
+    setIconSource('preset')
     setError('')
     setEditorOpen(true)
     focusCategoryName()
@@ -781,6 +785,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
   function openCreateChild(parent) {
     setEditingId(null)
     setForm(createEmptyForm(parent.id))
+    setIconSource('preset')
     setExpandedParentIds(current => new Set(current).add(parent.id))
     setError('')
     setEditorOpen(true)
@@ -793,11 +798,13 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
       name: category.name,
       parentId: category.parentId ?? '',
       icon: category.icon || 'Box',
+      iconUrl: category.iconUrl || '',
       color: category.color || '#edf0ff',
       sortOrder: category.sortOrder || 0,
       isVisible: category.isVisible !== false,
       showInShowcase: category.showInShowcase !== false
     })
+    setIconSource(category.iconUrl ? 'custom' : 'preset')
     setError('')
     setEditorOpen(true)
     focusCategoryName()
@@ -842,13 +849,60 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
     </label>
   }
 
+  async function uploadCategoryIcon(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!acceptedImageTypes.includes(file.type)) {
+      setError('Biểu tượng chỉ hỗ trợ JPG, PNG, WebP hoặc AVIF.')
+      return
+    }
+    if (file.size > maxImageSize) {
+      setError('Ảnh biểu tượng không được vượt quá 10 MB.')
+      return
+    }
+
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    if (!cloudName || !uploadPreset) {
+      setError('Chưa cấu hình Cloudinary để tải biểu tượng tùy chỉnh.')
+      return
+    }
+
+    setUploadingIcon(true)
+    setError('')
+    try {
+      const uploadData = new FormData()
+      uploadData.append('file', file)
+      uploadData.append('upload_preset', uploadPreset)
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, {
+        method: 'POST',
+        body: uploadData
+      })
+      const result = await response.json()
+      if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'Không thể tải biểu tượng lên Cloudinary.')
+      setForm(current => ({ ...current, iconUrl: result.secure_url }))
+      setIconSource('custom')
+    } catch (uploadError) {
+      setError(uploadError.message)
+    } finally {
+      setUploadingIcon(false)
+    }
+  }
+
   async function submit(event) {
     event.preventDefault()
+    const iconUrl = iconSource === 'custom' ? form.iconUrl.trim() : ''
+    if (iconSource === 'custom' && !/^https?:\/\//i.test(iconUrl)) {
+      setError('Hãy tải ảnh hoặc nhập URL biểu tượng bắt đầu bằng http:// hoặc https://.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
       const payload = {
         ...form,
+        iconUrl,
         parentId: form.parentId === '' ? null : Number(form.parentId),
         sortOrder: Number(form.sortOrder)
       }
@@ -917,7 +971,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
           <div className="category-tree-parent-row">
             {renderSelection(parent)}
             <button type="button" className="category-tree-main" onClick={() => toggleParent(parent.id)} aria-expanded={expanded} aria-controls={`category-children-${parent.id}`} aria-label={`${expanded ? 'Thu gọn' : 'Mở'} danh mục ${parent.name}`}>
-              <ChevronRight size={18}/><span className="category-manager-swatch" style={{ background: parent.color }}/><span className="category-manager-name"><b>{parent.name}</b><small>Danh mục cha · Thứ tự {parent.sortOrder || 0}</small></span><span className="category-child-count">{children.length} danh mục con</span>
+              <ChevronRight size={18}/><span className="category-manager-swatch" style={{ background: parent.color }}>{parent.iconUrl && <img src={parent.iconUrl} alt=""/>}</span><span className="category-manager-name"><b>{parent.name}</b><small>Danh mục cha · Thứ tự {parent.sortOrder || 0}</small></span><span className="category-child-count">{children.length} danh mục con</span>
             </button>
             <div className="category-tree-parent-controls">
               <button type="button" className="category-add-child" onClick={() => openCreateChild(parent)}><Plus size={15}/> Thêm con</button>
@@ -929,7 +983,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
             {children.length ? children.map(child => <div className="category-manager-item child" key={child.id || child.name}>
               <i className="category-tree-connector" aria-hidden="true"/>
               {renderSelection(child)}
-              <span className="category-manager-swatch" style={{ background: child.color }}/>
+              <span className="category-manager-swatch" style={{ background: child.color }}>{child.iconUrl && <img src={child.iconUrl} alt=""/>}</span>
               <span className="category-manager-name"><b>{child.name}</b><small>Danh mục con của {parent.name} · Thứ tự {child.sortOrder || 0}</small></span>
               {renderCategoryToggles(child)}
               {renderCategoryActions(child)}
@@ -954,7 +1008,11 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
           <div className="category-form-section">
             <div className="category-form-section-heading"><span>2</span><div><b>Nhận diện và sắp xếp</b><small>Thiết lập biểu tượng, màu sắc và vị trí hiển thị.</small></div></div>
             <div className="category-form-style-grid">
-              <label><span>Biểu tượng</span><select name="icon" value={form.icon} onChange={update}><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select></label>
+              <div className="category-icon-field">
+                <div className="category-icon-field-heading"><span>Biểu tượng</span><small>Chọn mẫu có sẵn hoặc dùng ảnh riêng.</small></div>
+                <div className="category-icon-source-tabs" role="group" aria-label="Nguồn biểu tượng danh mục"><button type="button" className={iconSource === 'preset' ? 'active' : ''} onClick={() => setIconSource('preset')}><Boxes size={14}/> Có sẵn</button><button type="button" className={iconSource === 'custom' ? 'active' : ''} onClick={() => setIconSource('custom')}><ImageIcon size={14}/> Tùy chỉnh</button></div>
+                {iconSource === 'preset' ? <select name="icon" value={form.icon} onChange={update} aria-label="Biểu tượng có sẵn"><option value="Box">Hộp sản phẩm</option><option value="Monitor">Màn hình</option><option value="Laptop">Laptop</option><option value="Cpu">CPU</option><option value="Headphones">Tai nghe</option><option value="Keyboard">Bàn phím</option><option value="Mouse">Chuột</option><option value="Camera">Camera</option><option value="Printer">Máy in</option></select> : <div className="category-custom-icon-editor"><span className="category-custom-icon-preview" style={{ background: form.color }}>{form.iconUrl ? <img src={form.iconUrl} alt="Xem trước biểu tượng tùy chỉnh"/> : <ImageIcon size={22}/>}</span><div><input type="url" name="iconUrl" value={form.iconUrl} onChange={update} placeholder="https://..." aria-label="URL biểu tượng tùy chỉnh"/><div className="category-custom-icon-actions"><label className={uploadingIcon ? 'uploading' : ''}>{uploadingIcon ? <RefreshCw className="spin" size={14}/> : <Upload size={14}/>} {uploadingIcon ? 'Đang tải...' : 'Tải ảnh lên'}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={uploadCategoryIcon} disabled={uploadingIcon}/></label>{form.iconUrl && <button type="button" onClick={() => setForm(current => ({ ...current, iconUrl: '' }))}>Xóa ảnh</button>}</div></div></div>}
+              </div>
               <label><span>Thứ tự hiển thị</span><input type="number" name="sortOrder" value={form.sortOrder} onChange={update} min="0" max="10000" required/><small>Số nhỏ đứng trước.</small></label>
               <label className="category-color-field"><span>Màu nhận diện</span><span className="category-color-control"><input type="color" name="color" value={form.color} onChange={update}/><b>{form.color.toUpperCase()}</b></span></label>
             </div>
@@ -968,7 +1026,7 @@ function CategoryManager({ categories, products, onCreated, onUpdated, onRequest
             </div>
           </div>
           {error && <div className="admin-form-error" role="alert">{error}</div>}
-          <div className="category-form-actions"><span>Kiểm tra lại thông tin trước khi lưu.</span><div><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div></div>
+          <div className="category-form-actions"><span>Kiểm tra lại thông tin trước khi lưu.</span><div><button type="button" className="admin-secondary" onClick={resetForm}>Hủy</button><button className="admin-primary" disabled={saving || uploadingIcon}>{editingId ? <Save size={17}/> : <Plus size={17}/>} {saving ? 'Đang lưu...' : uploadingIcon ? 'Đang tải biểu tượng...' : editingId ? 'Lưu thay đổi' : form.parentId === '' ? 'Thêm danh mục cha' : 'Thêm danh mục con'}</button></div></div>
         </form>
       </section>
     </div>}

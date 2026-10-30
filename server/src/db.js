@@ -248,6 +248,7 @@ export function mapCategoryRow(row) {
     id: numberValue(row.id),
     name: row.name,
     icon: row.icon || 'Box',
+    iconUrl: row.icon_url || '',
     color: row.color || '#edf0ff',
     parentId: row.parent_id === null || row.parent_id === undefined ? null : numberValue(row.parent_id),
     isVisible: row.is_visible === undefined ? true : Boolean(row.is_visible),
@@ -488,6 +489,7 @@ export async function findCategoryById(id) {
 export async function createCategory({
   name,
   icon = 'Box',
+  iconUrl = '',
   color = '#edf0ff',
   parentId = null,
   isVisible = true,
@@ -496,17 +498,18 @@ export async function createCategory({
 }) {
   const result = await query(`
     INSERT INTO product_categories (
-      name, icon, color, parent_id, is_visible, show_in_showcase, sort_order
+      name, icon, icon_url, color, parent_id, is_visible, show_in_showcase, sort_order
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
-  `, [name, icon, color, parentId, isVisible, showInShowcase, sortOrder])
+  `, [name, icon, iconUrl || null, color, parentId, isVisible, showInShowcase, sortOrder])
   return mapCategoryRow(result.rows[0])
 }
 
 export async function updateCategory(id, {
   name,
   icon,
+  iconUrl,
   color,
   parentId,
   isVisible,
@@ -522,15 +525,16 @@ export async function updateCategory(id, {
       UPDATE product_categories
       SET name = $1,
           icon = $2,
-          color = $3,
-          parent_id = $4,
-          is_visible = $5,
-          show_in_showcase = $6,
-          sort_order = $7,
+          icon_url = $3,
+          color = $4,
+          parent_id = $5,
+          is_visible = $6,
+          show_in_showcase = $7,
+          sort_order = $8,
           updated_at = NOW()
-      WHERE id = $8
+      WHERE id = $9
       RETURNING *
-    `, [name, icon, color, parentId, isVisible, showInShowcase, sortOrder, id])
+    `, [name, icon, iconUrl || null, color, parentId, isVisible, showInShowcase, sortOrder, id])
 
     if (current.name !== name) {
       await client.query(
