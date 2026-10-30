@@ -42,8 +42,8 @@ const comboAccessorySlots = [
 function getComboCandidates(slot, products, currentProductId) {
   return products.filter((item) => {
     if (item.id === currentProductId || item.stock === 0) return false;
-    const category = normalizeRecommendationText(item.category);
-    return slot.keywords.some((keyword) => category.includes(keyword));
+    const searchableText = normalizeRecommendationText(`${item.category} ${item.name}`);
+    return slot.keywords.some((keyword) => searchableText.includes(keyword));
   });
 }
 
