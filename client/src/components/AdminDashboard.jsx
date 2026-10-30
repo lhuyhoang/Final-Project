@@ -68,7 +68,12 @@ const orderAdminCategoryTree = categoryList => {
   return [...roots.flatMap(root => [root, ...children(root)]), ...orphans]
 }
 
-const normalizeAdminCategoryName = value => String(value || '').trim().toLocaleLowerCase('vi')
+const normalizeAdminCategoryName = value => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd')
+  .trim()
+  .toLowerCase()
 
 function getAdminCategoryRoot(category, categoryList) {
   if (!category) return null
@@ -306,7 +311,46 @@ function StripeMoneyList({ amounts, empty = '0' }) {
   return <span className="stripe-money-list">{amounts.map(item => <span key={item.currency}>{formatStripeAmount(item)}</span>)}</span>
 }
 
-function ProductEditor({ product, categories = defaultCategories, onClose, onSaved }) {
+function getAdminCategoryDescendantNames(categoryId, categories) {
+  const names = new Set()
+  let parentIds = new Set([categoryId])
+  while (parentIds.size) {
+    const children = categories.filter(category => parentIds.has(category.parentId))
+    parentIds = new Set()
+    children.forEach(category => {
+      names.add(category.name)
+      parentIds.add(category.id)
+    })
+  }
+  const category = categories.find(item => item.id === categoryId)
+  if (category) names.add(category.name)
+  return names
+}
+
+function UpgradeProductPicker({ group, products, categories, selectedIds, onSelect, onClose }) {
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState('newest')
+  const categoryNames = getAdminCategoryDescendantNames(group.categoryId, categories)
+  const normalizedQuery = query.trim().toLocaleLowerCase('vi')
+  const visibleProducts = products
+    .filter(item => categoryNames.has(item.category) && item.stock !== 0 && !selectedIds.has(item.id))
+    .filter(item => !normalizedQuery || `${item.name} ${item.brand} ${item.category}`.toLocaleLowerCase('vi').includes(normalizedQuery))
+    .sort((left, right) => {
+      if (sort === 'price-asc') return left.price - right.price
+      if (sort === 'price-desc') return right.price - left.price
+      return Number(right.id) - Number(left.id)
+    })
+
+  return <div className="admin-modal-backdrop upgrade-product-picker-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+    <section className="upgrade-product-picker" role="dialog" aria-modal="true" aria-labelledby="upgrade-product-picker-title">
+      <header><div><span>LINH KIỆN NÂNG CẤP</span><h2 id="upgrade-product-picker-title">Chọn sản phẩm cho nhóm {group.name || 'mới'}</h2><p>Chỉ hiển thị sản phẩm thuộc danh mục linh kiện đã chọn.</p></div><button type="button" onClick={onClose} aria-label="Đóng"><X size={21}/></button></header>
+      <div className="upgrade-picker-toolbar"><label><Search size={18}/><input autoFocus type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm tên sản phẩm hoặc thương hiệu..."/></label><select value={sort} onChange={event => setSort(event.target.value)} aria-label="Sắp xếp sản phẩm"><option value="newest">Mới nhất</option><option value="price-asc">Giá tăng dần</option><option value="price-desc">Giá giảm dần</option></select></div>
+      <div className="upgrade-picker-grid">{visibleProducts.map(item => <article className="upgrade-picker-card" key={item.id}><div><img src={item.image} alt={item.name} loading="lazy"/></div><small>{item.brand} · {item.category}</small><h3>{item.name}</h3><span>{item.oldPrice > item.price && <del>{formatPrice(item.oldPrice)}</del>}<strong>{formatPrice(item.price)}</strong></span><button type="button" onClick={() => onSelect(item)}><Check size={15}/> Chọn sản phẩm</button></article>)}{!visibleProducts.length && <div className="upgrade-picker-empty"><Package size={30}/><b>Không có sản phẩm phù hợp</b><span>Hãy kiểm tra danh mục, tồn kho hoặc từ khóa tìm kiếm.</span></div>}</div>
+    </section>
+  </div>
+}
+
+function ProductEditor({ product, products = [], categories = defaultCategories, onClose, onSaved }) {
   const [form, setForm] = useState(product ? {
     name: product.name,
     brand: product.brand,
@@ -330,7 +374,8 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
     upgradeOptions: Array.isArray(product.upgradeOptions)
       ? product.upgradeOptions.map(group => ({
           name: group.name || '',
-          options: Array.isArray(group.options) ? [...group.options] : []
+          categoryId: group.categoryId ?? '',
+          options: Array.isArray(group.options) ? group.options.map(option => typeof option === 'string' ? { productId: null, name: option } : { productId: option.productId ?? null, name: option.name || '' }) : []
         }))
       : [],
     promotions: Array.isArray(product.promotions) ? [...product.promotions] : [...defaultPromotions]
@@ -338,6 +383,18 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [upgradePickerGroupIndex, setUpgradePickerGroupIndex] = useState(null)
+
+  const selectedProductCategory = categories.find(category => category.name === form.category)
+  const selectedProductRoot = getAdminCategoryRoot(selectedProductCategory, categories)
+  const usesComponentUpgrades = normalizeAdminCategoryName(selectedProductRoot?.name) === 'pc'
+  const componentRoot = categories.find(category => {
+    const name = normalizeAdminCategoryName(category.name)
+    return (name === 'linh kien' || name === 'linh kien dien tu') && (category.parentId === null || category.parentId === undefined)
+  })
+  const componentCategories = componentRoot
+    ? categories.filter(category => category.parentId === componentRoot.id).sort(compareAdminCategories)
+    : categories.filter(category => category.parentId !== null && category.parentId !== undefined).sort(compareAdminCategories)
 
   function update(event) {
     setForm(current => ({ ...current, [event.target.name]: event.target.value }))
@@ -369,7 +426,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
   function addUpgradeGroup() {
     setForm(current => ({
       ...current,
-      upgradeOptions: [...current.upgradeOptions, { name: '', options: [''] }]
+      upgradeOptions: [...current.upgradeOptions, { name: '', categoryId: componentCategories[0]?.id || '', options: [] }]
     }))
   }
 
@@ -389,24 +446,14 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
     }))
   }
 
-  function addUpgradeOption(groupIndex) {
+  function addUpgradeProduct(groupIndex, productOption) {
     setForm(current => ({
       ...current,
       upgradeOptions: current.upgradeOptions.map((group, index) => (
-        index === groupIndex ? { ...group, options: [...group.options, ''] } : group
+        index === groupIndex ? { ...group, options: [...group.options, { productId: productOption.id, name: productOption.name }] } : group
       ))
     }))
-  }
-
-  function updateUpgradeOption(groupIndex, optionIndex, value) {
-    setForm(current => ({
-      ...current,
-      upgradeOptions: current.upgradeOptions.map((group, index) => (
-        index === groupIndex
-          ? { ...group, options: group.options.map((option, currentIndex) => currentIndex === optionIndex ? value : option) }
-          : group
-      ))
-    }))
+    setUpgradePickerGroupIndex(null)
   }
 
   function removeUpgradeOption(groupIndex, optionIndex) {
@@ -534,7 +581,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
       return
     }
     const invalidUpgradeGroup = form.upgradeOptions.find(group => (
-      !group.name.trim() || !group.options.length || group.options.some(option => !option.trim())
+      !group.name.trim() || !group.options.length || group.options.some(option => !option.name?.trim()) || (usesComponentUpgrades && !Number(group.categoryId))
     ))
     if (invalidUpgradeGroup) {
       setError('Mỗi nhóm nâng cấp cần có tên và ít nhất một lựa chọn đầy đủ.')
@@ -561,7 +608,8 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
         })),
         upgradeOptions: form.upgradeOptions.map(group => ({
           name: group.name.trim(),
-          options: group.options.map(option => option.trim())
+          categoryId: group.categoryId ? Number(group.categoryId) : null,
+          options: group.options.map(option => ({ productId: option.productId || null, name: option.name.trim() }))
         })),
         promotions: form.promotions.map(promotion => promotion.trim())
       }
@@ -596,8 +644,8 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
               <section className="product-upgrade-editor" aria-labelledby="product-upgrade-editor-title">
                 <div className="product-content-heading">
                   <span className="product-content-icon upgrade"><Settings size={17}/></span>
-                  <div><b id="product-upgrade-editor-title">Nâng cấp sản phẩm</b><small>Tạo các nhóm CPU, RAM, SSD... để khách lựa chọn khi xem chi tiết.</small></div>
-                  <button type="button" onClick={addUpgradeGroup} disabled={form.upgradeOptions.length >= 8}><Plus size={15}/> Thêm nhóm</button>
+                  <div><b id="product-upgrade-editor-title">Nâng cấp sản phẩm</b><small>{usesComponentUpgrades ? 'Chọn sản phẩm linh kiện thật; lựa chọn đầu tiên là cấu hình gốc để tính phần chênh lệch.' : 'Tạo các nhóm nâng cấp cho sản phẩm.'}</small></div>
+                  <button type="button" onClick={addUpgradeGroup} disabled={form.upgradeOptions.length >= 8 || (usesComponentUpgrades && !componentCategories.length)}><Plus size={15}/> Thêm nhóm</button>
                 </div>
                 {form.upgradeOptions.length ? <div className="product-upgrade-groups">
                   {form.upgradeOptions.map((group, groupIndex) => <article className="product-upgrade-group" key={groupIndex}>
@@ -606,12 +654,17 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
                       <label><small>Tên nhóm nâng cấp</small><input value={group.name} onChange={event => updateUpgradeGroup(groupIndex, 'name', event.target.value)} maxLength="50" placeholder="Ví dụ: RAM" aria-label={`Tên nhóm nâng cấp ${groupIndex + 1}`}/></label>
                       <button type="button" className="remove" onClick={() => removeUpgradeGroup(groupIndex)} aria-label={`Xóa nhóm nâng cấp ${groupIndex + 1}`}><Trash2 size={15}/></button>
                     </div>
-                    <div className="product-upgrade-options">
-                      {group.options.map((option, optionIndex) => <div key={optionIndex}>
-                        <input value={option} onChange={event => updateUpgradeOption(groupIndex, optionIndex, event.target.value)} maxLength="120" placeholder={`Lựa chọn ${optionIndex + 1}`} aria-label={`Lựa chọn ${optionIndex + 1} của nhóm ${group.name || groupIndex + 1}`}/>
-                        <button type="button" onClick={() => removeUpgradeOption(groupIndex, optionIndex)} disabled={group.options.length <= 1} aria-label={`Xóa lựa chọn ${optionIndex + 1}`}><X size={14}/></button>
-                      </div>)}
-                      <button type="button" className="add-option" onClick={() => addUpgradeOption(groupIndex)} disabled={group.options.length >= 8}><Plus size={14}/> Thêm lựa chọn</button>
+                    {usesComponentUpgrades && <div className="product-upgrade-category"><label><small>Danh mục linh kiện</small><select value={group.categoryId} onChange={event => updateUpgradeGroup(groupIndex, 'categoryId', event.target.value)}><option value="">Chọn danh mục con</option>{componentCategories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><small>Sản phẩm đầu tiên được xem là linh kiện cấu hình gốc.</small></div>}
+                    <div className="product-upgrade-products">
+                      {group.options.map((option, optionIndex) => {
+                        const linkedProduct = products.find(item => item.id === Number(option.productId))
+                        return <article className="product-upgrade-product" key={`${option.productId || option.name}-${optionIndex}`}>
+                          {linkedProduct ? <img src={linkedProduct.image} alt=""/> : <span><Package size={18}/></span>}
+                          <div><small>{optionIndex === 0 ? 'CẤU HÌNH GỐC' : `LỰA CHỌN ${optionIndex + 1}`}</small><b>{linkedProduct?.name || option.name}</b>{linkedProduct && <em>{formatPrice(linkedProduct.price)}</em>}</div>
+                          <button type="button" onClick={() => removeUpgradeOption(groupIndex, optionIndex)} aria-label={`Xóa ${option.name}`}><X size={14}/></button>
+                        </article>
+                      })}
+                      <button type="button" className="add-upgrade-product" onClick={() => setUpgradePickerGroupIndex(groupIndex)} disabled={!Number(group.categoryId) || group.options.length >= 8}><Plus size={15}/><span><b>Chọn sản phẩm</b><small>Mở danh sách linh kiện thuộc danh mục</small></span></button>
                     </div>
                   </article>)}
                 </div> : <button type="button" className="product-content-empty" onClick={addUpgradeGroup}><Settings size={20}/><span><b>Chưa có tùy chọn nâng cấp</b><small>Bấm để tạo nhóm nâng cấp đầu tiên cho sản phẩm.</small></span></button>}
@@ -678,6 +731,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
         <footer><button type="button" className="secondary" onClick={onClose}>Hủy</button><button className="primary" disabled={saving || uploading}><Save size={17}/>{saving ? 'Đang lưu...' : uploading ? 'Đang tải ảnh...' : 'Lưu sản phẩm'}</button></footer>
       </form>
     </section>
+    {upgradePickerGroupIndex !== null && form.upgradeOptions[upgradePickerGroupIndex] && <UpgradeProductPicker group={form.upgradeOptions[upgradePickerGroupIndex]} products={products.filter(item => item.id !== product?.id)} categories={categories} selectedIds={new Set(form.upgradeOptions[upgradePickerGroupIndex].options.map(option => Number(option.productId)).filter(Boolean))} onSelect={item => addUpgradeProduct(upgradePickerGroupIndex, item)} onClose={() => setUpgradePickerGroupIndex(null)}/>}
   </div>
 }
 
@@ -1811,7 +1865,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
         </section>}
       </div>}
     </main>
-    {editorOpen && <ProductEditor product={editor} categories={categories} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
+    {editorOpen && <ProductEditor product={editor} products={products} categories={categories} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
     {bulkImporterOpen && <BulkProductImporter categories={categories} onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {confirmation && <div className="admin-confirm-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !confirming && setConfirmation(null)}>

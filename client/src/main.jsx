@@ -1233,10 +1233,11 @@ function App() {
 
   function addToCart(product, quantity = 1) {
     const amount = Math.max(1, Math.floor(quantity));
+    const itemKey = product.cartKey || String(product.id);
     setCart((current) =>
-      current.some((item) => item.id === product.id)
+      current.some((item) => (item.cartKey || String(item.id)) === itemKey)
         ? current.map((item) =>
-            item.id === product.id
+            (item.cartKey || String(item.id)) === itemKey
               ? { ...item, quantity: item.quantity + amount }
               : item,
           )
@@ -1258,7 +1259,8 @@ function App() {
     setCart((current) => {
       const next = [...current];
       productsToAdd.forEach((product) => {
-        const existingIndex = next.findIndex((item) => item.id === product.id);
+        const productKey = product.cartKey || String(product.id);
+        const existingIndex = next.findIndex((item) => (item.cartKey || String(item.id)) === productKey);
         if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
         else next.push({ ...product, quantity: 1 });
       });
@@ -1268,11 +1270,11 @@ function App() {
     setToast(`Đã thêm combo ${productsToAdd.length} sản phẩm vào giỏ`);
     setTimeout(() => setToast(""), 2600);
   }
-  function updateQuantity(id, delta) {
+  function updateQuantity(itemKey, delta) {
     setCart((current) =>
       current
         .map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + delta } : item,
+          (item.cartKey || String(item.id)) === itemKey ? { ...item, quantity: item.quantity + delta } : item,
         )
         .filter((item) => item.quantity > 0),
     );
@@ -1518,6 +1520,7 @@ function App() {
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
+            upgrades: item.upgrades || [],
           })),
           customer: { name: customer.name, phone: customer.phone },
           shipping: { address: customer.address },
@@ -2325,18 +2328,19 @@ function App() {
         {cart.length ? (
           <>
             <div className="cart-items">
-              {cart.map((item) => (
-                <div className="cart-item" key={item.id}>
+              {cart.map((item) => {
+                const itemKey = item.cartKey || String(item.id);
+                return <div className="cart-item" key={itemKey}>
                   <img src={item.image} alt="" />
                   <div>
                     <b>{item.name}</b>
                     <strong>{formatPrice(item.price)}</strong>
                     <div className="quantity">
-                      <button onClick={() => updateQuantity(item.id, -1)}>
+                      <button onClick={() => updateQuantity(itemKey, -1)}>
                         -
                       </button>
                       <span>{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, 1)}>
+                      <button onClick={() => updateQuantity(itemKey, 1)}>
                         +
                       </button>
                     </div>
@@ -2344,13 +2348,13 @@ function App() {
                   <button
                     className="remove"
                     onClick={() =>
-                      setCart((c) => c.filter((x) => x.id !== item.id))
+                      setCart((c) => c.filter((x) => (x.cartKey || String(x.id)) !== itemKey))
                     }
                   >
                     <Trash2 size={17} />
                   </button>
-                </div>
-              ))}
+                </div>;
+              })}
             </div>
             <div className="cart-summary">
               <div>

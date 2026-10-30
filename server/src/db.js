@@ -912,7 +912,7 @@ export async function findOrderById(id) {
 
 function normalizeRequestedItems(items) {
   if (!Array.isArray(items) || !items.length) throw repositoryError(400, 'Giỏ hàng trống', 'EMPTY_CART')
-  const quantities = new Map()
+  const variants = new Map()
 
   for (const item of items) {
     const productId = Number(item.productId ?? item.id)
@@ -920,10 +920,32 @@ function normalizeRequestedItems(items) {
     if (!Number.isInteger(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw repositoryError(400, 'Sản phẩm hoặc số lượng không hợp lệ', 'INVALID_ORDER_ITEM')
     }
-    quantities.set(productId, (quantities.get(productId) || 0) + quantity)
+    const rawUpgrades = item.upgrades ?? item.selectedUpgrades ?? []
+    if (!Array.isArray(rawUpgrades) || rawUpgrades.length > 8) {
+      throw repositoryError(400, 'Cấu hình nâng cấp không hợp lệ', 'INVALID_PRODUCT_UPGRADES')
+    }
+    const upgrades = rawUpgrades.map(upgrade => {
+      const groupIndex = Number(upgrade?.groupIndex)
+      const upgradeProductId = Number(upgrade?.productId)
+      if (!Number.isInteger(groupIndex) || groupIndex < 0 || groupIndex > 7 || !Number.isInteger(upgradeProductId) || upgradeProductId < 1) {
+        throw repositoryError(400, 'Lựa chọn nâng cấp không hợp lệ', 'INVALID_PRODUCT_UPGRADE')
+      }
+      return { groupIndex, productId: upgradeProductId }
+    }).sort((left, right) => left.groupIndex - right.groupIndex)
+    if (new Set(upgrades.map(upgrade => upgrade.groupIndex)).size !== upgrades.length) {
+      throw repositoryError(400, 'Mỗi nhóm chỉ được chọn một sản phẩm nâng cấp', 'DUPLICATE_PRODUCT_UPGRADE')
+    }
+    const variantKey = `${productId}:${upgrades.map(upgrade => `${upgrade.groupIndex}-${upgrade.productId}`).join(',')}`
+    const existing = variants.get(variantKey)
+    if (existing) existing.quantity += quantity
+    else variants.set(variantKey, { productId, quantity, upgrades })
   }
 
-  return [...quantities].map(([productId, quantity]) => ({ productId, quantity }))
+  const normalized = [...variants.values()]
+  if (normalized.some(item => item.quantity > 20)) {
+    throw repositoryError(400, 'Số lượng mỗi cấu hình không được vượt quá 20', 'INVALID_ORDER_ITEM_QUANTITY')
+  }
+  return normalized
 }
 
 async function generateOrderId(client) {
@@ -952,9 +974,9 @@ export async function createOrder(input) {
     const user = mapUserRow(userResult.rows[0], { includePassword: false })
     if (!user) throw repositoryError(404, 'Không tìm thấy tài khoản', 'USER_NOT_FOUND')
 
-    const productIds = requestedItems.map(item => item.productId).sort((a, b) => a - b)
+    const productIds = [...new Set(requestedItems.map(item => item.productId))].sort((a, b) => a - b)
     const productResult = await client.query(`
-      SELECT id, name, image, price, stock
+      SELECT id, name, image, price, old_price, stock, upgrade_options
       FROM products
       WHERE id = ANY($1::integer[])
       ORDER BY id
@@ -962,18 +984,81 @@ export async function createOrder(input) {
     `, [productIds])
     const productsById = new Map(productResult.rows.map(row => [numberValue(row.id), row]))
 
-    const snapshots = requestedItems.map(item => {
+    const upgradeProductIds = [...new Set(requestedItems.flatMap(item => {
       const product = productsById.get(item.productId)
-      if (!product) throw repositoryError(404, `Sản phẩm #${item.productId} không còn tồn tại`, 'PRODUCT_NOT_FOUND')
-      if (numberValue(product.stock) < item.quantity) {
+      if (!product || !Array.isArray(product.upgrade_options)) return []
+      return product.upgrade_options.flatMap(group => Array.isArray(group?.options)
+        ? group.options.map(option => Number(option?.productId)).filter(Number.isInteger)
+        : [])
+    }))]
+    const upgradeProductResult = upgradeProductIds.length
+      ? await client.query(`
+          SELECT id, name, price, old_price, stock
+          FROM products
+          WHERE id = ANY($1::integer[])
+        `, [upgradeProductIds])
+      : { rows: [] }
+    const upgradeProductsById = new Map(upgradeProductResult.rows.map(row => [numberValue(row.id), row]))
+
+    const requestedStockByProduct = new Map()
+    requestedItems.forEach(item => requestedStockByProduct.set(
+      item.productId,
+      (requestedStockByProduct.get(item.productId) || 0) + item.quantity
+    ))
+    for (const [productId, requestedQuantity] of requestedStockByProduct) {
+      const product = productsById.get(productId)
+      if (!product) throw repositoryError(404, `Sản phẩm #${productId} không còn tồn tại`, 'PRODUCT_NOT_FOUND')
+      if (numberValue(product.stock) < requestedQuantity) {
         throw repositoryError(409, `${product.name} chỉ còn ${product.stock} sản phẩm`, 'INSUFFICIENT_STOCK')
       }
+    }
+
+    const snapshots = requestedItems.map(item => {
+      const product = productsById.get(item.productId)
+      const groups = Array.isArray(product.upgrade_options) ? product.upgrade_options : []
+      const requestedUpgrades = new Map(item.upgrades.map(upgrade => [upgrade.groupIndex, upgrade.productId]))
+      if ([...requestedUpgrades.keys()].some(groupIndex => !groups[groupIndex])) {
+        throw repositoryError(400, `Cấu hình nâng cấp của ${product.name} không còn hợp lệ`, 'PRODUCT_UPGRADE_CHANGED')
+      }
+      let upgradePrice = 0
+      const upgradedNames = []
+      const normalizedUpgrades = []
+      groups.forEach((group, groupIndex) => {
+        const options = Array.isArray(group?.options)
+          ? group.options.filter(option => Number.isInteger(Number(option?.productId)) && Number(option.productId) > 0)
+          : []
+        if (!options.length) return
+        const baseProductId = Number(options[0].productId)
+        const selectedProductId = requestedUpgrades.get(groupIndex) || baseProductId
+        const selectedOption = options.find(option => Number(option.productId) === selectedProductId)
+        if (!selectedOption) {
+          throw repositoryError(400, `Lựa chọn trong nhóm ${group.name || groupIndex + 1} không còn hợp lệ`, 'PRODUCT_UPGRADE_CHANGED')
+        }
+        const baseUpgradeProduct = upgradeProductsById.get(baseProductId)
+        const selectedUpgradeProduct = upgradeProductsById.get(selectedProductId)
+        if (!baseUpgradeProduct || !selectedUpgradeProduct) {
+          throw repositoryError(409, `Linh kiện trong nhóm ${group.name || groupIndex + 1} không còn tồn tại`, 'UPGRADE_PRODUCT_NOT_FOUND')
+        }
+        if (selectedProductId !== baseProductId && numberValue(selectedUpgradeProduct.stock) < item.quantity) {
+          throw repositoryError(409, `${selectedUpgradeProduct.name} không đủ tồn kho để nâng cấp`, 'UPGRADE_INSUFFICIENT_STOCK')
+        }
+        upgradePrice += Math.max(0, numberValue(selectedUpgradeProduct.price) - numberValue(baseUpgradeProduct.price))
+        normalizedUpgrades.push({ groupIndex, productId: selectedProductId })
+        if (selectedProductId !== baseProductId) upgradedNames.push(selectedUpgradeProduct.name)
+      })
+      if (item.upgrades.some(upgrade => !normalizedUpgrades.some(value => value.groupIndex === upgrade.groupIndex && value.productId === upgrade.productId))) {
+        throw repositoryError(400, `Cấu hình nâng cấp của ${product.name} không hợp lệ`, 'PRODUCT_UPGRADE_CHANGED')
+      }
+      const configuredName = upgradedNames.length
+        ? `${product.name} (Nâng cấp lên ${upgradedNames.join(', ')})`
+        : product.name
       return {
         productId: item.productId,
-        name: product.name,
+        name: configuredName,
         image: product.image,
-        price: numberValue(product.price),
-        quantity: item.quantity
+        price: numberValue(product.price) + upgradePrice,
+        quantity: item.quantity,
+        upgrades: normalizedUpgrades
       }
     })
 
@@ -984,7 +1069,7 @@ export async function createOrder(input) {
             updated_at = NOW()
         FROM UNNEST($1::integer[], $2::integer[]) AS requested(id, quantity)
         WHERE product.id = requested.id
-      `, [snapshots.map(item => item.productId), snapshots.map(item => item.quantity)])
+      `, [[...requestedStockByProduct.keys()], [...requestedStockByProduct.values()]])
     }
 
     const createdAt = input.createdAt || new Date().toISOString()

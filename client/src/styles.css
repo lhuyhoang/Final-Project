@@ -2511,7 +2511,7 @@ html[data-theme="dark"] .product-gallery-meta {
   box-shadow: 0 0 0 2px #e6332a12;
 }
 
-.detail-upgrade-group button span {
+.detail-upgrade-group button > span:not(.detail-upgrade-option-name) {
   position: absolute;
   right: -1px;
   bottom: -1px;
@@ -2522,6 +2522,31 @@ html[data-theme="dark"] .product-gallery-meta {
   padding: 0 2px 2px 0;
   color: #fff;
   background: linear-gradient(135deg, transparent 49%, var(--red) 50%);
+}
+
+.detail-upgrade-group button .detail-upgrade-option-name,
+.detail-upgrade-group button small {
+  display: block;
+}
+
+.detail-upgrade-group button .detail-upgrade-option-name {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+}
+
+.detail-upgrade-group button small {
+  margin-top: 3px;
+  color: #858b94;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.detail-upgrade-group button.active small {
+  color: #c34a43;
 }
 
 .detail-promotion ul {
@@ -4339,6 +4364,11 @@ html[data-theme="dark"] .detail-upgrade-group button.active {
   color: #ffaaa4;
   background: #342124;
   border-color: #ff746c;
+}
+
+html[data-theme="dark"] .detail-upgrade-group button small,
+html[data-theme="dark"] .detail-upgrade-group button.active small {
+  color: #d29a96;
 }
 
 html[data-theme="dark"] .detail-promotion {

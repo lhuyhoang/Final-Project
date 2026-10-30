@@ -111,7 +111,7 @@ export default function CheckoutPage({ user, cart, loading, onBack, onSubmit, th
           <section className="checkout-card">
             <div className="summary-title"><div><span>ĐƠN HÀNG</span><h2>{cart.length} sản phẩm</h2></div><Truck size={24}/></div>
             <div className="summary-items">
-              {cart.map(item => <article key={item.id}><img src={item.image} alt=""/><div><b>{item.name}</b><small>Số lượng: {item.quantity}</small></div><strong>{formatPrice(item.price * item.quantity)}</strong></article>)}
+              {cart.map(item => <article key={item.cartKey || item.id}><img src={item.image} alt=""/><div><b>{item.name}</b><small>Số lượng: {item.quantity}</small></div><strong>{formatPrice(item.price * item.quantity)}</strong></article>)}
             </div>
             <div className="summary-totals"><p><span>Tạm tính</span><b>{formatPrice(total)}</b></p><p><span>Phí vận chuyển</span><b className="free">Miễn phí</b></p><div><span>Tổng thanh toán</span><strong>{formatPrice(total)}</strong></div></div>
           </section>

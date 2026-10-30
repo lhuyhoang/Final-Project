@@ -2785,6 +2785,427 @@
   border-radius: 7px;
 }
 
+.product-upgrade-category {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 1.25fr);
+  gap: 12px;
+  align-items: end;
+  padding: 10px;
+  margin-top: 10px;
+  background: #f8f9fb;
+  border: 1px solid #e5e8ec;
+  border-radius: 8px;
+}
+
+.product-upgrade-category label > small,
+.product-upgrade-category > small {
+  display: block;
+  color: #7d838d;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.product-upgrade-category label > small {
+  margin-bottom: 5px;
+  font-weight: 800;
+}
+
+.product-form-fields .product-upgrade-category select {
+  height: 36px;
+  background: #fff;
+}
+
+.product-upgrade-products {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.product-upgrade-product,
+.add-upgrade-product {
+  display: grid;
+  min-width: 0;
+  min-height: 66px;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+}
+
+.product-upgrade-product > img,
+.product-upgrade-product > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  object-fit: contain;
+  color: #8c929b;
+  background: #f4f5f7;
+  border-radius: 7px;
+}
+
+.product-upgrade-product > div {
+  min-width: 0;
+}
+
+.product-upgrade-product small,
+.product-upgrade-product b,
+.product-upgrade-product em {
+  display: block;
+}
+
+.product-upgrade-product small {
+  color: var(--red);
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.product-upgrade-product b {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #343941;
+  font-size: 8px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-upgrade-product em {
+  margin-top: 4px;
+  color: #d52e26;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.product-upgrade-product > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: #a33a35;
+  background: #ffe9e7;
+  border: 0;
+  border-radius: 6px;
+}
+
+.add-upgrade-product {
+  grid-template-columns: 34px minmax(0, 1fr);
+  color: #727984;
+  text-align: left;
+  background: #fbfbfc;
+  border-style: dashed;
+}
+
+.add-upgrade-product > svg {
+  padding: 8px;
+  box-sizing: content-box;
+  color: var(--red);
+  background: #fff0ef;
+  border-radius: 8px;
+}
+
+.add-upgrade-product b,
+.add-upgrade-product small {
+  display: block;
+}
+
+.add-upgrade-product b {
+  color: #4b515a;
+  font-size: 8px;
+}
+
+.add-upgrade-product small {
+  margin-top: 3px;
+  font-size: 7px;
+}
+
+.add-upgrade-product:hover:not(:disabled) {
+  color: var(--red);
+  background: #fff7f6;
+  border-color: #efaaa5;
+}
+
+.add-upgrade-product:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.upgrade-product-picker-backdrop {
+  z-index: 130;
+}
+
+.upgrade-product-picker {
+  display: flex;
+  width: min(1120px, 100%);
+  max-height: min(850px, calc(100dvh - 48px));
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 15px;
+  box-shadow: 0 28px 80px #0007;
+}
+
+.upgrade-product-picker > header {
+  position: static;
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e8eaed;
+  box-shadow: none;
+}
+
+.upgrade-product-picker > header span {
+  color: var(--red);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.upgrade-product-picker > header h2 {
+  margin: 4px 0 0;
+  color: #25292f;
+  font-size: 17px;
+}
+
+.upgrade-product-picker > header p {
+  margin: 4px 0 0;
+  color: #858b94;
+  font-size: 8px;
+}
+
+.upgrade-product-picker > header > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: #777d86;
+  background: #f1f3f5;
+  border: 0;
+  border-radius: 50%;
+}
+
+.upgrade-picker-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.upgrade-picker-toolbar label {
+  display: flex;
+  min-height: 40px;
+  flex: 1 1 auto;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+  color: #969ca5;
+  background: #fff;
+  border: 1px solid #dfe2e7;
+  border-radius: 8px;
+}
+
+.upgrade-picker-toolbar input {
+  width: 100%;
+  min-width: 0;
+  color: #30343a;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.upgrade-picker-toolbar select {
+  min-width: 150px;
+  padding: 0 10px;
+  background: #fff;
+  border: 1px solid #dfe2e7;
+  border-radius: 8px;
+}
+
+.upgrade-picker-grid {
+  display: grid;
+  min-height: 280px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 20px 22px;
+  overflow-y: auto;
+  background: #f7f8fa;
+}
+
+.upgrade-picker-card {
+  display: flex;
+  min-width: 0;
+  min-height: 300px;
+  flex-direction: column;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e0e3e7;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px #2027330a;
+}
+
+.upgrade-picker-card > div {
+  height: 145px;
+  padding: 8px;
+  background: #fafbfc;
+  border-radius: 8px;
+}
+
+.upgrade-picker-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.upgrade-picker-card > small {
+  margin-top: 10px;
+  color: #898f98;
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upgrade-picker-card h3 {
+  display: -webkit-box;
+  min-height: 39px;
+  margin: 6px 0 8px;
+  overflow: hidden;
+  color: #30343a;
+  font-size: 10px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.upgrade-picker-card > span {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.upgrade-picker-card del {
+  color: #969ca5;
+  font-size: 8px;
+}
+
+.upgrade-picker-card strong {
+  color: var(--red);
+  font-size: 13px;
+}
+
+.upgrade-picker-card > button {
+  display: flex;
+  min-height: 38px;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  background: var(--red);
+  border: 0;
+  border-radius: 7px;
+}
+
+.upgrade-picker-empty {
+  display: flex;
+  min-height: 270px;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  color: #8c929b;
+}
+
+.upgrade-picker-empty b { color: #40454d; font-size: 10px; }
+.upgrade-picker-empty span { font-size: 8px; }
+
+.admin-shell.admin-theme-dark :where(.product-upgrade-category, .add-upgrade-product) {
+  color: #aeb5bf;
+  background: #242930;
+  border-color: #3a414b;
+}
+
+.admin-shell.admin-theme-dark :where(.product-upgrade-product, .upgrade-product-picker, .upgrade-product-picker > header, .upgrade-picker-card) {
+  color: #e7e9ed;
+  background: #20242b;
+  border-color: #393f49;
+}
+
+.admin-shell.admin-theme-dark :where(.product-upgrade-product b, .add-upgrade-product b, .upgrade-product-picker > header h2, .upgrade-picker-card h3, .upgrade-picker-empty b) {
+  color: #f0f2f5;
+}
+
+.admin-shell.admin-theme-dark :where(.product-upgrade-category select, .upgrade-picker-toolbar, .upgrade-picker-grid, .upgrade-picker-toolbar label, .upgrade-picker-toolbar select) {
+  color: #e3e6ea;
+  background: #181c22;
+  border-color: #363d47;
+  color-scheme: dark;
+}
+
+.admin-shell.admin-theme-dark .upgrade-picker-toolbar input {
+  color: #f0f2f5;
+}
+
+.admin-shell.admin-theme-dark .upgrade-picker-card > div,
+.admin-shell.admin-theme-dark .product-upgrade-product > span {
+  background: #292e36;
+}
+
+@media (max-width: 900px) {
+  .upgrade-picker-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-upgrade-category,
+  .product-upgrade-products {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-product-picker-backdrop {
+    padding: 10px;
+  }
+
+  .upgrade-product-picker {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .upgrade-product-picker > header,
+  .upgrade-picker-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .upgrade-product-picker > header > button {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+  }
+
+  .upgrade-picker-toolbar select {
+    min-height: 40px;
+  }
+
+  .upgrade-picker-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+}
+
 .product-content-heading > button:disabled,
 .product-upgrade-options .add-option:disabled {
   cursor: not-allowed;

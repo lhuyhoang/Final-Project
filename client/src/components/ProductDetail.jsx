@@ -303,7 +303,10 @@ export default function ProductDetail({
     setActiveImage(product.image);
     setSelectedUpgrades(Object.fromEntries(
       (Array.isArray(product.upgradeOptions) ? product.upgradeOptions : [])
-        .map((group, index) => [index, Array.isArray(group.options) ? group.options[0] || "" : ""]),
+        .map((group, index) => {
+          const option = Array.isArray(group.options) ? group.options[0] : null;
+          return [index, typeof option === "string" ? option : option?.productId || option?.name || ""];
+        }),
     ));
     setSelectedAccessories({});
     setPickerSlot(null);
@@ -387,7 +390,6 @@ export default function ProductDetail({
 
   if (!product) return <ProductDetailState loading={loading} onBack={onBack} />;
 
-  const savings = Math.max(0, product.oldPrice - product.price);
   const stockKnown = Number.isInteger(product.stock);
   const stock = stockKnown ? product.stock : 99;
   const policyText =
@@ -411,6 +413,42 @@ export default function ProductDetail({
   const upgradeOptions = Array.isArray(product.upgradeOptions)
     ? product.upgradeOptions.filter((group) => group?.name && Array.isArray(group.options) && group.options.length)
     : [];
+  const resolvedUpgradeGroups = upgradeOptions.map((group, groupIndex) => {
+    const options = group.options.map((option) => {
+      const legacyName = typeof option === "string" ? option : option?.name;
+      const productId = typeof option === "object" ? Number(option?.productId) : null;
+      const linkedProduct = Number.isInteger(productId) ? products.find((item) => item.id === productId) : null;
+      return { key: linkedProduct?.id || legacyName, name: linkedProduct?.name || legacyName || "Lựa chọn nâng cấp", product: linkedProduct };
+    });
+    const baseProduct = options[0]?.product;
+    return {
+      ...group,
+      groupIndex,
+      options: options.map((option) => ({
+        ...option,
+        priceDelta: option.product && baseProduct ? Math.max(0, Number(option.product.price) - Number(baseProduct.price)) : 0,
+      })),
+    };
+  });
+  const selectedUpgradeDetails = resolvedUpgradeGroups.map((group) => {
+    const selectedKey = selectedUpgrades[group.groupIndex];
+    return group.options.find((option) => String(option.key) === String(selectedKey)) || group.options[0];
+  }).filter(Boolean);
+  const upgradePrice = selectedUpgradeDetails.reduce((total, option) => total + option.priceDelta, 0);
+  const upgradedNames = selectedUpgradeDetails.flatMap((option, index) => {
+    const baseProductId = resolvedUpgradeGroups[index]?.options[0]?.product?.id;
+    return option.product && option.product.id !== baseProductId ? [option.name] : [];
+  });
+  const configuredProductName = upgradedNames.length ? `${product.name} (Nâng cấp lên ${upgradedNames.join(", ")})` : product.name;
+  const configuredProduct = {
+    ...product,
+    cartKey: `${product.id}:${selectedUpgradeDetails.map((option, index) => `${index}-${option.product?.id || option.key}`).join("|")}`,
+    name: configuredProductName,
+    price: Number(product.price) + upgradePrice,
+    oldPrice: Number(product.oldPrice) + upgradePrice,
+    upgrades: selectedUpgradeDetails.flatMap((option, groupIndex) => option.product ? [{ groupIndex, productId: option.product.id }] : []),
+  };
+  const savings = Math.max(0, configuredProduct.oldPrice - configuredProduct.price);
   const promotions = Array.isArray(product.promotions)
     ? product.promotions.filter((promotion) => typeof promotion === "string" && promotion.trim())
     : [];
@@ -572,7 +610,7 @@ export default function ProductDetail({
               <span>{product.category}</span>
               <b>{product.badge}</b>
             </div>
-            <h1 id="product-title">{product.name}</h1>
+            <h1 id="product-title">{configuredProductName}</h1>
             <div className="detail-rating-row">
               <span>
                 <Star size={17} fill="currentColor" /> {product.rating}/5
@@ -585,9 +623,9 @@ export default function ProductDetail({
             <div className="detail-price-panel">
               <small>GIÁ QUADPRO</small>
               <div>
-                <strong>{formatPrice(product.price)}</strong>
-                {product.oldPrice > product.price && (
-                  <del>{formatPrice(product.oldPrice)}</del>
+                <strong>{formatPrice(configuredProduct.price)}</strong>
+                {configuredProduct.oldPrice > configuredProduct.price && (
+                  <del>{formatPrice(configuredProduct.oldPrice)}</del>
                 )}
               </div>
               {savings > 0 && <span>Tiết kiệm {formatPrice(savings)}</span>}
@@ -612,20 +650,21 @@ export default function ProductDetail({
                   <Settings size={20} /> <b id="detail-upgrades-title">Nâng cấp</b>
                 </header>
                 <div className="detail-upgrade-groups">
-                  {upgradeOptions.map((group, groupIndex) => (
-                    <div className="detail-upgrade-group" key={`${group.name}-${groupIndex}`}>
+                  {resolvedUpgradeGroups.map((group) => (
+                    <div className="detail-upgrade-group" key={`${group.name}-${group.groupIndex}`}>
                       <strong>{group.name}</strong>
                       <div role="group" aria-label={`Chọn ${group.name}`}>
                         {group.options.map((option, optionIndex) => {
-                          const selected = selectedUpgrades[groupIndex] === option;
+                          const selected = String(selectedUpgrades[group.groupIndex]) === String(option.key);
                           return <button
                             type="button"
                             className={selected ? "active" : ""}
-                            onClick={() => setSelectedUpgrades((current) => ({ ...current, [groupIndex]: option }))}
+                            onClick={() => setSelectedUpgrades((current) => ({ ...current, [group.groupIndex]: option.key }))}
                             aria-pressed={selected}
-                            key={`${option}-${optionIndex}`}
+                            key={`${option.key}-${optionIndex}`}
                           >
-                            {option}
+                            <span className="detail-upgrade-option-name">{option.name}</span>
+                            <small>{option.priceDelta > 0 ? `+${formatPrice(option.priceDelta)}` : optionIndex === 0 ? "Cấu hình gốc" : "Không đổi giá"}</small>
                             {selected && <span aria-hidden="true"><BadgeCheck size={14}/></span>}
                           </button>;
                         })}
@@ -684,7 +723,7 @@ export default function ProductDetail({
               <button
                 type="button"
                 className="detail-add-cart"
-                onClick={() => onAdd(product, quantity)}
+                onClick={() => onAdd(configuredProduct, quantity)}
                 disabled={!canBuy}
               >
                 <ShoppingCart size={20} />
@@ -695,7 +734,7 @@ export default function ProductDetail({
               <button
                 type="button"
                 className="detail-buy-now"
-                onClick={() => onBuyNow(product, quantity)}
+                onClick={() => onBuyNow(configuredProduct, quantity)}
                 disabled={!canBuy}
               >
                 MUA NGAY <small>Mở giỏ hàng để thanh toán</small>

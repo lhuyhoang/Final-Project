@@ -551,17 +551,31 @@ function normalizeProduct(body = {}, current = {}) {
     if (!Array.isArray(group.options) || group.options.length < 1 || group.options.length > 8) {
       throw httpError(400, `Nhóm nâng cấp ${groupIndex + 1} phải có từ 1 đến 8 lựa chọn`)
     }
+    const rawCategoryId = group.categoryId
+    const categoryId = rawCategoryId === null || rawCategoryId === undefined || rawCategoryId === ''
+      ? null
+      : Number(rawCategoryId)
+    if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId < 1)) {
+      throw httpError(400, `Danh mục linh kiện của nhóm ${name} không hợp lệ`)
+    }
     const options = group.options.map((option, optionIndex) => {
-      const value = String(option || '').trim().replace(/\s+/g, ' ')
-      if (!value || value.length > 120) {
-        throw httpError(400, `Lựa chọn ${optionIndex + 1} của nhóm ${name} phải có từ 1 đến 120 ký tự`)
+      const legacyOption = typeof option === 'string'
+      const productIdValue = legacyOption ? null : Number(option?.productId)
+      const productId = Number.isInteger(productIdValue) && productIdValue > 0 ? productIdValue : null
+      const value = String(legacyOption ? option : option?.name || '').trim().replace(/\s+/g, ' ')
+      if (!value || value.length > 160) {
+        throw httpError(400, `Lựa chọn ${optionIndex + 1} của nhóm ${name} phải có tên từ 1 đến 160 ký tự`)
       }
-      return value
+      if (!legacyOption && option?.productId !== null && option?.productId !== undefined && !productId) {
+        throw httpError(400, `Sản phẩm của lựa chọn ${optionIndex + 1} trong nhóm ${name} không hợp lệ`)
+      }
+      return { productId, name: value }
     })
-    if (new Set(options.map(option => option.toLocaleLowerCase('vi'))).size !== options.length) {
+    const optionKeys = options.map(option => option.productId ? `product:${option.productId}` : `name:${option.name.toLocaleLowerCase('vi')}`)
+    if (new Set(optionKeys).size !== options.length) {
       throw httpError(400, `Nhóm nâng cấp ${name} có lựa chọn trùng nhau`)
     }
-    return { name, options }
+    return { name, categoryId, options }
   })
 
   const rawPromotions = body.promotions ?? current.promotions ?? DEFAULT_PRODUCT_PROMOTIONS
