@@ -390,6 +390,20 @@
   font-size: 9px;
 }
 
+.auth-forgot {
+  display: block;
+  padding: 2px 0 0;
+  margin: -3px 0 13px auto;
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 600;
+  border: 0;
+  background: none;
+}
+
+.auth-forgot:hover { text-decoration: underline; }
+.auth-forgot:focus-visible { outline: 3px solid #e6332a55; outline-offset: 3px; border-radius: 4px; }
+
 .auth-error,
 .admin-form-error {
   padding: 9px 11px;

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
 import { getUpgradeDisplayName } from '../../shared/upgradeDisplayName.mjs'
+import { matchesResetHash, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 
 const { Pool } = pg
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -431,6 +432,59 @@ export async function registerUserWithPassword(input) {
       RETURNING *
     `, [crypto.randomUUID(), input.name, email, input.phone || '', input.passwordHash])
     return mapUserRow(result.rows[0], { includePassword: false })
+  })
+}
+
+export async function reservePasswordReset({ email, requestId, otpHash }) {
+  return withTransaction(async client => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [`quadpro:password-reset:${email}`])
+    await client.query("DELETE FROM password_reset_requests WHERE window_started_at < NOW() - INTERVAL '1 day'")
+    const previous = (await client.query(`SELECT *, requested_at > NOW() - INTERVAL '60 seconds' AS cooling_down, window_started_at > NOW() - INTERVAL '1 hour' AS same_window FROM password_reset_requests WHERE email = $1 FOR UPDATE`, [email])).rows[0]
+    if (previous?.cooling_down || (previous?.same_window && previous.send_count >= 5)) {
+      throw repositoryError(429, 'Bạn đã yêu cầu mã quá nhiều lần. Vui lòng chờ rồi thử lại.', 'RESET_RATE_LIMITED')
+    }
+    const user = (await client.query("SELECT id FROM users WHERE email = $1 AND status = 'active'", [email])).rows[0]
+    await client.query(`
+      INSERT INTO password_reset_requests (email, request_id, user_id, otp_hash, expires_at, window_started_at, send_count)
+      VALUES ($1, $2, $3, $4, NOW() + $5 * INTERVAL '1 second', $6, $7)
+      ON CONFLICT (email) DO UPDATE SET request_id = EXCLUDED.request_id, user_id = EXCLUDED.user_id,
+        otp_hash = EXCLUDED.otp_hash, requested_at = NOW(), expires_at = EXCLUDED.expires_at,
+        attempts = 0, verified_at = NULL, reset_token_hash = NULL, reset_expires_at = NULL,
+        window_started_at = EXCLUDED.window_started_at, send_count = EXCLUDED.send_count
+    `, [email, requestId, user?.id || null, otpHash, OTP_EXPIRY_SECONDS, previous?.same_window ? previous.window_started_at : new Date(), previous?.same_window ? previous.send_count + 1 : 1])
+    return { userId: user?.id || null, retryAfterSeconds: OTP_RESEND_SECONDS }
+  })
+}
+
+export async function invalidatePasswordReset(requestId) {
+  // Retain resend counters even when the delivery provider fails.
+  await query('UPDATE password_reset_requests SET attempts = 5, reset_token_hash = NULL, reset_expires_at = NULL WHERE request_id = $1', [requestId])
+}
+
+export async function verifyPasswordResetOtp({ email, requestId, otpHash, resetTokenHash }) {
+  return withTransaction(async client => {
+    const row = (await client.query(`SELECT *, expires_at > NOW() AS unexpired FROM password_reset_requests WHERE email = $1 AND request_id = $2 FOR UPDATE`, [email, requestId])).rows[0]
+    if (!row || !row.unexpired || row.verified_at || row.attempts >= 5) return false
+    const user = row.user_id ? (await client.query("SELECT id FROM users WHERE id = $1 AND status = 'active'", [row.user_id])).rows[0] : null
+    if (!user || !matchesResetHash(otpHash, row.otp_hash.trim())) {
+      await client.query('UPDATE password_reset_requests SET attempts = attempts + 1 WHERE email = $1', [email])
+      return false
+    }
+    await client.query(`UPDATE password_reset_requests SET verified_at = NOW(), reset_token_hash = $1, reset_expires_at = NOW() + $2 * INTERVAL '1 second' WHERE email = $3`, [resetTokenHash, RESET_TOKEN_EXPIRY_SECONDS, email])
+    return true
+  })
+}
+
+export async function completePasswordReset({ email, requestId, resetTokenHash, passwordHash }) {
+  return withTransaction(async client => {
+    const row = (await client.query(`SELECT *, reset_expires_at > NOW() AS unexpired FROM password_reset_requests WHERE email = $1 AND request_id = $2 FOR UPDATE`, [email, requestId])).rows[0]
+    if (!row?.verified_at || !row.unexpired || !matchesResetHash(resetTokenHash, row.reset_token_hash?.trim())) return false
+    const updated = await client.query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND status = 'active' RETURNING id", [passwordHash, row.user_id])
+    if (!updated.rows.length) return false
+    await client.query('DELETE FROM user_sessions WHERE user_id = $1', [row.user_id])
+    // Consume credentials atomically with the password change and session revocation.
+    await client.query('DELETE FROM password_reset_requests WHERE email = $1', [email])
+    return true
   })
 }
 

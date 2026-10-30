@@ -32,7 +32,12 @@ Khi nâng cấp từ Neon Better Auth, migration giữ nguyên hồ sơ, vai tr�
 - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`: xác thực bằng session HttpOnly lưu trong PostgreSQL
 - `GET/PUT /api/auth/me`, `PUT /api/auth/password`: đọc/cập nhật hồ sơ và đổi mật khẩu
 - `GET /api/products`, `POST /api/orders`, `GET /api/orders`
-- `/api/admin/*`: thống kê, CRUD sản phẩm, đơn hàng và người dùng; bắt buộc session của tài khoản có quyền `admin`
+- `POST /api/auth/forgot-password`, `POST /api/auth/verify-reset-otp`, `POST /api/auth/reset-password`: khôi phục mật khẩu bằng OTP gửi email
+- `/api/admin/*`: thống kê, CRUD sản phẩm, đơn hàng và người dùng; admin toàn quyền, nhân viên chỉ truy cập các phần được cấp trong vai trò
+
+## Email OTP quên mật khẩu
+
+Hướng dẫn kết nối Gmail SMTP hoặc Resend và cấu hình Vercel: [docs/EMAIL-OTP.md](docs/EMAIL-OTP.md). Cần điền credential email và `EMAIL_OTP_SECRET` ở server, rồi redeploy để gửi thư thật.
 
 ## Upload ảnh Cloudinary
 

@@ -7,7 +7,8 @@
     "start": "node src/index.js",
     "db:init": "node scripts/db-init.js",
     "test:password": "node scripts/password-self-test.js",
-    "test:access": "node --test ../shared/adminAccess.test.mjs && node test/staff-access.integration.mjs"
+    "test:access": "node --test ../shared/adminAccess.test.mjs && node test/staff-access.integration.mjs",
+    "test:reset": "node --test test/resetOtp.test.mjs && node test/password-reset.integration.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,6 +16,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
+    "nodemailer": "^10.3.1",
     "pg": "^8.23.0",
     "stripe": "^23.0.0"
   },

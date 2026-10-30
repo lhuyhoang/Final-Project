@@ -22,6 +22,10 @@ import {
   createProduct as insertProduct,
   createUserSession,
   createUser,
+  reservePasswordReset,
+  invalidatePasswordReset,
+  verifyPasswordResetOtp,
+  completePasswordReset,
   deleteAllUserSessions,
   deleteOtherUserSessions,
   deleteProduct as removeProduct,
@@ -62,6 +66,8 @@ import { hashPassword, verifyPassword } from './password.js'
 import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs'
 import { normalizeProductImage } from '../../shared/productImage.mjs'
 import { canAccessAdminEndpoint, normalizeStaffRole } from '../../shared/adminAccess.mjs'
+import { generateResetOtp, getOtpSecret, hashResetValue, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
+import { getMailConfiguration, sendPasswordResetOtp } from './mail.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -370,6 +376,15 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.' }
 })
+
+const resetRequestLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { message: 'Bạn đã yêu cầu khôi phục quá nhiều lần. Vui lòng thử lại sau.' } })
+const resetVerifyLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 40, standardHeaders: true, legacyHeaders: false, message: { message: 'Bạn đã thử xác thực quá nhiều lần. Vui lòng thử lại sau.' } })
+
+function validateResetRequestId(value) {
+  const id = String(value || '')
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw httpError(400, 'Yêu cầu khôi phục không hợp lệ. Vui lòng gửi lại mã OTP.')
+  return id
+}
 
 function normalizeAuthEmail(value) {
   const email = String(value || '').trim().toLowerCase()
@@ -842,6 +857,44 @@ app.post('/api/auth/register', authLimiter, asyncHandler(async (req, res) => {
   })
   await issueSession(req, res, user)
   res.status(201).json({ user: safeUser(user) })
+}))
+
+app.post('/api/auth/forgot-password', resetRequestLimiter, asyncHandler(async (req, res) => {
+  const email = normalizeAuthEmail(req.body?.email)
+  getOtpSecret()
+  getMailConfiguration()
+  const requestId = crypto.randomUUID()
+  const otp = generateResetOtp()
+  const reservation = await reservePasswordReset({ email, requestId, otpHash: hashResetValue('otp', email, requestId, otp) })
+  if (reservation.userId) {
+    try { await sendPasswordResetOtp({ to: email, otp, requestId }) }
+    catch (error) { await invalidatePasswordReset(requestId); throw error }
+  }
+  res.status(202).json({ message: 'Nếu email đã được đăng ký và tài khoản còn hoạt động, mã OTP sẽ được gửi đến hộp thư của bạn.', requestId, expiresInSeconds: OTP_EXPIRY_SECONDS, retryAfterSeconds: OTP_RESEND_SECONDS })
+}))
+
+app.post('/api/auth/verify-reset-otp', resetVerifyLimiter, asyncHandler(async (req, res) => {
+  const email = normalizeAuthEmail(req.body?.email)
+  const requestId = validateResetRequestId(req.body?.requestId)
+  const otp = String(req.body?.otp || '')
+  if (!/^\d{6}$/.test(otp)) throw httpError(400, 'Mã OTP phải gồm đúng 6 chữ số.')
+  const resetToken = crypto.randomBytes(32).toString('base64url')
+  const valid = await verifyPasswordResetOtp({ email, requestId, otpHash: hashResetValue('otp', email, requestId, otp), resetTokenHash: hashResetValue('token', email, requestId, resetToken) })
+  if (!valid) throw httpError(400, 'Mã OTP không đúng, đã hết hạn hoặc đã sử dụng. Nếu đã nhập sai 5 lần, hãy yêu cầu mã mới.')
+  res.json({ resetToken, expiresInSeconds: RESET_TOKEN_EXPIRY_SECONDS })
+}))
+
+app.post('/api/auth/reset-password', resetVerifyLimiter, asyncHandler(async (req, res) => {
+  const email = normalizeAuthEmail(req.body?.email)
+  const requestId = validateResetRequestId(req.body?.requestId)
+  const resetToken = String(req.body?.resetToken || '')
+  if (!/^[A-Za-z0-9_-]{43}$/.test(resetToken)) throw httpError(400, 'Phiên đặt mật khẩu không hợp lệ. Vui lòng xác thực OTP lại.')
+  const password = validatePassword(req.body?.password, 'Mật khẩu mới')
+  const valid = await completePasswordReset({ email, requestId, resetTokenHash: hashResetValue('token', email, requestId, resetToken), passwordHash: await hashPassword(password) })
+  if (!valid) throw httpError(400, 'Phiên đặt mật khẩu đã hết hạn hoặc đã sử dụng. Vui lòng yêu cầu mã mới.')
+  clearSessionCookie(res)
+  clearLegacySessionCookie(res)
+  res.json({ message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.' })
 }))
 
 app.post('/api/auth/login', authLimiter, asyncHandler(async (req, res) => {

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound, X } from 'lucide-react'
 import { api, saveSession } from '../api'
+const PasswordResetForm = lazy(() => import('./PasswordResetForm'))
 
 const emptyForm = { name: '', phone: '', email: '', password: '', confirmPassword: '' }
 
@@ -10,6 +11,7 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const dialogRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -21,10 +23,20 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
 
   useEffect(() => {
     if (!open) return undefined
-    const onKeyDown = event => event.key === 'Escape' && onClose()
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector('input')?.focus()
+    const onKeyDown = event => {
+      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Tab') return
+      const nodes = [...(dialogRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled)') || [])]
+      if (event.shiftKey && document.activeElement === nodes[0]) { event.preventDefault(); nodes.at(-1)?.focus() }
+      else if (!event.shiftKey && document.activeElement === nodes.at(-1)) { event.preventDefault(); nodes[0]?.focus() }
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+    return () => { window.removeEventListener('keydown', onKeyDown); document.body.style.overflow = previousOverflow; previousFocus?.focus?.() }
+  }, [open])
 
   if (!open) return null
 
@@ -78,7 +90,7 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
   }
 
   return <div className="auth-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <section ref={dialogRef} className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <button className="auth-close" onClick={onClose} aria-label="Đóng"><X size={20}/></button>
       <div className="auth-visual">
         <div className="auth-brand"><span>Q</span><b>QUADPRO</b></div>
@@ -90,6 +102,7 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
         <ul><li>Bảo hành điện tử tập trung</li><li>Tích điểm cho mọi đơn hàng</li><li>Hỗ trợ kỹ thuật ưu tiên</li></ul>
       </div>
       <div className="auth-content">
+        {mode === 'forgot' ? <Suspense fallback={<h2 id="auth-title" role="status">Đang mở khôi phục mật khẩu…</h2>}><PasswordResetForm initialEmail={form.email} onBack={email => { setForm({ ...emptyForm, email }); switchMode('login') }}/></Suspense> : <>
         <span className="auth-kicker">XIN CHÀO</span>
         <h2 id="auth-title">{mode === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}</h2>
         <p>{mode === 'login' ? 'Tiếp tục hành trình công nghệ cùng QuadPro.' : 'Đăng ký miễn phí chỉ trong một phút.'}</p>
@@ -106,10 +119,12 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
           <label><span>Mật khẩu</span><div><LockKeyhole size={17}/><input type={showPassword ? 'text' : 'password'} name="password" value={form.password} onChange={update} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'register' ? 'Tối thiểu 8 ký tự' : 'Nhập mật khẩu'} required minLength="8"/><button type="button" onClick={() => setShowPassword(value => !value)} aria-label="Hiện hoặc ẩn mật khẩu">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div></label>
           {mode === 'register' && <label><span>Xác nhận mật khẩu</span><div><LockKeyhole size={17}/><input type={showPassword ? 'text' : 'password'} name="confirmPassword" value={form.confirmPassword} onChange={update} autoComplete="new-password" placeholder="Nhập lại mật khẩu" required minLength="8"/></div></label>}
           {mode === 'register' && <small className="password-hint">Mật khẩu cần chữ hoa, chữ thường và ít nhất một chữ số.</small>}
+          {mode === 'login' && <button type="button" className="auth-forgot" disabled={loading} onClick={() => switchMode('forgot')}>Quên mật khẩu?</button>}
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button className="auth-submit" disabled={loading}>{loading ? 'Đang xử lý...' : mode === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẢN'}</button>
         </form>
         <p className="auth-switch">{mode === 'login' ? 'Chưa có tài khoản?' : 'Đã là thành viên?'} <button onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}</button></p>
+        </>}
       </div>
     </section>
   </div>
