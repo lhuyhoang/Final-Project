@@ -69,6 +69,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import AuthModal from "./components/AuthModal";
 import CheckoutPage from "./components/CheckoutPage";
 import ProductDetail from "./components/ProductDetail";
+import HomeBanners from "./components/HomeBanners";
 import "./styles.css";
 import "./admin.css";
 
@@ -2009,67 +2010,7 @@ function App() {
           />
         ) : (
           <>
-        <section className="hero container">
-          <div className="hero-banner">
-            <div className="hero-grid" aria-hidden="true"></div>
-            <div className="hero-glow" aria-hidden="true"></div>
-            <div className="hero-copy">
-              <span className="eyebrow">QUADPRO BUILD STATION</span>
-              <h1>
-                SỨC MẠNH
-                <br />
-                <em>KHÔNG GIỚI HẠN</em>
-              </h1>
-              <p>
-                PC Gaming RTX 40 Series. Tối ưu từng FPS.
-                <br />
-                Bảo hành tận nơi, nâng cấp trọn đời.
-              </p>
-              <a href="#products">
-                KHÁM PHÁ NGAY <ArrowUpRight size={19} />
-              </a>
-            </div>
-            <div className="pc-visual" aria-hidden="true">
-              <div className="pc-case">
-                <div className="fans">
-                  <i></i>
-                  <i></i>
-                  <i></i>
-                </div>
-                <div className="gpu">GEFORCE RTX</div>
-              </div>
-              <div className="price-float">
-                <small>CHỈ TỪ</small>
-                <b>16.990K</b>
-              </div>
-            </div>
-            <div className="hero-dots">
-              <i></i>
-              <i className="active"></i>
-              <i></i>
-            </div>
-          </div>
-          <div className="side-promos">
-            <article className="promo-one">
-              <small>BACK TO SCHOOL</small>
-              <b>
-                LAPTOP
-                <br />
-                HỌC TẬP
-              </b>
-              <span>Giảm đến 3 triệu</span>
-            </article>
-            <article className="promo-two">
-              <small>NÂNG CẤP GÓC MÁY</small>
-              <b>
-                GEAR XỊN
-                <br />
-                GIÁ ÊM
-              </b>
-              <span>Mua combo giảm 15%</span>
-            </article>
-          </div>
-        </section>
+        <HomeBanners />
 
         <section className="benefits container">
           <div>
