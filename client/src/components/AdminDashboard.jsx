@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Gift, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Folder, FolderOpen, Gift, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -66,6 +66,42 @@ const orderAdminCategoryTree = categoryList => {
   const children = parent => categoryList.filter(category => category.parentId === parent.id).sort(compareAdminCategories)
   const orphans = categoryList.filter(category => category.parentId !== null && category.parentId !== undefined && !rootIds.has(category.parentId)).sort(compareAdminCategories)
   return [...roots.flatMap(root => [root, ...children(root)]), ...orphans]
+}
+
+const normalizeAdminCategoryName = value => String(value || '').trim().toLocaleLowerCase('vi')
+
+function getAdminCategoryRoot(category, categoryList) {
+  if (!category) return null
+  const categoriesById = new Map(categoryList.map(item => [item.id, item]))
+  const visited = new Set()
+  let current = category
+  while (current?.parentId !== null && current?.parentId !== undefined && !visited.has(current.id)) {
+    visited.add(current.id)
+    const parent = categoriesById.get(current.parentId)
+    if (!parent) break
+    current = parent
+  }
+  return current
+}
+
+function resolveAdminProductCategory(categoryName, categoryList) {
+  const normalizedName = normalizeAdminCategoryName(categoryName)
+  const category = categoryList.find(item => normalizeAdminCategoryName(item.name) === normalizedName)
+  return { category, root: getAdminCategoryRoot(category, categoryList) }
+}
+
+function organizeImportedRows(importedRows, categoryList) {
+  return importedRows.map(row => {
+    const { category, root } = resolveAdminProductCategory(row.product.category, categoryList)
+    const errors = [...row.errors]
+    if (!category) errors.push(`Danh mục “${row.product.category || 'trống'}” chưa tồn tại`)
+    return {
+      ...row,
+      errors,
+      destinationFolder: root?.name || 'Chưa phân loại',
+      product: category ? { ...row.product, category: category.name } : row.product
+    }
+  })
 }
 
 function normalizeImportHeader(value) {
@@ -645,7 +681,7 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
   </div>
 }
 
-function BulkProductImporter({ onClose, onSaved }) {
+function BulkProductImporter({ categories = defaultCategories, onClose, onSaved }) {
   const [fileName, setFileName] = useState('')
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
@@ -673,7 +709,7 @@ function BulkProductImporter({ onClose, onSaved }) {
             const { readSheet } = await import('read-excel-file/browser')
             return readSheet(file)
           })()
-      const importedRows = parseImportedRows(sheetRows)
+      const importedRows = organizeImportedRows(parseImportedRows(sheetRows), categories)
       setRows(importedRows)
       if (!importedRows.length) setError('File chưa có dữ liệu sản phẩm để nhập.')
     } catch (fileError) {
@@ -767,7 +803,7 @@ function BulkProductImporter({ onClose, onSaved }) {
             <span className="bulk-guide-icon"><Info size={16}/></span>
             <div>
               <strong>Chuẩn bị dữ liệu đúng định dạng</strong>
-              <p>Cột bắt buộc: <b>name, brand, category, price, stock, image</b>. Thông số dùng dạng <b>STT|Mô tả|SL|BH</b>; mỗi URL ảnh phụ đặt trên một dòng.</p>
+              <p>Cột bắt buộc: <b>name, brand, category, price, stock, image</b>. Tên category phải trùng danh mục cha hoặc con; hệ thống sẽ tự xếp sản phẩm vào thư mục cha tương ứng.</p>
             </div>
           </div>
           <button type="button" className="bulk-template-button" onClick={downloadTemplate}><Download size={15}/>Tải file mẫu CSV</button>
@@ -776,7 +812,7 @@ function BulkProductImporter({ onClose, onSaved }) {
         {error && <div className="admin-form-error" role="alert"><AlertTriangle size={16}/><span>{error}</span></div>}
         {rows.length > 0 && <>
           <div className="bulk-import-summary" aria-live="polite"><span><b>{rows.length}</b> dòng đọc được</span><span className="valid"><Check size={14}/><b>{validCount}</b> dòng hợp lệ</span>{invalidCount > 0 && <span className="invalid"><AlertTriangle size={14}/><b>{invalidCount}</b> dòng cần sửa</span>}</div>
-          <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Thông số</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.product.specifications.length} dòng</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
+          <div className="bulk-import-table-wrap"><table className="bulk-import-table"><thead><tr><th>Dòng</th><th>Sản phẩm</th><th>Danh mục</th><th>Thư mục đích</th><th>Giá bán</th><th>Thông số</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row => <tr key={row.rowNumber} className={row.errors.length ? 'invalid' : ''}><td>{row.rowNumber}</td><td><b>{row.product.name || '—'}</b><small>{row.product.brand || 'Chưa có thương hiệu'}</small></td><td>{row.product.category || '—'}</td><td><span className="bulk-folder-destination"><Folder size={14}/>{row.destinationFolder}</span></td><td>{row.product.price ? formatPrice(row.product.price) : '—'}</td><td>{row.product.specifications.length} dòng</td><td>{row.errors.length ? <span className="bulk-row-error">{row.errors.join(' · ')}</span> : <span className="bulk-row-valid">Hợp lệ</span>}</td></tr>)}</tbody></table></div>
         </>}
       </div>
       <footer className="bulk-import-footer">
@@ -1273,6 +1309,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   const [confirmation, setConfirmation] = useState(null)
   const [confirming, setConfirming] = useState(false)
   const [selectedProductIds, setSelectedProductIds] = useState(() => new Set())
+  const [productFolderId, setProductFolderId] = useState(null)
 
   async function loadDashboard(silent = false) {
     silent ? setRefreshing(true) : setLoading(true)
@@ -1467,6 +1504,9 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   async function saveBulkProducts(savedProducts) {
     setBulkImporterOpen(false)
     setProducts(current => [...savedProducts, ...current])
+    setProductFolderId(null)
+    setQuery('')
+    setSelectedProductIds(new Set())
     setProductPage(1)
     await loadDashboard(true)
     onProductsChanged()
@@ -1522,7 +1562,58 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   }
 
   const normalizedQuery = query.trim().toLowerCase()
-  const visibleProducts = useMemo(() => products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery)), [products, normalizedQuery])
+  const productFolders = useMemo(() => {
+    const categoryIds = new Set(categories.map(category => category.id))
+    const roots = categories
+      .filter(category => category.parentId === null || category.parentId === undefined || !categoryIds.has(category.parentId))
+      .sort(compareAdminCategories)
+    const categoryLookup = new Map(categories.map(category => [normalizeAdminCategoryName(category.name), category]))
+    const folderProducts = new Map(roots.map(root => [root.id, []]))
+    const uncategorizedProducts = []
+
+    products.forEach(product => {
+      const category = categoryLookup.get(normalizeAdminCategoryName(product.category))
+      const root = getAdminCategoryRoot(category, categories)
+      if (root && folderProducts.has(root.id)) folderProducts.get(root.id).push(product)
+      else uncategorizedProducts.push(product)
+    })
+
+    const folders = roots.map(root => ({
+      id: `category:${root.id}`,
+      categoryId: root.id,
+      name: root.name,
+      color: root.color || '#e6332a',
+      products: folderProducts.get(root.id) || [],
+      subcategories: categories.filter(category => category.parentId === root.id).sort(compareAdminCategories)
+    }))
+    if (uncategorizedProducts.length) {
+      folders.push({
+        id: 'uncategorized',
+        categoryId: null,
+        name: 'Chưa phân loại',
+        color: '#7c8491',
+        products: uncategorizedProducts,
+        subcategories: []
+      })
+    }
+    return folders
+  }, [categories, products])
+  const activeProductFolder = useMemo(
+    () => productFolders.find(folder => folder.id === productFolderId) || null,
+    [productFolderId, productFolders]
+  )
+  const visibleProductFolders = useMemo(() => productFolders.filter(folder => {
+    if (!normalizedQuery) return true
+    return [
+      folder.name,
+      ...folder.subcategories.map(category => category.name),
+      ...folder.products.flatMap(product => [product.name, product.brand, product.category])
+    ].some(value => String(value || '').toLowerCase().includes(normalizedQuery))
+  }), [normalizedQuery, productFolders])
+  const visibleProducts = useMemo(() => {
+    if (!activeProductFolder) return []
+    return activeProductFolder.products.filter(product => `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(normalizedQuery))
+  }, [activeProductFolder, normalizedQuery])
   const productPageSize = 15
   const productPageCount = Math.max(1, Math.ceil(visibleProducts.length / productPageSize))
   const productPages = useMemo(() => {
@@ -1566,6 +1657,10 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     setProductPage(1)
     setOnlinePaymentPage(1)
   }, [normalizedQuery])
+
+  useEffect(() => {
+    if (productFolderId && !activeProductFolder) setProductFolderId(null)
+  }, [activeProductFolder, productFolderId])
 
   useEffect(() => {
     setProductPage(current => Math.min(Math.max(current, 1), productPageCount))
@@ -1625,11 +1720,38 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           <section className="admin-panel recent-panel"><header><div><span>ĐƠN HÀNG</span><h2>Giao dịch gần đây</h2></div><button onClick={() => setTab('orders')}>Xem tất cả</button></header><div className="admin-table-wrap"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày đặt</th><th>Giá trị</th><th>Trạng thái</th></tr></thead><tbody>{stats.recentOrders.map(order => <tr key={order.id}><td><b>#{order.id}</b></td><td>{order.customer?.name}</td><td>{formatDate(order.createdAt)}</td><td><strong>{formatPrice(order.total)}</strong></td><td><StatusBadge status={order.status}/></td></tr>)}</tbody></table></div></section>
         </>}
 
-    {tab === 'products' && <section className="admin-panel admin-list-panel">
-          <header className="list-header"><div><span>KHO HÀNG</span><h2>{products.length} sản phẩm</h2><small className="pagination-summary">Hiển thị tối đa 15 sản phẩm mỗi trang</small></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm sản phẩm..."/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div></header>
-          {selectedProductIds.size > 0 && <div className="admin-bulk-toolbar"><span><Check size={16}/> Đã chọn <b>{selectedProductIds.size}</b> sản phẩm</span><button className="admin-danger-action" onClick={removeSelectedProducts}><Trash2 size={16}/> Xóa đã chọn</button><button className="admin-secondary compact" onClick={() => setSelectedProductIds(new Set())}>Bỏ chọn</button></div>}
-          <div className="admin-table-wrap"><table className="products-table"><thead><tr><th className="admin-select-cell"><input type="checkbox" checked={paginatedProducts.length > 0 && paginatedProducts.every(product => selectedProductIds.has(product.id))} onChange={toggleVisibleProductSelection} aria-label="Chọn tất cả sản phẩm trên trang hiện tại"/></th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{paginatedProducts.map(product => <tr key={product.id}><td className="admin-select-cell"><input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} aria-label={`Chọn ${product.name}`}/></td><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>
-          {visibleProducts.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(productPage, productPageCount)} / {productPageCount} · {visibleProducts.length} sản phẩm</span><div><button type="button" onClick={() => setProductPage(current => Math.max(1, current - 1))} disabled={productPage <= 1}>← Trước</button>{productPages.map(page => <button type="button" className={page === productPage ? 'active' : ''} key={page} onClick={() => setProductPage(page)}>{page}</button>)}<button type="button" onClick={() => setProductPage(current => Math.min(productPageCount, current + 1))} disabled={productPage >= productPageCount}>Sau →</button></div></footer>}
+    {tab === 'products' && <section className="admin-panel admin-list-panel product-library-panel">
+          <header className="list-header">
+            <div className="product-library-heading">
+              {activeProductFolder && <button type="button" className="product-folder-back" onClick={() => { setProductFolderId(null); setQuery(''); setProductPage(1); setSelectedProductIds(new Set()) }}><ArrowLeft size={15}/> Tất cả thư mục</button>}
+              <span>{activeProductFolder ? 'THƯ MỤC SẢN PHẨM' : 'KHO SẢN PHẨM'}</span>
+              <h2>{activeProductFolder ? activeProductFolder.name : `${productFolders.length} thư mục danh mục`}</h2>
+              <small className="pagination-summary">{activeProductFolder ? `${activeProductFolder.products.length} sản phẩm · tối đa 15 sản phẩm mỗi trang` : `${products.length} sản phẩm được tự động sắp xếp theo danh mục cha`}</small>
+            </div>
+            <div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder={activeProductFolder ? `Tìm trong ${activeProductFolder.name}...` : 'Tìm thư mục hoặc sản phẩm...'}/></label><button className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><Upload size={17}/> Nhập Excel</button><button className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={18}/> Thêm sản phẩm</button></div>
+          </header>
+
+          {!activeProductFolder ? <div className="product-folder-browser">
+            <div className="product-folder-browser-intro"><span><FolderOpen size={18}/></span><div><b>Thư mục danh mục</b><small>Mở một thư mục để xem và quản lý các sản phẩm thuộc danh mục cha cùng toàn bộ danh mục con.</small></div><strong>{products.length} sản phẩm</strong></div>
+            <div className="product-folder-grid">
+              {visibleProductFolders.map(folder => <button
+                type="button"
+                className={`product-folder-card${folder.id === 'uncategorized' ? ' uncategorized' : ''}`}
+                style={{ '--folder-accent': folder.color }}
+                key={folder.id}
+                onClick={() => { setProductFolderId(folder.id); setQuery(''); setProductPage(1); setSelectedProductIds(new Set()) }}
+              >
+                <span className="product-folder-icon"><Folder size={25}/></span>
+                <span className="product-folder-copy"><small>{folder.id === 'uncategorized' ? 'CẦN KIỂM TRA' : 'DANH MỤC CHA'}</small><b>{folder.name}</b><em>{folder.subcategories.length ? folder.subcategories.map(category => category.name).join(' · ') : 'Sản phẩm trực thuộc danh mục'}</em></span>
+                <span className="product-folder-count"><b>{folder.products.length}</b><small>sản phẩm</small><ChevronRight size={17}/></span>
+              </button>)}
+            </div>
+            {!visibleProductFolders.length && <div className="product-folder-empty"><Search size={25}/><b>Không tìm thấy thư mục phù hợp</b><span>Thử tìm bằng tên danh mục, sản phẩm hoặc thương hiệu.</span></div>}
+          </div> : <>
+            {selectedProductIds.size > 0 && <div className="admin-bulk-toolbar"><span><Check size={16}/> Đã chọn <b>{selectedProductIds.size}</b> sản phẩm</span><button className="admin-danger-action" onClick={removeSelectedProducts}><Trash2 size={16}/> Xóa đã chọn</button><button className="admin-secondary compact" onClick={() => setSelectedProductIds(new Set())}>Bỏ chọn</button></div>}
+            <div className="admin-table-wrap"><table className="products-table"><thead><tr><th className="admin-select-cell"><input type="checkbox" checked={paginatedProducts.length > 0 && paginatedProducts.every(product => selectedProductIds.has(product.id))} onChange={toggleVisibleProductSelection} aria-label="Chọn tất cả sản phẩm trên trang hiện tại"/></th><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr></thead><tbody>{paginatedProducts.map(product => <tr key={product.id}><td className="admin-select-cell"><input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} aria-label={`Chọn ${product.name}`}/></td><td><div className="admin-product-cell"><img src={product.image} alt=""/><span><b>{product.name}</b><small>{product.brand} · #{product.id}</small></span></div></td><td>{product.category}</td><td><strong>{formatPrice(product.price)}</strong><del>{formatPrice(product.oldPrice)}</del></td><td><span className={`stock-count ${product.stock <= 5 ? 'critical' : product.stock <= 10 ? 'low' : ''}`}>{product.stock}</span></td><td><div className="row-actions"><button onClick={() => { setEditor(product); setEditorOpen(true) }} aria-label={`Sửa ${product.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeProduct(product)} aria-label={`Xóa ${product.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleProducts.length && <div className="table-empty">{query ? 'Không tìm thấy sản phẩm phù hợp trong thư mục này.' : 'Thư mục này chưa có sản phẩm.'}</div>}</div>
+            {visibleProducts.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(productPage, productPageCount)} / {productPageCount} · {visibleProducts.length} sản phẩm</span><div><button type="button" onClick={() => setProductPage(current => Math.max(1, current - 1))} disabled={productPage <= 1}>← Trước</button>{productPages.map(page => <button type="button" className={page === productPage ? 'active' : ''} key={page} onClick={() => setProductPage(page)}>{page}</button>)}<button type="button" onClick={() => setProductPage(current => Math.min(productPageCount, current + 1))} disabled={productPage >= productPageCount}>Sau →</button></div></footer>}
+          </>}
         </section>}
 
         {tab === 'categories' && <CategoryManager categories={categories} products={products} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory} onRequestBulkDelete={removeCategories}/>}
@@ -1690,7 +1812,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       </div>}
     </main>
     {editorOpen && <ProductEditor product={editor} categories={categories} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}
-    {bulkImporterOpen && <BulkProductImporter onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
+    {bulkImporterOpen && <BulkProductImporter categories={categories} onClose={() => setBulkImporterOpen(false)} onSaved={saveBulkProducts}/>}
     {showroomEditorOpen && <ShowroomEditor showroom={showroomEditor} onClose={() => { setShowroomEditorOpen(false); setShowroomEditor(null) }} onSaved={saveShowroom}/>}
     {confirmation && <div className="admin-confirm-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !confirming && setConfirmation(null)}>
       <section className="admin-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-description">
