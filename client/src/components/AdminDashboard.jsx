@@ -483,6 +483,15 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
     }))
   }
 
+  function updateUpgradeOptionName(groupIndex, optionIndex, name) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.map((group, index) => index === groupIndex
+        ? { ...group, options: group.options.map((option, currentIndex) => currentIndex === optionIndex ? { ...option, name } : option) }
+        : group)
+    }))
+  }
+
   function addPromotion() {
     setForm(current => ({ ...current, promotions: [...current.promotions, ''] }))
   }
@@ -679,9 +688,9 @@ function ProductEditor({ product, products = [], categories = defaultCategories,
                     <div className="product-upgrade-products">
                       {group.options.map((option, optionIndex) => {
                         const linkedProduct = products.find(item => item.id === Number(option.productId))
-                        return <article className="product-upgrade-product" key={`${option.productId || option.name}-${optionIndex}`}>
+                        return <article className="product-upgrade-product" key={`${option.productId || 'legacy'}-${optionIndex}`}>
                           {linkedProduct ? <img src={linkedProduct.image} alt=""/> : <span><Package size={18}/></span>}
-                          <div><small>{optionIndex === 0 ? 'CẤU HÌNH GỐC' : `LỰA CHỌN ${optionIndex + 1}`}</small><b>{linkedProduct?.name || option.name}</b>{linkedProduct && <em>{formatPrice(linkedProduct.price)}</em>}</div>
+                          <div><small>{optionIndex === 0 ? 'CẤU HÌNH GỐC' : `LỰA CHỌN ${optionIndex + 1}`}</small><label className="upgrade-option-name"><span>Tên hiển thị</span><input value={option.name} maxLength="160" onChange={event => updateUpgradeOptionName(groupIndex, optionIndex, event.target.value)} placeholder="Ví dụ: RAM 16GB DDR4" aria-label={`Tên hiển thị lựa chọn ${optionIndex + 1} nhóm ${groupIndex + 1}`}/></label>{linkedProduct && <><b title={linkedProduct.name}>Linh kiện: {linkedProduct.name}</b><em>{formatPrice(linkedProduct.price)}</em></>}</div>
                           <button type="button" onClick={() => removeUpgradeOption(groupIndex, optionIndex)} aria-label={`Xóa ${option.name}`}><X size={14}/></button>
                         </article>
                       })}

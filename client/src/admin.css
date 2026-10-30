@@ -2882,6 +2882,26 @@
   font-weight: 800;
 }
 
+.product-upgrade-product .upgrade-option-name {
+  display: grid;
+  gap: 4px;
+  margin: 7px 0;
+}
+
+.product-form-fields .upgrade-option-name > span {
+  margin: 0;
+  color: #737b88;
+  font-size: 9px;
+}
+
+.product-form-fields .upgrade-option-name input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+
 .product-upgrade-product > button {
   display: grid;
   width: 28px;

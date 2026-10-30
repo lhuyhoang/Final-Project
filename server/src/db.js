@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
+import { getUpgradeDisplayName } from '../../shared/upgradeDisplayName.mjs'
 
 const { Pool } = pg
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -1048,7 +1049,7 @@ export async function createOrder(input) {
         }
         upgradePrice += Math.max(0, numberValue(selectedUpgradeProduct.price) - numberValue(baseUpgradeProduct.price))
         normalizedUpgrades.push({ groupIndex, productId: selectedProductId })
-        if (selectedProductId !== baseProductId) upgradedNames.push(selectedUpgradeProduct.name)
+        if (selectedProductId !== baseProductId) upgradedNames.push(getUpgradeDisplayName(selectedOption, selectedUpgradeProduct))
       })
       if (item.upgrades.some(upgrade => !normalizedUpgrades.some(value => value.groupIndex === upgrade.groupIndex && value.productId === upgrade.productId))) {
         throw repositoryError(400, `Cấu hình nâng cấp của ${product.name} không hợp lệ`, 'PRODUCT_UPGRADE_CHANGED')

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getUpgradeDisplayName } from "../../../shared/upgradeDisplayName.mjs";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -418,7 +419,7 @@ export default function ProductDetail({
       const legacyName = typeof option === "string" ? option : option?.name;
       const productId = typeof option === "object" ? Number(option?.productId) : null;
       const linkedProduct = Number.isInteger(productId) ? products.find((item) => item.id === productId) : null;
-      return { key: linkedProduct?.id || legacyName, name: linkedProduct?.name || legacyName || "Lựa chọn nâng cấp", product: linkedProduct };
+      return { key: linkedProduct?.id || legacyName, name: getUpgradeDisplayName(option, linkedProduct), product: linkedProduct };
     });
     const baseProduct = options[0]?.product;
     return {
