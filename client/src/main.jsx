@@ -1249,6 +1249,25 @@ function App() {
     );
     setTimeout(() => setToast(""), 2200);
   }
+
+  function addComboToCart(comboProducts) {
+    const productsToAdd = [...new Map(
+      comboProducts.filter((product) => product && product.stock !== 0).map((product) => [product.id, product]),
+    ).values()];
+    if (!productsToAdd.length) return;
+    setCart((current) => {
+      const next = [...current];
+      productsToAdd.forEach((product) => {
+        const existingIndex = next.findIndex((item) => item.id === product.id);
+        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
+        else next.push({ ...product, quantity: 1 });
+      });
+      return next;
+    });
+    setCartOpen(true);
+    setToast(`Đã thêm combo ${productsToAdd.length} sản phẩm vào giỏ`);
+    setTimeout(() => setToast(""), 2600);
+  }
   function updateQuantity(id, delta) {
     setCart((current) =>
       current
@@ -1974,6 +1993,7 @@ function App() {
             onOpenCategory={(category) => openCatalog(category)}
             onOpenProduct={openProduct}
             onAdd={addToCart}
+            onAddCombo={addComboToCart}
             onBuyNow={buyNow}
           />
         ) : selectedCatalogCategory ? (
