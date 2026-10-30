@@ -6,6 +6,7 @@ const banners = [
   { image: "build-pc-gaming.jpg", label: "Build PC Gaming giá tốt tại QuadShop" },
   { image: "pc-delta-force.jpg", label: "Cấu hình PC chiến Delta Force và quà tặng" },
   { image: "halloween-pc.jpg", label: "Halloween săn deal, build PC cực chill" },
+  { image: "halloween-deals.jpg", label: "Ưu đãi Halloween và miễn phí vận chuyển toàn quốc" },
 ];
 
 export default function HomeBanners() {
@@ -90,14 +91,6 @@ export default function HomeBanners() {
             </button>
           )}
         </div>
-      </div>
-      <div className="home-banners-promos">
-        <a href="#products" aria-label="Xem sản phẩm PC khuyến mãi Halloween">
-          <img src="/images/banners/halloween-pc.jpg" alt="Halloween săn deal, build PC cực chill" width="2856" height="1087" />
-        </a>
-        <a href="#products" aria-label="Xem các sản phẩm đang ưu đãi">
-          <img src="/images/banners/halloween-deals.jpg" alt="Ưu đãi Halloween và miễn phí vận chuyển toàn quốc" width="2051" height="1123" />
-        </a>
       </div>
     </section>
   );

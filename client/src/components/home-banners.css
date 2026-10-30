@@ -1,9 +1,5 @@
 .home-banners {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 27%);
-  gap: 14px;
   margin-top: 16px;
-  align-items: start;
 }
 
 .home-banners-carousel {
@@ -106,14 +102,6 @@
 .home-banners-pagination [aria-current="true"] span { width: 21px; background: white; }
 .home-banners button:focus-visible,
 .home-banners a:focus-visible { outline: 3px solid var(--red); outline-offset: -3px; }
-
-.home-banners-promos { display: grid; gap: 14px; }
-.home-banners-promos a { display: block; overflow: hidden; border-radius: 12px; }
-
-@media (max-width: 1100px) {
-  .home-banners { grid-template-columns: minmax(0, 1fr); }
-  .home-banners-promos { display: none; }
-}
 
 @media (max-width: 600px) {
   .home-banners { margin-top: 12px; }
