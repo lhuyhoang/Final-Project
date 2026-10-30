@@ -4578,6 +4578,97 @@ html[data-theme="dark"] .admin-confirm-dialog .secondary:hover {
   background: #f8f9fb;
 }
 
+.product-folder-browser.nested {
+  min-height: 0;
+}
+
+.product-folder-breadcrumb {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  color: #9aa1ac;
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.product-folder-breadcrumb > span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.product-folder-breadcrumb button {
+  display: inline-flex;
+  min-height: 30px;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 7px;
+  color: #6a7380;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.product-folder-breadcrumb button:hover:not(:disabled) {
+  color: var(--red);
+  background: #fff3f1;
+}
+
+.product-folder-breadcrumb button[aria-current="page"] {
+  color: #303944;
+  font-weight: 800;
+  cursor: default;
+}
+
+.product-folder-breadcrumb button:focus-visible {
+  outline: 3px solid #e6332a2b;
+  outline-offset: 2px;
+}
+
+.product-folder-direct-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 14px 20px;
+  color: #4e5968;
+  font-size: 10px;
+  border-top: 1px solid #e5e8ec;
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.product-folder-direct-heading > svg {
+  color: var(--red);
+}
+
+.product-folder-direct-heading > small {
+  margin-left: auto;
+  color: #939ba7;
+  font-size: 8px;
+}
+
+.admin-shell.admin-theme-dark :where(.product-folder-breadcrumb, .product-folder-direct-heading) {
+  color: #b5bdc9;
+  border-color: #363c46;
+}
+
+.admin-shell.admin-theme-dark .product-folder-breadcrumb button {
+  color: #a7b1bf;
+}
+
+.admin-shell.admin-theme-dark .product-folder-breadcrumb button[aria-current="page"] {
+  color: #eef1f5;
+}
+
+.admin-shell.admin-theme-dark .product-folder-breadcrumb button:hover:not(:disabled) {
+  color: #ffaaa4;
+  background: #342124;
+}
+
 .product-folder-browser-intro {
   display: flex;
   min-height: 64px;
