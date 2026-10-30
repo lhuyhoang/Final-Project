@@ -22,7 +22,6 @@ import {
   Facebook,
   HardDrive,
   Headphones,
-  Heart,
   Instagram,
   Keyboard,
   Laptop,
@@ -435,9 +434,6 @@ function ProductCard({ product, onAdd, onOpen, carousel = false }) {
         tabIndex="0"
       >
         <span className="discount">-{product.discount}%</span>
-        <button type="button" className="heart" aria-label={`Yêu thích ${product.name}`}>
-          <Heart size={19} />
-        </button>
         <img src={product.image} alt={product.name} loading="lazy" />
         <span className="product-badge">{product.badge}</span>
       </div>
