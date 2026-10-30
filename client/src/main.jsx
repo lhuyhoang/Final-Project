@@ -1360,22 +1360,6 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function openOrderTracking() {
-    setBuilderView(false);
-    if (window.location.pathname !== "/account/orders") {
-      window.history.pushState({}, "", "/account/orders");
-    }
-    setAdminView(false);
-    setAccountView(true);
-    setCheckoutView(false);
-    setProductId(null);
-    setCatalogSelection(null);
-    setAccountOpen(false);
-    setShowroomOpen(false);
-    if (!session) openAuth("login");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   function leaveAccountSettings() {
     setBuilderView(false);
     if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
@@ -1824,12 +1808,6 @@ function App() {
                 </div>
               )}
             </div>
-            <button type="button" onClick={openOrderTracking}>
-              <Truck />
-              <span>
-                Tra cứu<small>Đơn hàng</small>
-              </span>
-            </button>
             <div className="account-wrap">
               <button
                 className="account-trigger"
