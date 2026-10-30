@@ -6,7 +6,8 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "db:init": "node scripts/db-init.js",
-    "test:password": "node scripts/password-self-test.js"
+    "test:password": "node scripts/password-self-test.js",
+    "test:access": "node --test ../shared/adminAccess.test.mjs && node test/staff-access.integration.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -16,5 +17,8 @@
     "helmet": "^8.0.0",
     "pg": "^8.23.0",
     "stripe": "^23.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
   }
 }

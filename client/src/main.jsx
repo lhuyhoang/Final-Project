@@ -72,6 +72,7 @@ import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
 import PcBuilderPage from "./components/PcBuilderPage";
 import { mergePcBuildCart } from "./pc-builder.mjs";
+import { canEnterAdmin } from "../../shared/adminAccess.mjs";
 import "./styles.css";
 import "./admin.css";
 
@@ -1141,7 +1142,7 @@ function App() {
     const isCheckoutRoute = window.location.pathname.startsWith("/checkout");
     if (!isAdminRoute && !isAccountRoute && !isCheckoutRoute) return;
     if (!session) openAuth("login");
-    else if (isAdminRoute && session.user.role !== "admin") leaveAdmin();
+    else if (isAdminRoute && !canEnterAdmin(session.user)) leaveAdmin();
   }, [sessionReady, session]);
   useEffect(() => {
     const syncRoute = () => {
@@ -1315,7 +1316,7 @@ function App() {
     setAuthOpen(false);
     setToast(`Xin chào, ${nextSession.user.name}`);
     setTimeout(() => setToast(""), 2200);
-    if (nextSession.user.role === "admin") openAdmin();
+    if (canEnterAdmin(nextSession.user)) openAdmin();
     else if (window.location.pathname.startsWith("/admin")) leaveAdmin();
   }
 
@@ -1584,10 +1585,11 @@ function App() {
     );
   }
 
-  if (adminView && session?.user.role === "admin") {
+  if (adminView && canEnterAdmin(session?.user)) {
     return (
       <AdminDashboard
         user={session.user}
+        onUserUpdated={handleUserUpdated}
         onBack={leaveAdmin}
         onLogout={logout}
         onProductsChanged={refreshProducts}
@@ -1826,6 +1828,7 @@ function App() {
                     {session
                       ? session.user.role === "admin"
                         ? "Quản trị viên"
+                        : session.user.role === "staff" ? session.user.staffRoleName || "Nhân viên"
                         : "Thành viên"
                       : "Đăng nhập"}
                   </small>
@@ -1841,9 +1844,9 @@ function App() {
                       <small>{session.user.email}</small>
                     </p>
                   </div>
-                  {session.user.role === "admin" && (
+                  {canEnterAdmin(session.user) && (
                     <button onClick={openAdmin}>
-                      <LayoutDashboard size={17} /> Admin Dashboard
+                      <LayoutDashboard size={17} /> Trang quản lý
                     </button>
                   )}
                   <button onClick={openAccountSettings}>

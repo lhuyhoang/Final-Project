@@ -4,6 +4,8 @@ import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
+import UserManager from './UserManager'
+import { hasAdminPermission } from '../../../shared/adminAccess.mjs'
 import { getBuildCategoryScope, isPcBuildCategory, normalizeBuildText } from '../../../shared/pcBuild.mjs'
 import { buildProductFolders, getProductFolderPath } from '../product-folders'
 import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/productImage.mjs'
@@ -60,7 +62,7 @@ const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
-const validAdminTabs = new Set(['overview', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
+const validAdminTabs = new Set(['overview', 'inventory', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
 const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
 const compareAdminCategories = (left, right) =>
   (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) || left.name.localeCompare(right.name, 'vi')
@@ -1367,8 +1369,12 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
-  const [tab, setTab] = useState(loadAdminTab)
+export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
+  const [requestedTab, setTab] = useState(loadAdminTab)
+  const [accessUser, setAccessUser] = useState(user)
+  const allowed = permission => hasAdminPermission(accessUser, permission)
+  const availableTabs = ['overview', 'inventory', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'users', 'settings'].filter(allowed)
+  const tab = availableTabs.includes(requestedTab) ? requestedTab : availableTabs[0] || ''
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
   const [products, setProducts] = useState([])
@@ -1400,18 +1406,23 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     silent ? setRefreshing(true) : setLoading(true)
     setError('')
     try {
-      const stripeRequest = api('/api/admin/stripe/overview')
+      const { user: currentUser } = await api('/api/admin/access')
+      setAccessUser(currentUser)
+      if (onUserUpdated) onUserUpdated(currentUser)
+      const permitted = permission => hasAdminPermission(currentUser, permission)
+      const fetchIf = (enabled, path, fallback = []) => enabled ? api(path) : Promise.resolve(fallback)
+      const stripeRequest = fetchIf(permitted('online-payments'), '/api/admin/stripe/overview', null)
         .then(data => ({ data }))
         .catch(stripeError => ({ error: stripeError }))
       const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, settingsData, stripeResult] = await Promise.all([
-        api('/api/admin/stats'),
-        api('/api/admin/products'),
-        api('/api/admin/categories'),
-        api('/api/admin/showrooms'),
-        api('/api/admin/orders'),
-        api('/api/admin/payments'),
-        api('/api/admin/users'),
-        api('/api/admin/settings'),
+        fetchIf(permitted('overview'), '/api/admin/stats', null),
+        fetchIf(permitted('products') || permitted('inventory') || permitted('settings'), '/api/admin/products'),
+        fetchIf(permitted('products') || permitted('inventory') || permitted('categories'), '/api/admin/categories'),
+        fetchIf(permitted('showrooms'), '/api/admin/showrooms'),
+        fetchIf(permitted('orders'), '/api/admin/orders'),
+        fetchIf(permitted('online-payments'), '/api/admin/payments'),
+        fetchIf(currentUser.role === 'admin', '/api/admin/users'),
+        fetchIf(permitted('settings'), '/api/admin/settings', {}),
         stripeRequest
       ])
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
@@ -1426,7 +1437,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       setStripeOverview(stripeResult.data || { error: stripeResult.error?.message || 'Không thể tải dữ liệu Stripe Sandbox' })
     } catch (requestError) {
       setError(requestError.message)
-      if (requestError.status === 401 || requestError.status === 403) onLogout()
+      if (requestError.status === 401) onLogout()
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -1434,6 +1445,25 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
   }
 
   useEffect(() => { loadDashboard() }, [])
+
+  useEffect(() => {
+    const refreshAccess = async () => {
+      if (document.hidden) return
+      try {
+        const { user: currentUser } = await api('/api/admin/access')
+        if (JSON.stringify(currentUser) !== JSON.stringify(accessUser)) {
+          setEditorOpen(false); setBulkImporterOpen(false); setShowroomEditorOpen(false); setConfirmation(null)
+          await loadDashboard(true)
+        }
+      } catch (error) {
+        if (error.status === 401) onLogout()
+        else if (error.status === 403) { setAccessUser({ ...accessUser, role: 'customer', permissions: [] }); onBack() }
+      }
+    }
+    window.addEventListener('focus', refreshAccess)
+    const timer = window.setInterval(refreshAccess, 30000)
+    return () => { window.removeEventListener('focus', refreshAccess); window.clearInterval(timer) }
+  }, [accessUser])
 
   useEffect(() => {
     try {
@@ -1622,30 +1652,6 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     }
   }
 
-  async function toggleUserStatus(account) {
-    const status = account.status === 'active' ? 'blocked' : 'active'
-    try {
-      const updated = await api(`/api/admin/users/${account.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
-      setUsers(current => current.map(item => item.id === updated.id ? updated : item))
-      showNotice(status === 'blocked' ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản')
-    } catch (requestError) {
-      setError(requestError.message)
-    }
-  }
-
-  async function updateUserRole(account, role) {
-    try {
-      const updated = await api(`/api/admin/users/${account.id}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role })
-      })
-      setUsers(current => current.map(item => item.id === updated.id ? updated : item))
-      showNotice(role === 'admin' ? 'Đã cấp quyền quản trị' : 'Đã chuyển thành khách hàng')
-    } catch (requestError) {
-      setError(requestError.message)
-    }
-  }
-
   const normalizedQuery = query.trim().toLowerCase()
   const productFolders = useMemo(() => buildProductFolders(categories, products), [categories, products])
   const rootProductFolders = useMemo(() => productFolders.filter(folder => !folder.parentFolderId), [productFolders])
@@ -1705,7 +1711,6 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
     const start = (safePage - 1) * onlinePaymentPageSize
     return visibleOnlinePayments.slice(start, start + onlinePaymentPageSize)
   }, [onlinePaymentPage, onlinePaymentPageCount, visibleOnlinePayments])
-  const visibleUsers = useMemo(() => users.filter(account => `${account.name} ${account.email} ${account.phone}`.toLowerCase().includes(normalizedQuery)), [users, normalizedQuery])
   const unreadOrders = useMemo(() => orders.filter(order => order.status === 'pending' && isAfterLastRead(order.createdAt, notificationReads.orders)).length, [notificationReads.orders, orders])
   const unreadOnlinePayments = useMemo(() => onlinePayments.filter(order => isAfterLastRead(order.paidAt, notificationReads.onlinePayments)).length, [notificationReads.onlinePayments, onlinePayments])
   const maxRevenue = Math.max(1, ...(stats?.revenueSeries || []).map(item => item.value))
@@ -1736,14 +1741,15 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
+    { id: 'inventory', label: 'Nhập hàng', icon: Upload },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'categories', label: 'Danh mục', icon: ClipboardList },
     { id: 'showrooms', label: 'Showroom', icon: MapPinned },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
-    { id: 'users', label: 'Khách hàng', icon: Users },
+    { id: 'users', label: 'Người dùng', icon: Users },
     { id: 'settings', label: 'Hiệu ứng chuyển cảnh', icon: Settings }
-  ]
+  ].filter(item => allowed(item.id))
 
   return <div
     className={`admin-shell admin-theme-${theme}`}
@@ -1753,7 +1759,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
       <button className="admin-logo" onClick={onBack}><span>Q</span><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
       <div className="admin-nav-label">QUẢN TRỊ</div>
       <nav>{navItems.map(item => { const Icon = item.icon; const count = item.id === 'orders' ? unreadOrders : item.id === 'online-payments' ? unreadOnlinePayments : 0; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{count > 0 && <b aria-label={`${count} thông báo chưa xem`}>{count}</b>}</button> })}</nav>
-      <div className="admin-user"><div>{user.name.charAt(0).toUpperCase()}</div><span><b>{user.name}</b><small>Quản trị viên</small></span></div>
+      <div className="admin-user"><div>{user.name.charAt(0).toUpperCase()}</div><span><b>{user.name}</b><small>{accessUser.role === 'admin' ? 'Quản trị viên' : accessUser.staffRoleName || 'Nhân viên'}</small></span></div>
       <button className="admin-logout" onClick={onLogout}><LogOut size={18}/> Đăng xuất</button>
     </aside>
 
@@ -1767,6 +1773,8 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
 
       {error && <div className="admin-alert"><AlertTriangle size={18}/><span>{error}</span><button onClick={() => setError('')}><X size={17}/></button></div>}
       {loading ? <div className="admin-loading"><RefreshCw className="spin"/><span>Đang tải dữ liệu quản trị...</span></div> : <div className="admin-content">
+        {!tab && <div className="admin-panel table-empty">Bạn chưa được cấp tab quản lý nào. Liên hệ admin để được phân quyền.</div>}
+        {tab === 'inventory' && <section className="admin-panel inventory-entry-panel"><span className="inventory-entry-icon"><Upload size={32}/></span><div><small>NHẬP KHO</small><h2>Nhập sản phẩm vào cửa hàng</h2><p>Thêm sản phẩm mới hoặc nhập nhiều sản phẩm bằng Excel. Danh mục, giá và tồn kho được lưu theo dữ liệu bạn nhập.</p><div><button type="button" className="admin-primary" onClick={() => { setEditor(null); setEditorOpen(true) }}><Plus size={17}/> Thêm sản phẩm</button><button type="button" className="admin-secondary" onClick={() => setBulkImporterOpen(true)}><FileSpreadsheet size={17}/> Nhập Excel</button></div></div></section>}
         {tab === 'overview' && stats && <>
           <section className="admin-stats-grid">
             <StatCard icon={WalletCards} label="Doanh thu đã thu" value={formatPrice(stats.totalRevenue)} note={`${formatPrice(stats.onlineRevenue)} thanh toán online`} tone="red"/>
@@ -1863,10 +1871,7 @@ export default function AdminDashboard({ user, onBack, onLogout, onProductsChang
           {visibleOnlinePayments.length > 0 && <footer className="admin-pagination"><span>Trang {Math.min(onlinePaymentPage, onlinePaymentPageCount)} / {onlinePaymentPageCount}</span><div><button type="button" onClick={() => setOnlinePaymentPage(current => Math.max(1, current - 1))} disabled={onlinePaymentPage <= 1}>← Trước</button>{onlinePaymentPages.map(page => <button type="button" className={page === onlinePaymentPage ? 'active' : ''} key={page} onClick={() => setOnlinePaymentPage(page)}>{page}</button>)}<button type="button" onClick={() => setOnlinePaymentPage(current => Math.min(onlinePaymentPageCount, current + 1))} disabled={onlinePaymentPage >= onlinePaymentPageCount}>Sau →</button></div></footer>}
         </section>}
 
-        {tab === 'users' && <section className="admin-panel admin-list-panel">
-          <header className="list-header"><div><span>THÀNH VIÊN</span><h2>{users.length} tài khoản</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, email, số điện thoại..."/></label></div></header>
-          <div className="admin-table-wrap"><table><thead><tr><th>Người dùng</th><th>Liên hệ</th><th>Vai trò</th><th>Ngày đăng ký</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{visibleUsers.map(account => <tr key={account.id}><td><div className="account-cell"><div>{account.name.charAt(0).toUpperCase()}</div><span><b>{account.name}</b><small>{account.id}</small></span></div></td><td><div className="customer-cell"><b>{account.email}</b><small>{account.phone || 'Chưa cập nhật SĐT'}</small></div></td><td><select className={`role-badge role-select ${account.role}`} value={account.role} disabled={account.id === user.id} onChange={event => updateUserRole(account, event.target.value)} aria-label={`Vai trò của ${account.name}`}><option value="customer">Khách hàng</option><option value="admin">Quản trị</option></select></td><td>{formatDate(account.createdAt)}</td><td><span className={`account-status ${account.status}`}>{account.status === 'active' ? 'Hoạt động' : 'Đã khóa'}</span></td><td><button className="account-toggle" disabled={account.id === user.id} onClick={() => toggleUserStatus(account)}>{account.status === 'active' ? 'Khóa' : 'Mở khóa'}</button></td></tr>)}</tbody></table>{!visibleUsers.length && <div className="table-empty">Không tìm thấy tài khoản phù hợp.</div>}</div>
-        </section>}
+        {tab === 'users' && accessUser.role === 'admin' && <UserManager users={users} currentUser={accessUser} onChanged={() => loadDashboard(true)}/>}
       </div>}
     </main>
     {editorOpen && <ProductEditor product={editor} products={products} categories={categories} initialCategory={activeProductFolder?.subcategories[0]?.name || categories.find(category => category.id === activeProductFolder?.categoryId)?.name} onClose={() => { setEditorOpen(false); setEditor(null) }} onSaved={saveProduct}/>}

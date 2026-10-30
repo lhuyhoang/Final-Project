@@ -1,0 +1,89 @@
+.user-manager { --um-surface: #fff; --um-soft: #f6f7fa; --um-line: #e3e6ed; --um-text: #282e38; --um-muted: #7b8492; color: var(--um-text); }
+.admin-theme-dark .user-manager { --um-surface: #20242b; --um-soft: #181c23; --um-line: #373f4b; --um-text: #eef1f6; --um-muted: #a2adbd; }
+.user-manager-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 24px; }
+.user-manager-heading h2 { margin: 6px 0 8px; font-size: 24px; letter-spacing: -.6px; }
+.user-manager-heading small { color: var(--red); font-size: 9px; font-weight: 800; letter-spacing: .15em; }
+.user-manager-heading p { margin: 0; color: var(--um-muted); font-size: 12px; line-height: 1.7; }
+.user-back { display: flex; align-items: center; gap: 7px; padding: 0; margin-bottom: 14px; color: var(--um-muted); background: none; border: 0; font-size: 11px; }
+.user-heading-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.user-manager .admin-primary, .user-manager .admin-secondary,
+.inventory-entry-panel .admin-primary, .inventory-entry-panel .admin-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: auto; min-height: 38px; padding: 9px 12px; font-size: 11px; }
+.user-folder-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.user-folder { display: flex; align-items: center; gap: 18px; padding: 26px; color: inherit; text-align: left; border: 1px solid var(--um-line); border-radius: 14px; background: var(--um-surface); transition: border-color .2s, box-shadow .2s; }
+.user-folder:hover { border-color: #e78a84; box-shadow: 0 8px 28px #3c142009; }
+.user-folder > span { display: flex; flex-shrink: 0; width: 64px; height: 64px; align-items: center; justify-content: center; position: relative; border-radius: 14px; color: var(--red); background: #e6332a12; }
+.user-folder > span > svg + svg { position: absolute; right: 9px; bottom: 9px; background: var(--um-surface); border-radius: 4px; }
+.user-folder > div { flex: 1; min-width: 0; }
+.user-folder small { display: block; color: var(--um-muted); font-size: 8px; letter-spacing: .08em; font-weight: 700; }
+.user-folder b { display: block; margin-top: 6px; font-size: 18px; }
+.user-folder p { margin: 7px 0 10px; color: var(--um-muted); font-size: 11px; line-height: 1.6; }
+.user-folder em { color: var(--red); font-size: 11px; font-style: normal; font-weight: 700; }
+.user-section-tabs { display: flex; gap: 6px; margin-bottom: 20px; padding: 5px; background: var(--um-surface); border: 1px solid var(--um-line); border-radius: 10px; width: fit-content; }
+.user-section-tabs button { display: flex; gap: 7px; align-items: center; padding: 10px 16px; color: var(--um-muted); background: transparent; border: 0; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.user-section-tabs [aria-selected="true"] { color: var(--red); background: #e6332a10; }
+.user-list-search { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid var(--um-line); }
+.user-list-search label { display: flex; align-items: center; gap: 8px; width: min(380px, 75%); padding: 10px 12px; color: var(--um-muted); border: 1px solid var(--um-line); border-radius: 8px; }
+.user-list-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--um-text); background: transparent; font-size: 12px; }
+.user-list-search > span { color: var(--um-muted); font-size: 11px; }
+.user-role-select { width: 220px; max-width: 100%; padding: 8px; color: var(--um-text); background: var(--um-soft); border: 1px solid var(--um-line); border-radius: 6px; font-size: 11px; }
+.staff-roles-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.staff-role-card { padding: 20px; border: 1px solid var(--um-line); border-radius: 12px; background: var(--um-surface); display: flex; flex-direction: column; }
+.staff-role-card > div:first-child { display: flex; gap: 12px; align-items: center; }
+.staff-role-card > div:first-child > span { display: grid; width: 44px; height: 44px; place-items: center; background: #e6332a10; color: var(--red); border-radius: 10px; }
+.staff-role-card h3 { margin: 0 0 5px; font-size: 15px; overflow-wrap: anywhere; }
+.staff-role-card small { color: var(--um-muted); font-size: 10px; }
+.staff-role-card ul { flex: 1; list-style: none; padding: 15px 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-content: start; }
+.staff-role-card li { display: flex; gap: 4px; align-items: center; padding: 5px 7px; font-size: 10px; color: var(--um-muted); background: var(--um-soft); border-radius: 5px; }
+.staff-role-card li svg { color: #139567; }
+.staff-role-actions { display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid var(--um-line); }
+.user-delete-role { display: grid; place-items: center; height: 34px; width: 34px; border: 0; background: #e6332a10; border-radius: 6px; color: var(--red); }
+.user-manager button:disabled { cursor: not-allowed; opacity: .45; }
+.user-manager :where(button, input, select):focus-visible { outline: 3px solid #e6332a55; outline-offset: 2px; }
+.user-manager-error { padding: 12px 14px; margin: 12px 0; background: #e6332a0c; color: #d13b32; border: 1px solid #e6332a40; border-radius: 8px; font-size: 12px; line-height: 1.6; }
+.user-manager-notice { display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-size: 12px; color: #15906c; background: #16966a10; border-radius: 8px; }
+.user-manager-empty { padding: 40px 20px; color: var(--um-muted); font-size: 12px; text-align: center; }
+.user-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; color: var(--um-muted); font-size: 11px; border-top: 1px solid var(--um-line); }
+.user-pagination > div { display: flex; gap: 7px; }
+.user-dialog-backdrop { position: fixed; inset: 0; z-index: 160; display: grid; place-items: center; padding: 20px; background: #10141e99; backdrop-filter: blur(4px); }
+.user-dialog { width: min(740px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; background: var(--um-surface); color: var(--um-text); border: 1px solid var(--um-line); border-radius: 16px; box-shadow: 0 24px 80px #0003; }
+.user-dialog > header { position: static; display: flex; justify-content: space-between; align-items: center; padding: 22px 24px; background: var(--um-surface); border-bottom: 1px solid var(--um-line); box-shadow: none; }
+.user-dialog header small { color: var(--red); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.user-dialog header h2 { margin: 6px 0 0; font-size: 21px; }
+.user-dialog header > button { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; color: var(--um-muted); background: var(--um-soft); }
+.user-dialog-body { padding: 24px; }
+.user-field { display: grid; gap: 8px; color: var(--um-text); font-size: 12px; font-weight: 600; }
+.user-field input, .user-field select { width: 100%; min-width: 0; height: 42px; padding: 9px 12px; color: var(--um-text); background: var(--um-soft); border: 1px solid var(--um-line); border-radius: 7px; font: inherit; }
+.role-permissions-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 22px 0 12px; font-size: 12px; }
+.role-permissions-heading button { padding: 4px; color: var(--red); font-size: 11px; background: none; border: 0; }
+.role-permission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.role-permission-grid label { display: flex; align-items: flex-start; gap: 10px; padding: 14px; background: var(--um-surface); border: 1px solid var(--um-line); border-radius: 9px; cursor: pointer; }
+.role-permission-grid label.selected { border-color: #e6332a80; background: #e6332a05; }
+.role-permission-grid input { flex-shrink: 0; width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--red); }
+.role-permission-grid b { display: block; font-size: 12px; }
+.role-permission-grid small { display: block; margin-top: 5px; color: var(--um-muted); font-size: 10px; line-height: 1.7; }
+.user-form-hint { display: flex; align-items: flex-start; gap: 7px; color: var(--um-muted); font-size: 11px; line-height: 1.7; margin: 18px 0 0; }
+.user-form-hint svg { flex-shrink: 0; margin-top: 2px; color: #139567; }
+.user-dialog footer { position: static; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 24px; background: var(--um-soft); color: var(--um-muted); border-top: 1px solid var(--um-line); font-size: 10px; }
+.user-dialog footer > div { display: flex; gap: 8px; margin-left: auto; }
+.staff-create-fields { display: grid; gap: 16px; }
+.inventory-entry-panel { display: flex; align-items: flex-start; gap: 22px; padding: 32px; }
+.inventory-entry-icon { display: grid; flex-shrink: 0; width: 72px; height: 72px; place-items: center; color: var(--red); border-radius: 16px; background: #e6332a10; }
+.inventory-entry-panel small { color: var(--red); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.inventory-entry-panel h2 { margin: 8px 0 10px; font-size: 23px; }
+.inventory-entry-panel p { max-width: 600px; color: #8992a0; font-size: 12px; line-height: 1.8; }
+.inventory-entry-panel > div > div { display: flex; gap: 10px; margin-top: 20px; }
+@media (max-width: 1100px) { .staff-roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .user-manager-heading { align-items: stretch; flex-direction: column; }
+  .user-folder-grid, .staff-roles-grid { grid-template-columns: 1fr; }
+  .user-folder { padding: 20px; }
+  .user-dialog-backdrop { padding: 10px; }
+  .user-dialog { max-height: calc(100dvh - 20px); }
+  .user-dialog > header, .user-dialog-body, .user-dialog footer { padding: 18px; }
+  .role-permission-grid { grid-template-columns: 1fr; }
+  .user-dialog footer > span { display: none; }
+  .user-section-tabs { width: 100%; }
+  .user-section-tabs button { flex: 1; justify-content: center; padding: 10px 8px; font-size: 11px; }
+  .inventory-entry-panel { padding: 22px; flex-direction: column; }
+  .inventory-entry-panel > div > div { flex-wrap: wrap; }
+}

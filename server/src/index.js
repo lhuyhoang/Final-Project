@@ -21,6 +21,7 @@ import {
   createOrder as insertOrder,
   createProduct as insertProduct,
   createUserSession,
+  createUser,
   deleteAllUserSessions,
   deleteOtherUserSessions,
   deleteProduct as removeProduct,
@@ -44,6 +45,10 @@ import {
   listProducts,
   listShowrooms,
   listUsers,
+  listStaffRoles,
+  findStaffRole,
+  saveStaffRole,
+  deleteStaffRole,
   processStripeWebhookEvent,
   registerUserWithPassword,
   updateCategory,
@@ -56,6 +61,7 @@ import {
 import { hashPassword, verifyPassword } from './password.js'
 import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs'
 import { normalizeProductImage } from '../../shared/productImage.mjs'
+import { canAccessAdminEndpoint, normalizeStaffRole } from '../../shared/adminAccess.mjs'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -349,6 +355,9 @@ const safeUser = user => ({
   address: user.address || '',
   province: user.province || '',
   role: user.role,
+  staffRoleId: user.staffRoleId,
+  staffRoleName: user.staffRoleName,
+  permissions: user.permissions || [],
   status: user.status,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt || user.createdAt
@@ -463,7 +472,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
 })
 
 function authorizeAdmin(req, res, next) {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Bạn không có quyền quản trị' })
+  if (!canAccessAdminEndpoint(req.user, req.method, req.path)) return res.status(403).json({ message: 'Bạn chưa được cấp quyền thực hiện thao tác này', code: 'ADMIN_PERMISSION_DENIED' })
   next()
 }
 
@@ -1172,7 +1181,49 @@ app.get('/api/orders', authenticate, asyncHandler(async (req, res) => {
   res.json(orders)
 }))
 
-app.use('/api/admin', authenticate, authorizeAdmin)
+app.use('/api/admin', (req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+  next()
+}, authenticate, authorizeAdmin)
+
+app.get('/api/admin/access', (req, res) => res.json({ user: req.user }))
+
+app.get('/api/admin/roles', asyncHandler(async (req, res) => res.json(await listStaffRoles())))
+
+function validateStaffRoleBody(body) {
+  try { return normalizeStaffRole(body) } catch (error) { throw httpError(400, error.message) }
+}
+
+app.post('/api/admin/roles', asyncHandler(async (req, res) => {
+  res.status(201).json(await saveStaffRole(null, validateStaffRoleBody(req.body)))
+}))
+
+app.put('/api/admin/roles/:id', asyncHandler(async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) throw httpError(400, 'Vai trò không hợp lệ')
+  const role = await saveStaffRole(Number(req.params.id), validateStaffRoleBody(req.body))
+  if (!role) throw httpError(404, 'Không tìm thấy vai trò')
+  res.json(role)
+}))
+
+app.delete('/api/admin/roles/:id', asyncHandler(async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) throw httpError(400, 'Vai trò không hợp lệ')
+  const role = await deleteStaffRole(Number(req.params.id))
+  if (!role) throw httpError(404, 'Không tìm thấy vai trò')
+  res.json(role)
+}))
+
+app.post('/api/admin/users', asyncHandler(async (req, res) => {
+  const name = String(req.body?.name || '').trim().replace(/\s+/g, ' ')
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  const password = req.body?.password
+  const staffRoleId = Number(req.body?.staffRoleId)
+  if (name.length < 2 || name.length > 60) throw httpError(400, 'Họ tên phải từ 2 đến 60 ký tự')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw httpError(400, 'Email không hợp lệ')
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw httpError(400, 'Mật khẩu phải từ 8 đến 128 ký tự')
+  if (!Number.isSafeInteger(staffRoleId) || staffRoleId < 1 || !await findStaffRole(staffRoleId)) throw httpError(400, 'Chọn vai trò nhân viên hợp lệ')
+  const user = await createUser({ name, email, passwordHash: await hashPassword(password), role: 'staff', staffRoleId, status: 'active' })
+  res.status(201).json(safeUser(user))
+}))
 
 app.get('/api/admin/stats', asyncHandler(async (req, res) => {
   res.json(await getAdminStats())
@@ -1401,9 +1452,11 @@ app.patch('/api/admin/users/:id/status', asyncHandler(async (req, res) => {
 
 app.patch('/api/admin/users/:id/role', asyncHandler(async (req, res) => {
   const role = String(req.body?.role || '')
-  if (!['admin', 'customer'].includes(role)) throw httpError(400, 'Vai trò tài khoản không hợp lệ')
+  if (!['admin', 'staff', 'customer'].includes(role)) throw httpError(400, 'Vai trò tài khoản không hợp lệ')
   if (req.params.id === req.user.id) throw httpError(400, 'Không thể tự thay đổi quyền của tài khoản đang đăng nhập')
-  const user = await saveUser(req.params.id, { role })
+  const staffRoleId = role === 'staff' ? Number(req.body?.staffRoleId) : null
+  if (role === 'staff' && (!Number.isSafeInteger(staffRoleId) || staffRoleId < 1 || !await findStaffRole(staffRoleId))) throw httpError(400, 'Chọn vai trò nhân viên hợp lệ')
+  const user = await saveUser(req.params.id, { role, staffRoleId })
   if (!user) throw httpError(404, 'Không tìm thấy người dùng')
   await deleteAllUserSessions(user.id)
   res.json(safeUser(user))

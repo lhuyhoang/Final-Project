@@ -202,6 +202,9 @@ export function mapUserRow(row, { includePassword = true } = {}) {
     address: row.address || '',
     province: row.province || '',
     role: row.role,
+    staffRoleId: row.staff_role_id == null ? null : numberValue(row.staff_role_id),
+    staffRoleName: row.staff_role_name || '',
+    permissions: row.role === 'staff' && Array.isArray(row.staff_permissions) ? row.staff_permissions : [],
     status: row.status,
     createdAt: timestampValue(row.created_at),
     updatedAt: timestampValue(row.updated_at || row.created_at)
@@ -317,13 +320,13 @@ function translateUserConstraintError(error, message) {
 }
 
 export async function findUserById(id, { includePassword = true } = {}) {
-  const result = await query('SELECT * FROM users WHERE id = $1', [id])
+  const result = await query('SELECT users.*, staff_roles.name AS staff_role_name, staff_roles.permissions AS staff_permissions FROM users LEFT JOIN staff_roles ON staff_roles.id = users.staff_role_id WHERE users.id = $1', [id])
   return mapUserRow(result.rows[0], { includePassword })
 }
 
 export async function findUserByEmail(email, { includePassword = true } = {}) {
   const normalizedEmail = String(email || '').trim().toLowerCase()
-  const result = await query('SELECT * FROM users WHERE email = $1', [normalizedEmail])
+  const result = await query('SELECT users.*, staff_roles.name AS staff_role_name, staff_roles.permissions AS staff_permissions FROM users LEFT JOIN staff_roles ON staff_roles.id = users.staff_role_id WHERE users.email = $1', [normalizedEmail])
   return mapUserRow(result.rows[0], { includePassword })
 }
 
@@ -334,9 +337,9 @@ export async function createUser(input) {
     const result = await query(`
       INSERT INTO users (
         id, name, email, phone, landline, address, province,
-        password_hash, role, status, created_at, updated_at
+        password_hash, role, status, created_at, updated_at, staff_role_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `, [
       input.id || crypto.randomUUID(),
@@ -350,9 +353,10 @@ export async function createUser(input) {
       input.role || 'customer',
       input.status || 'active',
       createdAt,
-      input.updatedAt || createdAt
+      input.updatedAt || createdAt,
+      input.staffRoleId ?? null
     ])
-    return mapUserRow(result.rows[0])
+    return findUserById(result.rows[0].id)
   } catch (error) {
     translateUserConstraintError(error, 'Email đã được sử dụng')
   }
@@ -367,6 +371,7 @@ export async function updateUser(id, updates = {}) {
     address: 'address',
     province: 'province',
     role: 'role',
+    staffRoleId: 'staff_role_id',
     status: 'status',
     createdAt: 'created_at',
     updatedAt: 'updated_at'
@@ -397,7 +402,7 @@ export async function updateUser(id, updates = {}) {
       WHERE id = $${values.length}
       RETURNING *
     `, values)
-    return mapUserRow(result.rows[0])
+    return result.rows[0] ? findUserById(result.rows[0].id) : null
   } catch (error) {
     translateUserConstraintError(error, 'Email đã được sử dụng bởi tài khoản khác')
   }
@@ -441,9 +446,10 @@ export async function createUserSession({ tokenHash, userId, expiresAt, userAgen
 
 export async function findUserBySessionTokenHash(tokenHash) {
   const result = await query(`
-    SELECT users.*
+    SELECT users.*, staff_roles.name AS staff_role_name, staff_roles.permissions AS staff_permissions
     FROM user_sessions
     JOIN users ON users.id = user_sessions.user_id
+    LEFT JOIN staff_roles ON staff_roles.id = users.staff_role_id
     WHERE user_sessions.token_hash = $1
       AND user_sessions.expires_at > NOW()
       AND users.status = 'active'
@@ -471,15 +477,51 @@ export async function listUsers({ role, status } = {}) {
   const values = []
   if (role) {
     values.push(role)
-    conditions.push(`role = $${values.length}`)
+    conditions.push(`users.role = $${values.length}`)
   }
   if (status) {
     values.push(status)
-    conditions.push(`status = $${values.length}`)
+    conditions.push(`users.status = $${values.length}`)
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const result = await query(`SELECT * FROM users ${where} ORDER BY created_at DESC, id DESC`, values)
+  const result = await query(`SELECT users.*, staff_roles.name AS staff_role_name, staff_roles.permissions AS staff_permissions FROM users LEFT JOIN staff_roles ON staff_roles.id = users.staff_role_id ${where} ORDER BY users.created_at DESC, users.id DESC`, values)
   return result.rows.map(row => mapUserRow(row, { includePassword: false }))
+}
+
+function mapStaffRole(row) {
+  return row ? { id: numberValue(row.id), name: row.name, permissions: row.permissions, memberCount: numberValue(row.member_count || 0), createdAt: timestampValue(row.created_at), updatedAt: timestampValue(row.updated_at) } : null
+}
+
+export async function listStaffRoles() {
+  const result = await query(`SELECT staff_roles.*, (SELECT COUNT(*) FROM users WHERE users.staff_role_id = staff_roles.id)::int AS member_count FROM staff_roles ORDER BY staff_roles.name, staff_roles.id`)
+  return result.rows.map(mapStaffRole)
+}
+
+export async function findStaffRole(id) {
+  const result = await query('SELECT * FROM staff_roles WHERE id = $1', [id])
+  return mapStaffRole(result.rows[0])
+}
+
+export async function saveStaffRole(id, input) {
+  try {
+    const result = id == null
+      ? await query('INSERT INTO staff_roles (name, permissions) VALUES ($1, $2::jsonb) RETURNING *', [input.name, JSON.stringify(input.permissions)])
+      : await query('UPDATE staff_roles SET name = $1, permissions = $2::jsonb, updated_at = NOW() WHERE id = $3 RETURNING *', [input.name, JSON.stringify(input.permissions), id])
+    return mapStaffRole(result.rows[0])
+  } catch (error) {
+    if (error.code === '23505') throw repositoryError(409, 'Tên vai trò đã tồn tại.', 'ROLE_NAME_EXISTS')
+    throw error
+  }
+}
+
+export async function deleteStaffRole(id) {
+  try {
+    const result = await query('DELETE FROM staff_roles WHERE id = $1 RETURNING *', [id])
+    return mapStaffRole(result.rows[0])
+  } catch (error) {
+    if (['23503', '23001'].includes(error.code)) throw repositoryError(409, 'Vai trò đang được gán cho nhân viên. Hãy chuyển nhân viên sang vai trò khác trước.', 'ROLE_IN_USE')
+    throw error
+  }
 }
 
 export async function listCategories() {
