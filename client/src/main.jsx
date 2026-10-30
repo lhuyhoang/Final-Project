@@ -70,6 +70,7 @@ import AuthModal from "./components/AuthModal";
 import CheckoutPage from "./components/CheckoutPage";
 import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
+import FooterContact from "./components/FooterContact";
 import PcBuilderPage from "./components/PcBuilderPage";
 import { mergePcBuildCart } from "./pc-builder.mjs";
 import { canEnterAdmin } from "../../shared/adminAccess.mjs";
@@ -2229,13 +2230,7 @@ function App() {
             <a>Chính sách đổi trả</a>
             <a>Vận chuyển & thanh toán</a>
           </div>
-          <div>
-            <h3>Về QuadPro</h3>
-            <a>Giới thiệu công ty</a>
-            <a>Hệ thống showroom</a>
-            <a>Tuyển dụng</a>
-            <a>Tin công nghệ</a>
-          </div>
+          <FooterContact showrooms={showrooms} />
           <div>
             <h3>Tổng đài hỗ trợ</h3>
             <strong>1900 6868</strong>

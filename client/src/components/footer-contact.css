@@ -1,0 +1,10 @@
+.footer-grid .footer-contact { min-width: 0; }
+.footer-contact-list { display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
+.footer-contact-list > li { display: flex; align-items: flex-start; gap: 9px; min-width: 0; font-size: 11px; line-height: 1.7; }
+.footer-contact-list > li > svg { flex-shrink: 0; margin-top: 2px; color: #ff6b62; }
+.footer-grid .footer-contact .footer-contact-list a { display: block; min-width: 0; margin: 0; color: inherit; font-size: 11px; line-height: 1.7; text-decoration: none; overflow-wrap: anywhere; }
+.footer-contact-list b { display: block; margin-bottom: 2px; color: #f3f3f5; font-size: 11px; font-weight: 600; }
+.footer-contact-list a > span { display: block; }
+.footer-grid .footer-contact .footer-contact-list a:hover,
+.footer-grid .footer-contact .footer-contact-list a:hover b { color: #ff7a72; }
+.footer-contact-list a:focus-visible { outline: 2px solid #ff7a72; outline-offset: 4px; border-radius: 3px; }
