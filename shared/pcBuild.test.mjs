@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { calculatePcBuild, getBuildCategoryScope, isPcBuildCategory, normalizePcComponents, validatePcBuild } from './pcBuild.mjs'
+import { calculatePcBuild, getBuildCategoryScope, getPcBuildSlotScope, isPcBuildCategory, normalizeBuildText, normalizePcComponents, validatePcBuild } from './pcBuild.mjs'
 
 const categories = [
   { id: 1, name: 'PC', parentId: null },
@@ -61,4 +61,36 @@ test('rejects insufficient stock including the same product selected in multiple
 test('legacy products with no build components retain an empty recipe', () => {
   assert.deepEqual(normalizePcComponents([]), [])
   assert.deepEqual(calculatePcBuild([], products), { price: 0, oldPrice: 0, savings: 0, specifications: [] })
+})
+
+test('automatically resolves component categories with uppercase Vietnamese Đ and alternate root names', () => {
+  const categoryList = categories.map(category => category.id === 3 ? { ...category, name: 'LINH KIỆN ĐIỆN TỬ' } : category)
+  assert.equal(normalizeBuildText('ĐIỆN TỬ'), 'dien tu')
+  assert.deepEqual([...getPcBuildSlotScope('cpu', categoryList)], ['cpu'])
+  assert.deepEqual([...getPcBuildSlotScope('ram', categoryList)].sort(), ['ddr5', 'ram'])
+  const renamedRoot = categoryList.map(category => category.id === 3 ? { ...category, name: 'Linh kiện máy tính' } : category)
+  assert.equal(getPcBuildSlotScope('cpu', renamedRoot).has('cpu'), true)
+})
+
+test('includes all matching categories for a slot instead of selecting only the first one', () => {
+  const categoryList = [...categories,
+    { id: 20, name: 'SSD', parentId: 3 }, { id: 21, name: 'HDD', parentId: 3 },
+    { id: 22, name: 'NVMe', parentId: 20 }, { id: 23, name: 'CPU Intel', parentId: 4 },
+  ]
+  assert.deepEqual([...getPcBuildSlotScope('storage', categoryList)].sort(), ['hdd', 'nvme', 'ssd'])
+  assert.deepEqual([...getPcBuildSlotScope('cpu', categoryList)].sort(), ['cpu', 'cpu intel'])
+})
+
+test('keeps graphics cards out of monitor scope and unrelated categories out of component scopes', () => {
+  const categoryList = [...categories,
+    { id: 30, name: 'Card màn hình - VGA', parentId: 3 },
+    { id: 31, name: 'Laptop', parentId: null },
+    { id: 32, name: 'RAM laptop', parentId: 31 },
+    { id: 33, name: 'Program software', parentId: 3 },
+  ]
+  assert.equal(getPcBuildSlotScope('gpu', categoryList).has('card man hinh vga'), true)
+  assert.equal(getPcBuildSlotScope('monitor', categoryList).has('card man hinh vga'), false)
+  assert.equal(getPcBuildSlotScope('ram', categoryList).has('ram laptop'), false)
+  assert.equal(getPcBuildSlotScope('ram', categoryList).has('program software'), false)
+  assert.equal(getPcBuildSlotScope('unknown', categoryList).size, 0)
 })

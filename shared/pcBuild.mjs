@@ -1,17 +1,17 @@
 export const pcBuildSlots = [
-  { id: 'cpu', name: 'CPU', keywords: ['cpu', 'bo vi xu ly'] },
+  { id: 'cpu', name: 'CPU', keywords: ['cpu', 'vi xu ly', 'processor', 'processors'] },
   { id: 'mainboard', name: 'Mainboard', keywords: ['mainboard', 'bo mach chu', 'motherboard'] },
-  { id: 'ram', name: 'RAM', keywords: ['ram', 'bo nho'] },
-  { id: 'gpu', name: 'Card đồ họa', keywords: ['vga', 'card do hoa', 'gpu'] },
-  { id: 'storage', name: 'Ổ cứng', keywords: ['ssd', 'hdd', 'o cung'] },
-  { id: 'psu', name: 'Nguồn (PSU)', keywords: ['nguon', 'psu'] },
+  { id: 'ram', name: 'RAM', keywords: ['ram', 'bo nho', 'ddr4', 'ddr5', 'memory'] },
+  { id: 'gpu', name: 'Card đồ họa', keywords: ['vga', 'card do hoa', 'card man hinh', 'gpu', 'graphics card'] },
+  { id: 'storage', name: 'Ổ cứng', keywords: ['ssd', 'hdd', 'o cung', 'luu tru', 'storage'] },
+  { id: 'psu', name: 'Nguồn (PSU)', keywords: ['nguon', 'psu', 'power supply'] },
   { id: 'cooler', name: 'Tản nhiệt', keywords: ['tan nhiet', 'cooler'] },
   { id: 'case', name: 'Vỏ case', keywords: ['case', 'vo may'] },
   { id: 'monitor', name: 'Màn hình', keywords: ['man hinh', 'monitor'] },
 ]
 
 export const normalizeBuildText = value => String(value || '')
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
 export function getBuildCategoryRoot(category, categories) {
@@ -50,8 +50,31 @@ export function getBuildCategoryScope(categoryId, categories) {
 export function getPcBuildCategories(categories) {
   return categories.filter(category => {
     const rootName = normalizeBuildText(getBuildCategoryRoot(category, categories)?.name)
-    return ['linh kien', 'linh kien dien tu', 'man hinh'].includes(rootName)
+    return rootName === 'linh kien' || rootName.startsWith('linh kien ') || rootName === 'man hinh' || rootName.startsWith('man hinh ')
   }).sort((left, right) => (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) || left.name.localeCompare(right.name, 'vi'))
+}
+
+function matchesSlotCategory(slot, categoryName) {
+  const name = ` ${normalizeBuildText(categoryName)} `
+  const matches = keywords => keywords.some(keyword => name.includes(` ${keyword} `))
+  // A graphics card category can contain “màn hình”; it is not a monitor category.
+  if (slot.id === 'monitor' && matches(pcBuildSlots.find(item => item.id === 'gpu').keywords)) return false
+  if (slot.id === 'ram' && matches(pcBuildSlots.find(item => item.id === 'storage').keywords)) return false
+  return matches(slot.keywords)
+}
+
+export function getPcBuildSlotCategories(slotId, categories) {
+  const slot = pcBuildSlots.find(item => item.id === slotId)
+  if (!slot) return []
+  return getPcBuildCategories(categories).filter(category => matchesSlotCategory(slot, category.name))
+}
+
+export function getPcBuildSlotScope(slotId, categories) {
+  const scope = new Set()
+  getPcBuildSlotCategories(slotId, categories).forEach(category => {
+    getBuildCategoryScope(category.id, categories).forEach(name => scope.add(name))
+  })
+  return scope
 }
 
 export function normalizePcComponents(value) {
@@ -97,7 +120,7 @@ export function validatePcBuild(components, products, categories, pcCategory, cu
   const allowedCategoryIds = new Set(getPcBuildCategories(categories).map(category => Number(category.id)))
   const requested = new Map()
   components.forEach(component => {
-    if (!allowedCategoryIds.has(component.categoryId)) throw new Error('Hãy chọn danh mục Linh kiện hoặc Màn hình cho cấu hình PC.')
+    if (!allowedCategoryIds.has(component.categoryId)) throw new Error('Danh mục của linh kiện không còn thuộc nhóm Linh kiện hoặc Màn hình.')
     const product = products.find(item => Number(item.id) === component.productId)
     if (!product || product.id === currentProductId) throw new Error('Linh kiện không còn tồn tại hoặc trùng với PC đang sửa.')
     if (!getBuildCategoryScope(component.categoryId, categories).has(normalizeBuildText(product.category))) throw new Error(`${product.name} không thuộc danh mục linh kiện đã chọn.`)

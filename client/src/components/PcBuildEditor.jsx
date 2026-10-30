@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight, Package, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { calculatePcBuild, getBuildCategoryScope, getPcBuildCategories, normalizeBuildText, normalizePcComponents, pcBuildSlots, validatePcBuild } from '../../../shared/pcBuild.mjs'
+import { calculatePcBuild, getPcBuildSlotScope, normalizeBuildText, normalizePcComponents, pcBuildSlots, validatePcBuild } from '../../../shared/pcBuild.mjs'
 import '../pc-build.css'
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
@@ -51,7 +51,7 @@ function BuildComponentPicker({ row, products, categories, onSelect, onClose }) 
   const [brands, setBrands] = useState([])
   const [stockOnly, setStockOnly] = useState(true)
   const [page, setPage] = useState(1)
-  const scope = useMemo(() => getBuildCategoryScope(row.categoryId, categories), [row.categoryId, categories])
+  const scope = useMemo(() => getPcBuildSlotScope(row.id, categories), [row.id, categories])
   const candidates = useMemo(() => products.filter(product => scope.has(normalizeBuildText(product.category))), [products, scope])
   const availableBrands = [...new Set(candidates.map(product => product.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'))
   const filtered = candidates.filter(product =>
@@ -86,7 +86,7 @@ function BuildComponentPicker({ row, products, categories, onSelect, onClose }) 
             <div className="pc-component-result-copy"><small>{product.brand} · #{product.id}</small><h3>{product.name}</h3><span>{product.policyText || 'Bảo hành theo sản phẩm'}</span><span className={product.stock > 0 ? 'available' : 'unavailable'}>{product.stock > 0 ? `Còn ${product.stock} sản phẩm` : 'Hết hàng'}</span><div>{product.oldPrice > product.price && <del>{formatPrice(product.oldPrice)}</del>}<strong>{formatPrice(product.price)}</strong></div></div>
             <button type="button" className="pc-build-primary" disabled={product.stock <= 0} onClick={() => onSelect(product)}><Plus size={15}/> Thêm vào cấu hình</button>
           </article>)}
-          {!visible.length && <div className="pc-build-empty"><Package size={30}/><b>Không tìm thấy linh kiện phù hợp</b><span>Thử đổi bộ lọc hoặc chọn lại danh mục linh kiện.</span></div>}
+          {!visible.length && <div className="pc-build-empty"><Package size={30}/><b>{candidates.length ? 'Không tìm thấy linh kiện phù hợp' : `Chưa có sản phẩm trong nhóm ${row.name}`}</b><span>{candidates.length ? 'Thử đổi từ khóa hoặc bộ lọc sản phẩm.' : `Thêm sản phẩm thuộc danh mục ${row.name} vào kho để chọn tại đây.`}</span></div>}
         </div>
         <div className="pc-build-pagination"><span>Trang {safePage} / {pageCount}</span><div><button type="button" onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} aria-label="Trang linh kiện trước"><ChevronLeft size={17}/></button><button type="button" onClick={() => setPage(safePage + 1)} disabled={safePage >= pageCount} aria-label="Trang linh kiện sau"><ChevronRight size={17}/></button></div></div>
       </div>
@@ -95,11 +95,9 @@ function BuildComponentPicker({ row, products, categories, onSelect, onClose }) 
 }
 
 export default function PcBuildEditor({ components = [], categories, products, pcCategory, onApply, onClose }) {
-  const availableCategories = useMemo(() => getPcBuildCategories(categories), [categories])
   const [rows, setRows] = useState(() => pcBuildSlots.map(slot => {
     const saved = components.find(component => component.slotId === slot.id)
-    const matchedCategory = availableCategories.find(category => slot.keywords.some(keyword => normalizeBuildText(category.name).includes(keyword)))
-    return { ...slot, categoryId: saved?.categoryId || matchedCategory?.id || '', productId: saved?.productId || null, quantity: saved?.quantity || 1, warranty: saved?.warranty || '' }
+    return { ...slot, categoryId: saved?.categoryId || null, productId: saved?.productId || null, quantity: saved?.quantity || 1, warranty: saved?.warranty || '' }
   }))
   const [pickerSlotId, setPickerSlotId] = useState(null)
   const [error, setError] = useState('')
@@ -131,12 +129,12 @@ export default function PcBuildEditor({ components = [], categories, products, p
         <div className="pc-build-rows">{rows.map((row, index) => {
           const product = products.find(product => product.id === Number(row.productId))
           return <div className="pc-build-row" key={row.id}>
-            <div className="pc-build-row-label"><span>{String(index + 1).padStart(2, '0')}</span><b>{row.name}</b><select aria-label={`Danh mục cho ${row.name}`} value={row.categoryId} onChange={event => updateRow(row.id, { categoryId: Number(event.target.value) || '', productId: null, quantity: 1 })}><option value="">Chọn danh mục</option>{availableCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
+            <div className="pc-build-row-label"><span>{String(index + 1).padStart(2, '0')}</span><b>{row.name}</b></div>
             {row.productId ? <div className="pc-build-selected-component">
               <div className="pc-build-selected-image">{product ? <img src={product.image} alt=""/> : <Package size={22}/>}</div>
               <div className="pc-build-selected-copy"><b>{product?.name || 'Linh kiện không còn trong kho'}</b>{product && <span>{product.oldPrice > product.price && <del>{formatPrice(product.oldPrice)}</del>}<strong>{formatPrice(product.price)}</strong><small>/ sản phẩm</small></span>}<label>Bảo hành<input value={row.warranty} maxLength={40} onChange={event => updateRow(row.id, { warranty: event.target.value })} placeholder="Theo chính sách sản phẩm" aria-label={`Bảo hành ${row.name}`}/></label></div>
               <div className="pc-build-row-quantity"><label>Số lượng<input type="number" min="1" max="99" value={row.quantity} onChange={event => updateRow(row.id, { quantity: event.target.value })} aria-label={`Số lượng ${row.name}`}/></label><strong>{formatPrice((Number(product?.price) || 0) * (Number(row.quantity) || 0))}</strong><div><button type="button" onClick={() => setPickerSlotId(row.id)}>Đổi</button><button type="button" onClick={() => updateRow(row.id, { productId: null, quantity: 1, warranty: '' })} aria-label={`Xóa ${row.name}`}><Trash2 size={15}/></button></div></div>
-            </div> : <div className="pc-build-row-empty"><button type="button" className="pc-build-primary" onClick={() => setPickerSlotId(row.id)} disabled={!row.categoryId}><Plus size={15}/> Chọn {row.name}</button><small>{row.categoryId ? 'Chọn sản phẩm có sẵn trong kho hàng' : 'Chọn danh mục tương ứng để xem linh kiện'}</small></div>}
+            </div> : <div className="pc-build-row-empty"><button type="button" className="pc-build-primary" onClick={() => setPickerSlotId(row.id)}><Plus size={15}/> Chọn {row.name}</button><small>Tự động hiển thị linh kiện {row.name} trong kho</small></div>}
           </div>
         })}</div>
         {(error || calculationError) && <p className="pc-build-error" role="alert">{error || calculationError}</p>}
@@ -145,7 +143,8 @@ export default function PcBuildEditor({ components = [], categories, products, p
     </BuildDialog>
     {pickerRow && <BuildComponentPicker key={pickerRow.id} row={pickerRow} products={products} categories={categories} onClose={() => setPickerSlotId(null)} onSelect={product => {
       const warranty = product.specifications?.find(item => item.warranty)?.warranty || ''
-      updateRow(pickerRow.id, { productId: product.id, quantity: 1, warranty })
+      const category = categories.find(category => normalizeBuildText(category.name) === normalizeBuildText(product.category))
+      updateRow(pickerRow.id, { categoryId: category?.id || null, productId: product.id, quantity: 1, warranty })
       setPickerSlotId(null)
     }}/>}
   </>
