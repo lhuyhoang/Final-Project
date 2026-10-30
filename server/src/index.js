@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import Stripe from 'stripe'
 import {
+  DEFAULT_PRODUCT_PROMOTIONS,
   DEFAULT_PRODUCT_POLICY_TEXT,
   ORDER_STATUSES,
   attachStripeCheckoutSession,
@@ -535,6 +536,46 @@ function normalizeProduct(body = {}, current = {}) {
     return { description, quantity, warranty }
   })
 
+  const rawUpgradeOptions = body.upgradeOptions ?? current.upgradeOptions ?? []
+  if (!Array.isArray(rawUpgradeOptions) || rawUpgradeOptions.length > 8) {
+    throw httpError(400, 'Nâng cấp sản phẩm phải là danh sách tối đa 8 nhóm')
+  }
+  const upgradeOptions = rawUpgradeOptions.map((group, groupIndex) => {
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      throw httpError(400, `Nhóm nâng cấp ${groupIndex + 1} không hợp lệ`)
+    }
+    const name = String(group.name || '').trim().replace(/\s+/g, ' ')
+    if (!name || name.length > 50) {
+      throw httpError(400, `Tên nhóm nâng cấp ${groupIndex + 1} phải có từ 1 đến 50 ký tự`)
+    }
+    if (!Array.isArray(group.options) || group.options.length < 1 || group.options.length > 8) {
+      throw httpError(400, `Nhóm nâng cấp ${groupIndex + 1} phải có từ 1 đến 8 lựa chọn`)
+    }
+    const options = group.options.map((option, optionIndex) => {
+      const value = String(option || '').trim().replace(/\s+/g, ' ')
+      if (!value || value.length > 120) {
+        throw httpError(400, `Lựa chọn ${optionIndex + 1} của nhóm ${name} phải có từ 1 đến 120 ký tự`)
+      }
+      return value
+    })
+    if (new Set(options.map(option => option.toLocaleLowerCase('vi'))).size !== options.length) {
+      throw httpError(400, `Nhóm nâng cấp ${name} có lựa chọn trùng nhau`)
+    }
+    return { name, options }
+  })
+
+  const rawPromotions = body.promotions ?? current.promotions ?? DEFAULT_PRODUCT_PROMOTIONS
+  if (!Array.isArray(rawPromotions) || rawPromotions.length > 20) {
+    throw httpError(400, 'Khuyến mãi phải là danh sách tối đa 20 dòng')
+  }
+  const promotions = rawPromotions.map((promotion, index) => {
+    const value = String(promotion || '').trim().replace(/\s+/g, ' ')
+    if (!value || value.length > 300) {
+      throw httpError(400, `Khuyến mãi ${index + 1} phải có từ 1 đến 300 ký tự`)
+    }
+    return value
+  })
+
   const price = Math.round(number('price', 1))
   const oldPrice = Math.round(number('oldPrice', 1))
   const rating = Number(body.rating ?? current.rating ?? 5)
@@ -580,6 +621,8 @@ function normalizeProduct(body = {}, current = {}) {
     policyText: text('policyText', 120, DEFAULT_PRODUCT_POLICY_TEXT),
     description: optionalText('description', 2000),
     specifications,
+    upgradeOptions,
+    promotions,
     gallery,
     image
   }

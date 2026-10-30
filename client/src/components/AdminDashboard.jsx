@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Gift, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
@@ -31,7 +31,8 @@ const statusLabels = {
   cancelled: 'Đã hủy'
 }
 const defaultPolicyText = 'Trả góp 0% • Bảo hành 36 tháng'
-const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', gallery: [], galleryText: '', badge: 'Mới', policyText: defaultPolicyText, description: '', specifications: [] }
+const defaultPromotions = ['Miễn phí giao hàng cho đơn từ 500.000₫', 'Hỗ trợ kiểm tra và tối ưu trước khi giao']
+const emptyProduct = { name: '', brand: '', category: 'PC Gaming', price: '', oldPrice: '', stock: '', image: '', gallery: [], galleryText: '', badge: 'Mới', policyText: defaultPolicyText, description: '', specifications: [], upgradeOptions: [], promotions: defaultPromotions }
 const emptyShowroom = { name: '', address: '', phone: '', openingHours: '', mapUrl: '', isActive: true, sortOrder: 0 }
 const defaultTransitionSettings = {
   productGalleryIntervalSeconds: 5,
@@ -289,7 +290,14 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
           quantity: item.quantity || 1,
           warranty: item.warranty || ''
         }))
-      : []
+      : [],
+    upgradeOptions: Array.isArray(product.upgradeOptions)
+      ? product.upgradeOptions.map(group => ({
+          name: group.name || '',
+          options: Array.isArray(group.options) ? [...group.options] : []
+        }))
+      : [],
+    promotions: Array.isArray(product.promotions) ? [...product.promotions] : [...defaultPromotions]
   } : emptyProduct)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -319,6 +327,78 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
     setForm(current => ({
       ...current,
       specifications: current.specifications.filter((_, itemIndex) => itemIndex !== index)
+    }))
+  }
+
+  function addUpgradeGroup() {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: [...current.upgradeOptions, { name: '', options: [''] }]
+    }))
+  }
+
+  function updateUpgradeGroup(groupIndex, field, value) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.map((group, index) => (
+        index === groupIndex ? { ...group, [field]: value } : group
+      ))
+    }))
+  }
+
+  function removeUpgradeGroup(groupIndex) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.filter((_, index) => index !== groupIndex)
+    }))
+  }
+
+  function addUpgradeOption(groupIndex) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.map((group, index) => (
+        index === groupIndex ? { ...group, options: [...group.options, ''] } : group
+      ))
+    }))
+  }
+
+  function updateUpgradeOption(groupIndex, optionIndex, value) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.map((group, index) => (
+        index === groupIndex
+          ? { ...group, options: group.options.map((option, currentIndex) => currentIndex === optionIndex ? value : option) }
+          : group
+      ))
+    }))
+  }
+
+  function removeUpgradeOption(groupIndex, optionIndex) {
+    setForm(current => ({
+      ...current,
+      upgradeOptions: current.upgradeOptions.map((group, index) => (
+        index === groupIndex
+          ? { ...group, options: group.options.filter((_, currentIndex) => currentIndex !== optionIndex) }
+          : group
+      ))
+    }))
+  }
+
+  function addPromotion() {
+    setForm(current => ({ ...current, promotions: [...current.promotions, ''] }))
+  }
+
+  function updatePromotion(index, value) {
+    setForm(current => ({
+      ...current,
+      promotions: current.promotions.map((promotion, currentIndex) => currentIndex === index ? value : promotion)
+    }))
+  }
+
+  function removePromotion(index) {
+    setForm(current => ({
+      ...current,
+      promotions: current.promotions.filter((_, currentIndex) => currentIndex !== index)
     }))
   }
 
@@ -417,6 +497,17 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
       setError('URL hình ảnh chính phải bắt đầu bằng http:// hoặc https://.')
       return
     }
+    const invalidUpgradeGroup = form.upgradeOptions.find(group => (
+      !group.name.trim() || !group.options.length || group.options.some(option => !option.trim())
+    ))
+    if (invalidUpgradeGroup) {
+      setError('Mỗi nhóm nâng cấp cần có tên và ít nhất một lựa chọn đầy đủ.')
+      return
+    }
+    if (form.promotions.some(promotion => !promotion.trim())) {
+      setError('Nội dung khuyến mãi không được để trống.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -431,7 +522,12 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
           description: item.description.trim(),
           quantity: Number(item.quantity),
           warranty: item.warranty.trim()
-        }))
+        })),
+        upgradeOptions: form.upgradeOptions.map(group => ({
+          name: group.name.trim(),
+          options: group.options.map(option => option.trim())
+        })),
+        promotions: form.promotions.map(promotion => promotion.trim())
       }
       const saved = await api(product ? `/api/admin/products/${product.id}` : '/api/admin/products', {
         method: product ? 'PUT' : 'POST',
@@ -460,6 +556,46 @@ function ProductEditor({ product, categories = defaultCategories, onClose, onSav
             <label><span>Nhãn nổi bật</span><input name="badge" value={form.badge} onChange={update} maxLength="40"/></label>
             <label className="full"><span>Thông tin trả góp / bảo hành</span><input name="policyText" value={form.policyText} onChange={update} maxLength="120" required/></label>
             <label className="full"><span>Mô tả sản phẩm</span><textarea name="description" value={form.description} onChange={update} maxLength="2000" rows="5" placeholder="Nhập đặc điểm, công dụng và thông tin nổi bật của sản phẩm..."/></label>
+            <div className="product-sales-content full">
+              <section className="product-upgrade-editor" aria-labelledby="product-upgrade-editor-title">
+                <div className="product-content-heading">
+                  <span className="product-content-icon upgrade"><Settings size={17}/></span>
+                  <div><b id="product-upgrade-editor-title">Nâng cấp sản phẩm</b><small>Tạo các nhóm CPU, RAM, SSD... để khách lựa chọn khi xem chi tiết.</small></div>
+                  <button type="button" onClick={addUpgradeGroup} disabled={form.upgradeOptions.length >= 8}><Plus size={15}/> Thêm nhóm</button>
+                </div>
+                {form.upgradeOptions.length ? <div className="product-upgrade-groups">
+                  {form.upgradeOptions.map((group, groupIndex) => <article className="product-upgrade-group" key={groupIndex}>
+                    <div className="product-upgrade-group-head">
+                      <span>{groupIndex + 1}</span>
+                      <label><small>Tên nhóm nâng cấp</small><input value={group.name} onChange={event => updateUpgradeGroup(groupIndex, 'name', event.target.value)} maxLength="50" placeholder="Ví dụ: RAM" aria-label={`Tên nhóm nâng cấp ${groupIndex + 1}`}/></label>
+                      <button type="button" className="remove" onClick={() => removeUpgradeGroup(groupIndex)} aria-label={`Xóa nhóm nâng cấp ${groupIndex + 1}`}><Trash2 size={15}/></button>
+                    </div>
+                    <div className="product-upgrade-options">
+                      {group.options.map((option, optionIndex) => <div key={optionIndex}>
+                        <input value={option} onChange={event => updateUpgradeOption(groupIndex, optionIndex, event.target.value)} maxLength="120" placeholder={`Lựa chọn ${optionIndex + 1}`} aria-label={`Lựa chọn ${optionIndex + 1} của nhóm ${group.name || groupIndex + 1}`}/>
+                        <button type="button" onClick={() => removeUpgradeOption(groupIndex, optionIndex)} disabled={group.options.length <= 1} aria-label={`Xóa lựa chọn ${optionIndex + 1}`}><X size={14}/></button>
+                      </div>)}
+                      <button type="button" className="add-option" onClick={() => addUpgradeOption(groupIndex)} disabled={group.options.length >= 8}><Plus size={14}/> Thêm lựa chọn</button>
+                    </div>
+                  </article>)}
+                </div> : <button type="button" className="product-content-empty" onClick={addUpgradeGroup}><Settings size={20}/><span><b>Chưa có tùy chọn nâng cấp</b><small>Bấm để tạo nhóm nâng cấp đầu tiên cho sản phẩm.</small></span></button>}
+              </section>
+
+              <section className="product-promotion-editor" aria-labelledby="product-promotion-editor-title">
+                <div className="product-content-heading">
+                  <span className="product-content-icon promotion"><Gift size={17}/></span>
+                  <div><b id="product-promotion-editor-title">Khuyến mãi</b><small>Nội dung này thay thế hoàn toàn mục “Ưu đãi khi mua hàng”.</small></div>
+                  <button type="button" onClick={addPromotion} disabled={form.promotions.length >= 20}><Plus size={15}/> Thêm dòng</button>
+                </div>
+                {form.promotions.length ? <div className="product-promotion-list">
+                  {form.promotions.map((promotion, index) => <div className="product-promotion-row" key={index}>
+                    <span><Gift size={14}/></span>
+                    <textarea value={promotion} onChange={event => updatePromotion(index, event.target.value)} maxLength="300" rows="2" placeholder="Nhập nội dung khuyến mãi..." aria-label={`Khuyến mãi ${index + 1}`}/>
+                    <button type="button" onClick={() => removePromotion(index)} aria-label={`Xóa khuyến mãi ${index + 1}`}><Trash2 size={15}/></button>
+                  </div>)}
+                </div> : <button type="button" className="product-content-empty" onClick={addPromotion}><Gift size={20}/><span><b>Chưa có khuyến mãi</b><small>Bấm để thêm chương trình khuyến mãi cho sản phẩm.</small></span></button>}
+              </section>
+            </div>
             <div className="product-spec-editor full">
               <div className="product-spec-heading">
                 <div><span>Cấu hình / thông số kỹ thuật</span><small>Tối đa 30 dòng · hiển thị theo mẫu STT, mô tả, SL và BH</small></div>

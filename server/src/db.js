@@ -11,6 +11,10 @@ const defaultMigrationsDirectory = path.resolve(__dirname, '../migrations')
 
 export const ORDER_STATUSES = ['pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled']
 export const DEFAULT_PRODUCT_POLICY_TEXT = 'Trả góp 0% • Bảo hành 36 tháng'
+export const DEFAULT_PRODUCT_PROMOTIONS = [
+  'Miễn phí giao hàng cho đơn từ 500.000₫',
+  'Hỗ trợ kiểm tra và tối ưu trước khi giao'
+]
 
 function parseInteger(value, fallback, name, minimum = 1, maximum = Number.MAX_SAFE_INTEGER) {
   if (value === undefined || value === '') return fallback
@@ -221,6 +225,8 @@ export function mapProductRow(row) {
     policyText: row.policy_text,
     description: row.description || '',
     specifications: Array.isArray(row.specifications) ? row.specifications : [],
+    upgradeOptions: Array.isArray(row.upgrade_options) ? row.upgrade_options : [],
+    promotions: Array.isArray(row.promotions) ? row.promotions : [],
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
     image: row.image
   }
@@ -656,9 +662,9 @@ export async function createProduct(input) {
     INSERT INTO products (
       name, category, brand, price, old_price, stock, rating, reviews,
       discount, badge, policy_text, description, specifications,
-      gallery, image, created_at, updated_at
+      upgrade_options, promotions, gallery, image, created_at, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     RETURNING *
   `, [
     input.name,
@@ -674,6 +680,8 @@ export async function createProduct(input) {
     input.policyText || DEFAULT_PRODUCT_POLICY_TEXT,
     input.description || '',
     JSON.stringify(input.specifications || []),
+    JSON.stringify(input.upgradeOptions || []),
+    JSON.stringify(input.promotions ?? DEFAULT_PRODUCT_PROMOTIONS),
     JSON.stringify(input.gallery || []),
     input.image,
     createdAt,
@@ -697,6 +705,8 @@ export async function updateProduct(id, updates = {}) {
     policyText: 'policy_text',
     description: 'description',
     specifications: 'specifications',
+    upgradeOptions: 'upgrade_options',
+    promotions: 'promotions',
     gallery: 'gallery',
     image: 'image',
     createdAt: 'created_at',
@@ -707,7 +717,7 @@ export async function updateProduct(id, updates = {}) {
 
   for (const [field, column] of Object.entries(columnMap)) {
     if (updates[field] === undefined) continue
-    values.push(['specifications', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
+    values.push(['specifications', 'upgradeOptions', 'promotions', 'gallery'].includes(field) ? JSON.stringify(updates[field]) : updates[field])
     assignments.push(`${column} = $${values.length}`)
   }
 

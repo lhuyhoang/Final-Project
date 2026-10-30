@@ -2713,6 +2713,254 @@
   grid-column: 1 / -1;
 }
 
+.product-sales-content {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+}
+
+.product-upgrade-editor,
+.product-promotion-editor {
+  padding: 15px;
+  background: #f7f8fa;
+  border: 1px solid #e2e4e8;
+  border-radius: 11px;
+}
+
+.product-content-heading {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.product-content-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.product-content-icon.upgrade {
+  color: #a02b25;
+  background: #ffe8e6;
+}
+
+.product-content-icon.promotion {
+  color: #a66a00;
+  background: #fff1cf;
+}
+
+.product-content-heading b,
+.product-content-heading small {
+  display: block;
+}
+
+.product-content-heading b {
+  color: #34383f;
+  font-size: 10px;
+}
+
+.product-content-heading small {
+  margin-top: 3px;
+  color: #858b95;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.product-content-heading > button,
+.product-upgrade-options .add-option {
+  display: inline-flex;
+  min-height: 32px;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  background: var(--red);
+  border: 0;
+  border-radius: 7px;
+}
+
+.product-content-heading > button:disabled,
+.product-upgrade-options .add-option:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.product-upgrade-groups,
+.product-promotion-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.product-upgrade-group {
+  padding: 11px;
+  background: #fff;
+  border: 1px solid #e2e5e9;
+  border-radius: 9px;
+}
+
+.product-upgrade-group-head {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: end;
+}
+
+.product-upgrade-group-head > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  align-self: center;
+  color: #aa2e28;
+  font-size: 8px;
+  font-weight: 800;
+  background: #fff0ef;
+  border-radius: 7px;
+}
+
+.product-upgrade-group-head label small {
+  display: block;
+  margin-bottom: 5px;
+  color: #777d87;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.product-form-fields .product-upgrade-group-head input,
+.product-form-fields .product-upgrade-options input {
+  height: 36px;
+  background: #fbfbfc;
+}
+
+.product-upgrade-group-head .remove,
+.product-promotion-row > button,
+.product-upgrade-options > div > button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #a43a34;
+  background: #ffe9e7;
+  border: 0;
+  border-radius: 7px;
+}
+
+.product-upgrade-group-head .remove:hover,
+.product-promotion-row > button:hover,
+.product-upgrade-options > div > button:hover:not(:disabled) {
+  color: #fff;
+  background: #c52c25;
+}
+
+.product-upgrade-options {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+
+.product-upgrade-options > div {
+  display: grid;
+  flex: 1 1 180px;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 30px;
+}
+
+.product-upgrade-options > div input {
+  border-radius: 7px 0 0 7px;
+}
+
+.product-upgrade-options > div > button {
+  width: 30px;
+  height: 36px;
+  border-radius: 0 7px 7px 0;
+}
+
+.product-upgrade-options > div > button:disabled {
+  cursor: not-allowed;
+  color: #9ca1a9;
+  background: #eef0f2;
+}
+
+.product-upgrade-options .add-option {
+  color: #aa2e28;
+  background: #fff0ef;
+  border: 1px dashed #efaaa5;
+}
+
+.product-promotion-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e2e5e9;
+  border-radius: 9px;
+}
+
+.product-promotion-row > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #bd2a23;
+  background: #fff0ef;
+  border-radius: 7px;
+}
+
+.product-form-fields .product-promotion-row textarea {
+  min-height: 54px;
+  padding: 8px 10px;
+  resize: vertical;
+  background: #fbfbfc;
+}
+
+.product-content-empty {
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  color: #7b818b;
+  background: #fff;
+  border: 1px dashed #d4d8de;
+  border-radius: 8px;
+}
+
+.product-content-empty:hover {
+  color: var(--red);
+  background: #fff8f7;
+  border-color: #e6a19c;
+}
+
+.product-content-empty span,
+.product-content-empty b,
+.product-content-empty small {
+  display: block;
+  text-align: left;
+}
+
+.product-content-empty b {
+  color: #484d55;
+  font-size: 9px;
+}
+
+.product-content-empty small {
+  margin-top: 4px;
+  color: #8b9098;
+  font-size: 8px;
+}
+
 .product-spec-editor {
   padding: 15px;
   background: #f7f8fa;
@@ -4945,6 +5193,58 @@ html[data-theme="dark"] .product-gallery-list figure {
 
 html[data-theme="dark"] :where(.product-form-fields input, .product-form-fields select, .product-form-fields textarea) {
   color-scheme: dark;
+}
+
+html[data-theme="dark"] :where(.product-upgrade-editor, .product-promotion-editor) {
+  background: var(--admin-surface-raised);
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] :where(.product-upgrade-group, .product-promotion-row, .product-content-empty) {
+  color: var(--admin-text);
+  background: var(--admin-surface-soft);
+  border-color: var(--admin-border);
+}
+
+html[data-theme="dark"] :where(.product-content-heading b, .product-content-empty b) {
+  color: var(--admin-text);
+}
+
+html[data-theme="dark"] :where(.product-content-heading small, .product-content-empty small, .product-upgrade-group-head label small) {
+  color: var(--admin-muted);
+}
+
+html[data-theme="dark"] .product-content-empty:hover {
+  color: #ffaaa4;
+  background: #342124;
+  border-color: #754146;
+}
+
+html[data-theme="dark"] :where(.product-content-icon.upgrade, .product-upgrade-group-head > span, .product-upgrade-options .add-option, .product-promotion-row > span) {
+  color: #ffaaa4;
+  background: #3b2022;
+  border-color: #713237;
+}
+
+html[data-theme="dark"] .product-content-icon.promotion {
+  color: #ffd278;
+  background: #493714;
+}
+
+html[data-theme="dark"] .product-upgrade-options > div > button:disabled {
+  color: #747b86;
+  background: #292e35;
+}
+
+@media (max-width: 760px) {
+  .product-content-heading {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .product-content-heading > button {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
 }
 
 html[data-theme="dark"] :where(.product-form-fields input, .product-form-fields select, .product-form-fields textarea, .product-image-upload > label):focus-visible {

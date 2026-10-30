@@ -9,12 +9,12 @@ import {
   Package,
   Plus,
   RefreshCcw,
+  Settings,
   ShieldCheck,
   ShoppingCart,
   Star,
   Truck,
   Wrench,
-  Zap,
 } from "lucide-react";
 
 const formatPrice = (value) =>
@@ -180,6 +180,7 @@ export default function ProductDetail({
 }) {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState("");
+  const [selectedUpgrades, setSelectedUpgrades] = useState({});
   const baseImageRef = useRef(null);
   const incomingImageRef = useRef(null);
   const previousImageRef = useRef("");
@@ -189,6 +190,10 @@ export default function ProductDetail({
     if (!product) return undefined;
     setQuantity(1);
     setActiveImage(product.image);
+    setSelectedUpgrades(Object.fromEntries(
+      (Array.isArray(product.upgradeOptions) ? product.upgradeOptions : [])
+        .map((group, index) => [index, Array.isArray(group.options) ? group.options[0] || "" : ""]),
+    ));
     window.scrollTo({ top: 0, behavior: "auto" });
     const previousTitle = document.title;
     document.title = `${product.name} | QuadPro`;
@@ -275,6 +280,12 @@ export default function ProductDetail({
   ];
   const technicalSpecifications = Array.isArray(product.specifications)
     ? product.specifications.filter((item) => item?.description)
+    : [];
+  const upgradeOptions = Array.isArray(product.upgradeOptions)
+    ? product.upgradeOptions.filter((group) => group?.name && Array.isArray(group.options) && group.options.length)
+    : [];
+  const promotions = Array.isArray(product.promotions)
+    ? product.promotions.filter((promotion) => typeof promotion === "string" && promotion.trim())
     : [];
   const canBuy = stock > 0;
 
@@ -410,24 +421,50 @@ export default function ProductDetail({
               <p>{productDescription}</p>
             </div>
 
-            <div className="detail-promotion">
-              <header>
-                <Gift size={20} /> <b>Ưu đãi khi mua hàng</b>
-              </header>
-              <ul>
-                {savings > 0 && (
-                  <li>
-                    <Zap size={16} /> Giảm trực tiếp {formatPrice(savings)}
-                  </li>
-                )}
-                <li>
-                  <Gift size={16} /> Miễn phí giao hàng cho đơn từ 500.000₫
-                </li>
-                <li>
-                  <Wrench size={16} /> Hỗ trợ kiểm tra và tối ưu trước khi giao
-                </li>
-              </ul>
-            </div>
+            {upgradeOptions.length > 0 && (
+              <section className="detail-upgrades" aria-labelledby="detail-upgrades-title">
+                <header>
+                  <Settings size={20} /> <b id="detail-upgrades-title">Nâng cấp</b>
+                </header>
+                <div className="detail-upgrade-groups">
+                  {upgradeOptions.map((group, groupIndex) => (
+                    <div className="detail-upgrade-group" key={`${group.name}-${groupIndex}`}>
+                      <strong>{group.name}</strong>
+                      <div role="group" aria-label={`Chọn ${group.name}`}>
+                        {group.options.map((option, optionIndex) => {
+                          const selected = selectedUpgrades[groupIndex] === option;
+                          return <button
+                            type="button"
+                            className={selected ? "active" : ""}
+                            onClick={() => setSelectedUpgrades((current) => ({ ...current, [groupIndex]: option }))}
+                            aria-pressed={selected}
+                            key={`${option}-${optionIndex}`}
+                          >
+                            {option}
+                            {selected && <span aria-hidden="true"><BadgeCheck size={14}/></span>}
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {promotions.length > 0 && (
+              <section className="detail-promotion" aria-labelledby="detail-promotions-title">
+                <header>
+                  <Gift size={20} /> <b id="detail-promotions-title">Khuyến mãi</b>
+                </header>
+                <ul>
+                  {promotions.map((promotion, index) => (
+                    <li key={`${promotion}-${index}`}>
+                      <Gift size={16} /> <span>{promotion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <div className="detail-stock-row">
               <span className={canBuy ? "in-stock" : "sold-out"}>
