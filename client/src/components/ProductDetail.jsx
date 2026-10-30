@@ -51,6 +51,24 @@ function getComboCandidates(slot, products, currentProductId) {
   });
 }
 
+function belongsToPcCategory(productCategory, categories) {
+  const normalizedProductCategory = normalizeRecommendationText(productCategory);
+  const isPcName = (name) => {
+    const normalized = normalizeRecommendationText(name);
+    return normalized === "pc" || normalized.startsWith("pc ") || normalized.endsWith(" pc");
+  };
+  if (isPcName(normalizedProductCategory)) return true;
+
+  let current = categories.find((category) => normalizeRecommendationText(category.name) === normalizedProductCategory);
+  const visited = new Set();
+  while (current && !visited.has(current.id)) {
+    if (isPcName(current.name)) return true;
+    visited.add(current.id);
+    current = categories.find((category) => category.id === current.parentId);
+  }
+  return false;
+}
+
 function ComboProductPicker({ slot, products, selectedProduct, onSelect, onClose, onOpenProduct }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
@@ -259,6 +277,7 @@ function RelatedProduct({ product, onOpen, onAdd }) {
 export default function ProductDetail({
   product,
   products,
+  categories = [],
   loading,
   galleryInterval = 5,
   galleryTransition = "slide",
@@ -406,6 +425,7 @@ export default function ProductDetail({
     .reduce((total, item) => total + (Number(item.price) || 0), 0);
   const comboSavings = [product, ...selectedComboProducts]
     .reduce((total, item) => total + Math.max(0, (Number(item.oldPrice) || Number(item.price) || 0) - (Number(item.price) || 0)), 0);
+  const showComboBuilder = belongsToPcCategory(product.category, categories);
   const canBuy = stock > 0;
 
   function changeQuantity(change) {
@@ -505,6 +525,56 @@ export default function ProductDetail({
               <BadgeCheck size={17} /> Hình ảnh sản phẩm được kiểm tra trước khi
               đăng bán
             </p>
+            {showComboBuilder && <section className="combo-builder gallery-combo" aria-labelledby="combo-builder-title">
+              <header>
+                <div>
+                  <span>SẢN PHẨM MUA KÈM</span>
+                  <h2 id="combo-builder-title">Phụ kiện dành cho bộ PC này</h2>
+                  <p>Chọn phụ kiện phù hợp và thêm toàn bộ combo vào giỏ.</p>
+                </div>
+                <span className="combo-selected-count">Đã chọn {selectedComboProducts.length}/{comboAccessorySlots.length}</span>
+              </header>
+
+              <div className="combo-accessory-grid">
+                {comboAccessorySlots.map((slot) => {
+                  const selected = selectedAccessories[slot.id];
+                  const SlotIcon = slot.icon;
+                  const candidates = getComboCandidates(slot, products || [], product.id);
+                  const saving = selected ? Math.max(0, (selected.oldPrice || selected.price) - selected.price) : 0;
+                  return <article className={`combo-accessory-card${selected ? " selected" : ""}`} key={slot.id}>
+                    <div className="combo-accessory-media">
+                      {selected ? <img src={selected.image} alt={selected.name}/> : <span><SlotIcon size={30}/></span>}
+                      {selected && <i aria-label="Đã chọn"><Check size={14}/></i>}
+                    </div>
+                    <div className="combo-accessory-copy">
+                      <small>{slot.label}</small>
+                      <h3>{selected ? selected.name : slot.description}</h3>
+                      {selected ? <>
+                        {selected.oldPrice > selected.price && <del>{formatPrice(selected.oldPrice)}</del>}
+                        <strong>{formatPrice(selected.price)}</strong>
+                        {saving > 0 && <em>Tiết kiệm {formatPrice(saving)}</em>}
+                      </> : <p>{candidates.length ? `${candidates.length} sản phẩm để lựa chọn` : "Đang cập nhật"}</p>}
+                    </div>
+                    <footer>
+                      {selected && <button type="button" className="remove" onClick={() => setSelectedAccessories((current) => ({ ...current, [slot.id]: null }))}>Xóa</button>}
+                      <button type="button" className="select" onClick={() => setPickerSlot(slot)} disabled={!candidates.length}>
+                        {selected ? "Đổi" : "Chọn sản phẩm"}
+                      </button>
+                    </footer>
+                  </article>;
+                })}
+              </div>
+
+              <footer className="combo-summary">
+                <div>
+                  <span>Tạm tính <strong>{formatPrice(comboTotal)}</strong></span>
+                  <span>Tiết kiệm <b>{formatPrice(comboSavings)}</b></span>
+                </div>
+                <button type="button" onClick={addComboToCart} disabled={!selectedComboProducts.length || !canBuy}>
+                  <ShoppingCart size={17}/> Mua combo
+                </button>
+              </footer>
+            </section>}
           </div>
 
           <div className="product-detail-summary" data-depth="4">
@@ -644,57 +714,6 @@ export default function ProductDetail({
           </div>
         </section>
 
-        <section className="combo-builder" aria-labelledby="combo-builder-title">
-          <header>
-            <div>
-              <span>SẢN PHẨM MUA KÈM</span>
-              <h2 id="combo-builder-title">Hoàn thiện bộ sản phẩm của bạn</h2>
-              <p>Chọn thêm phụ kiện phù hợp và đưa toàn bộ combo vào giỏ chỉ với một lần bấm.</p>
-            </div>
-            <span className="combo-selected-count">Đã chọn {selectedComboProducts.length}/{comboAccessorySlots.length}</span>
-          </header>
-
-          <div className="combo-accessory-grid">
-            {comboAccessorySlots.map((slot) => {
-              const selected = selectedAccessories[slot.id];
-              const SlotIcon = slot.icon;
-              const candidates = getComboCandidates(slot, products || [], product.id);
-              const saving = selected ? Math.max(0, (selected.oldPrice || selected.price) - selected.price) : 0;
-              return <article className={`combo-accessory-card${selected ? " selected" : ""}`} key={slot.id}>
-                <div className="combo-accessory-media">
-                  {selected ? <img src={selected.image} alt={selected.name}/> : <span><SlotIcon size={36}/></span>}
-                  {selected && <i aria-label="Đã chọn"><Check size={15}/></i>}
-                </div>
-                <div className="combo-accessory-copy">
-                  <small>{slot.label}</small>
-                  <h3>{selected ? selected.name : slot.description}</h3>
-                  {selected ? <>
-                    {selected.oldPrice > selected.price && <del>{formatPrice(selected.oldPrice)}</del>}
-                    <strong>{formatPrice(selected.price)}</strong>
-                    {saving > 0 && <em>Tiết kiệm {formatPrice(saving)}</em>}
-                  </> : <p>{candidates.length ? `${candidates.length} sản phẩm để lựa chọn` : "Đang cập nhật sản phẩm"}</p>}
-                </div>
-                <footer>
-                  {selected && <button type="button" className="remove" onClick={() => setSelectedAccessories((current) => ({ ...current, [slot.id]: null }))}>Xóa</button>}
-                  <button type="button" className="select" onClick={() => setPickerSlot(slot)} disabled={!candidates.length}>
-                    {selected ? "Đổi sản phẩm" : "Chọn sản phẩm"}
-                  </button>
-                </footer>
-              </article>;
-            })}
-          </div>
-
-          <footer className="combo-summary">
-            <div>
-              <span>Tạm tính <strong>{formatPrice(comboTotal)}</strong></span>
-              <span>Tiết kiệm <b>{formatPrice(comboSavings)}</b></span>
-            </div>
-            <button type="button" onClick={addComboToCart} disabled={!selectedComboProducts.length || !canBuy}>
-              <ShoppingCart size={18}/> Mua combo ({selectedComboProducts.length + 1} sản phẩm)
-            </button>
-          </footer>
-        </section>
-
         <section className="detail-services" aria-label="Quyền lợi mua hàng">
           <article>
             <Truck />
@@ -791,7 +810,7 @@ export default function ProductDetail({
           </section>
         )}
       </div>
-      {pickerSlot && <ComboProductPicker
+      {showComboBuilder && pickerSlot && <ComboProductPicker
         slot={pickerSlot}
         products={getComboCandidates(pickerSlot, products || [], product.id)}
         selectedProduct={selectedAccessories[pickerSlot.id]}

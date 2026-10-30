@@ -1983,6 +1983,7 @@ function App() {
           <ProductDetail
             product={productsLoaded ? selectedProduct : null}
             products={products}
+            categories={categories}
             loading={!productsLoaded}
             galleryInterval={transitionSettings.productGalleryIntervalSeconds}
             galleryTransition={transitionSettings.productGalleryTransition}
