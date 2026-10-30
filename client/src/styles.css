@@ -4609,6 +4609,12 @@ html[data-theme="dark"] .stripe-checkout-button {
   position: relative;
 }
 
+.search > input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .search .search-submit,
 .search > button[aria-label="Xóa tìm kiếm"] {
   display: grid;
