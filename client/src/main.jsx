@@ -2249,7 +2249,7 @@ function App() {
           </div>
         </div>
         <div className="copyright container">
-          © 2026 QUADPRO. Thiết kế và phát triển cho đồ án E-commerce Level 3.
+          © 2026 QUADPRO.
           <div className="footer-payment-methods" aria-label="Các phương thức thanh toán được hỗ trợ">
             <span className="footer-payment-label">Thanh toán an toàn:</span>
             <span className="payment-brand payment-brand-visa" role="img" aria-label="Visa" title="Visa">VISA</span>
