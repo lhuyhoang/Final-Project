@@ -3,7 +3,7 @@ export const staffPermissions = [
   { id: 'inventory', name: 'Nhập hàng', description: 'Thêm sản phẩm mới hoặc nhập hàng loạt bằng Excel; không sửa, xóa sản phẩm cũ.' },
   { id: 'products', name: 'Sản phẩm', description: 'Xem, thêm, sửa, xóa và nhập Excel sản phẩm.' },
   { id: 'categories', name: 'Danh mục', description: 'Quản lý danh mục cha, con và hiển thị trang chủ.' },
-  { id: 'showrooms', name: 'Showroom', description: 'Thêm, sửa, xóa showroom.' },
+  { id: 'showrooms', name: 'Thông tin', description: 'Quản lý showroom, số điện thoại, email và link Messenger/Zalo của cửa hàng.' },
   { id: 'orders', name: 'Đơn hàng', description: 'Xem thông tin khách đặt hàng và cập nhật trạng thái đơn.' },
   { id: 'online-payments', name: 'Thanh toán', description: 'Xem giao dịch trực tuyến, báo cáo và số dư Stripe.' },
   { id: 'settings', name: 'Hiệu ứng chuyển cảnh', description: 'Thay đổi hiệu ứng ảnh và dải sản phẩm của cửa hàng.' },
@@ -43,6 +43,7 @@ export function canAccessAdminEndpoint(user, method, path) {
   if ((verb === 'POST' && pathname === '/categories') || (verb === 'PATCH' && /^\/categories\/\d+$/.test(pathname)) || (verb === 'DELETE' && /^\/categories(?:\/\d+)?$/.test(pathname))) return any('categories')
   if ((verb === 'GET' || verb === 'POST') && pathname === '/showrooms') return any('showrooms')
   if (['PUT', 'DELETE'].includes(verb) && /^\/showrooms\/\d+$/.test(pathname)) return any('showrooms')
+  if (['GET', 'PATCH'].includes(verb) && pathname === '/contact') return any('showrooms')
   if ((verb === 'GET' && pathname === '/orders') || (verb === 'PATCH' && /^\/orders\/[^/]+\/status$/.test(pathname))) return any('orders')
   if (verb === 'GET' && ['/payments', '/stripe/overview'].includes(pathname)) return any('online-payments')
   if (['GET', 'PATCH'].includes(verb) && pathname === '/settings') return any('settings')

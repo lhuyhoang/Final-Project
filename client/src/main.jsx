@@ -31,7 +31,6 @@ import {
   MapPin,
   MemoryStick,
   Menu,
-  MessageCircle,
   Microchip,
   Monitor,
   MonitorUp,
@@ -71,6 +70,8 @@ import CheckoutPage from "./components/CheckoutPage";
 import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
 import FooterContact from "./components/FooterContact";
+import ContactButtons from "./components/ContactButtons";
+import { defaultShopContact } from "../../shared/shopContact.mjs";
 import PcBuilderPage from "./components/PcBuilderPage";
 import { mergePcBuildCart } from "./pc-builder.mjs";
 import { canEnterAdmin } from "../../shared/adminAccess.mjs";
@@ -940,6 +941,7 @@ function App() {
   const [products, setProducts] = useState(fallbackProducts);
   const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
+  const [shopContact, setShopContact] = useState(defaultShopContact);
   const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1022,6 +1024,7 @@ function App() {
     try {
       const settings = await api("/api/settings");
       setTransitionSettings({ ...defaultTransitionSettings, ...settings });
+      setShopContact({ ...defaultShopContact, ...settings.contact });
     } catch {
       /* The default interval keeps the gallery usable while settings load. */
     }
@@ -1596,6 +1599,7 @@ function App() {
         onProductsChanged={refreshProducts}
         onCategoriesChanged={refreshCategories}
         onShowroomsChanged={refreshShowrooms}
+        onContactChanged={setShopContact}
         onTransitionSettingsChanged={(updated) => setTransitionSettings({ ...defaultTransitionSettings, ...updated })}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -1639,7 +1643,7 @@ function App() {
       <div className="top-strip">
         <span>Miễn phí giao hàng đơn từ 500K</span>
         <span>
-          Hotline: <b>1900 6868</b>
+          Hotline: <b>{shopContact.phone}</b>
         </span>
         <span>{showrooms.length ? `Hệ thống ${showrooms.length} showroom toàn quốc` : "Hệ thống showroom toàn quốc"}</span>
       </div>
@@ -2230,11 +2234,11 @@ function App() {
             <a>Chính sách đổi trả</a>
             <a>Vận chuyển & thanh toán</a>
           </div>
-          <FooterContact showrooms={showrooms} />
+          <FooterContact showrooms={showrooms} contact={shopContact} />
           <div>
             <h3>Tổng đài hỗ trợ</h3>
-            <strong>1900 6868</strong>
-            <small>08:00 - 21:30 (Tất cả các ngày)</small>
+            <strong>{shopContact.phone}</strong>
+            <small>{shopContact.supportHours}</small>
             <h3>Đăng ký nhận ưu đãi</h3>
             <div className="newsletter">
               <input placeholder="Email của bạn" />
@@ -2335,9 +2339,7 @@ function App() {
           {toast}
         </div>
       )}
-      <button className="chat-fab" aria-label="Chat hỗ trợ">
-        <MessageCircle fill="currentColor" />
-      </button>
+      <ContactButtons messengerUrl={shopContact.messengerUrl} zaloUrl={shopContact.zaloUrl} />
     </>
   );
 }

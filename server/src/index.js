@@ -66,6 +66,7 @@ import { hashPassword, verifyPassword } from './password.js'
 import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs'
 import { normalizeProductImage } from '../../shared/productImage.mjs'
 import { canAccessAdminEndpoint, normalizeStaffRole } from '../../shared/adminAccess.mjs'
+import { normalizeShopContact, readShopContact } from '../../shared/shopContact.mjs'
 import { generateResetOtp, getOtpSecret, hashResetValue, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 import { getMailConfiguration, sendPasswordResetOtp } from './mail.js'
 
@@ -761,6 +762,7 @@ function mapPublicStoreSettings(settings) {
   const carouselDurationValue = Number(settings.product_carousel_duration_ms?.value)
   const carouselEasingValue = String(settings.product_carousel_easing?.value || 'smooth')
   return {
+    contact: readShopContact(settings),
     productGalleryIntervalSeconds: Number.isInteger(parsedInterval)
       ? Math.min(Math.max(parsedInterval, 2), 60)
       : 5,
@@ -1288,6 +1290,18 @@ app.get('/api/admin/categories', asyncHandler(async (req, res) => res.json(await
 
 app.get('/api/admin/settings', asyncHandler(async (req, res) => {
   res.json(mapPublicStoreSettings(await getStoreSettings()))
+}))
+
+app.get('/api/admin/contact', asyncHandler(async (req, res) => {
+  res.json(readShopContact(await getStoreSettings()))
+}))
+
+app.patch('/api/admin/contact', asyncHandler(async (req, res) => {
+  let contact
+  try { contact = normalizeShopContact(req.body, readShopContact(await getStoreSettings())) }
+  catch (error) { throw httpError(400, error.message) }
+  await updateStoreSetting('shop_contact_info', JSON.stringify(contact))
+  res.json(contact)
 }))
 
 app.patch('/api/admin/settings', asyncHandler(async (req, res) => {

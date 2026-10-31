@@ -1,0 +1,10 @@
+.contact-buttons { position: fixed; z-index: 15; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+.contact-button { position: relative; display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid #ffffff4d; border-radius: 50%; color: white; text-decoration: none; box-shadow: 0 5px 18px #005eff38; transition: transform 200ms ease, box-shadow 200ms ease; }
+.contact-button-messenger { background: linear-gradient(145deg, #00b2ff, #1769ff 65%, #7a39ff); }
+.contact-button-zalo { background: #0068ff; }
+.contact-button:hover, .contact-button:focus-visible { transform: translateY(-3px); box-shadow: 0 8px 22px #005eff55; }
+.contact-button:focus-visible { outline: 3px solid #89c3ff; outline-offset: 4px; }
+.contact-button-label { position: absolute; right: calc(100% + 12px); padding: 8px 12px; border-radius: 7px; background: #20242d; color: white; white-space: nowrap; font-size: 11px; font-weight: 600; opacity: 0; visibility: hidden; transform: translateX(5px); transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease; pointer-events: none; }
+.contact-button:hover .contact-button-label, .contact-button:focus-visible .contact-button-label { opacity: 1; visibility: visible; transform: none; }
+@media (max-width: 760px) { .contact-buttons { right: max(15px, env(safe-area-inset-right)); bottom: max(15px, env(safe-area-inset-bottom)); gap: 10px; } .contact-button { width: 48px; height: 48px; } }
+@media (prefers-reduced-motion: reduce) { .contact-button, .contact-button-label { transition: none; } }

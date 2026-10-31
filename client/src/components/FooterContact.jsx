@@ -1,5 +1,6 @@
 import { Mail, MapPin, Phone } from 'lucide-react'
 import './footer-contact.css'
+import { defaultShopContact } from '../../../shared/shopContact.mjs'
 
 function showroomMapUrl(showroom) {
   try {
@@ -9,7 +10,7 @@ function showroomMapUrl(showroom) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(showroom.address || showroom.name)}`
 }
 
-export default function FooterContact({ showrooms = [] }) {
+export default function FooterContact({ showrooms = [], contact = defaultShopContact }) {
   const visibleShowrooms = showrooms.filter(showroom => showroom.isActive !== false)
   return <div className="footer-contact">
     <h3>Thông tin liên hệ</h3>
@@ -20,8 +21,8 @@ export default function FooterContact({ showrooms = [] }) {
           <b>{showroom.name}</b><span>{showroom.address}</span>
         </a>
       </li>) : <li><MapPin size={17} aria-hidden="true"/><span>Địa chỉ showroom đang được cập nhật.</span></li>}
-      <li><Phone size={17} aria-hidden="true"/><a href="tel:0812077051" aria-label="Gọi 0812077051">0812077051</a></li>
-      <li><Mail size={17} aria-hidden="true"/><a href="mailto:quadprosupport@gmail.com">quadprosupport@gmail.com</a></li>
+      <li><Phone size={17} aria-hidden="true"/><a href={`tel:${contact.phone.replace(/[\s().-]/g, '')}`} aria-label={`Gọi ${contact.phone}`}>{contact.phone}</a></li>
+      <li><Mail size={17} aria-hidden="true"/><a href={`mailto:${contact.email}`}>{contact.email}</a></li>
     </ul>
   </div>
 }

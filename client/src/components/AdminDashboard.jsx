@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Folder, FolderOpen, Gift, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
 import UserManager from './UserManager'
+import { defaultShopContact } from '../../../shared/shopContact.mjs'
 import { hasAdminPermission } from '../../../shared/adminAccess.mjs'
 import { getBuildCategoryScope, isPcBuildCategory, normalizeBuildText } from '../../../shared/pcBuild.mjs'
 import { buildProductFolders, getProductFolderPath } from '../product-folders'
 import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/productImage.mjs'
+
+const ContactInfoEditor = lazy(() => import('./ContactInfoEditor'))
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -1369,7 +1372,7 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
+export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onContactChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
   const [requestedTab, setTab] = useState(loadAdminTab)
   const [accessUser, setAccessUser] = useState(user)
   const allowed = permission => hasAdminPermission(accessUser, permission)
@@ -1380,6 +1383,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [showrooms, setShowrooms] = useState([])
+  const [shopContact, setShopContact] = useState(defaultShopContact)
   const [orders, setOrders] = useState([])
   const [onlinePayments, setOnlinePayments] = useState([])
   const [stripeOverview, setStripeOverview] = useState(null)
@@ -1414,7 +1418,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
       const stripeRequest = fetchIf(permitted('online-payments'), '/api/admin/stripe/overview', null)
         .then(data => ({ data }))
         .catch(stripeError => ({ error: stripeError }))
-      const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, settingsData, stripeResult] = await Promise.all([
+      const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, settingsData, stripeResult, contactData] = await Promise.all([
         fetchIf(permitted('overview'), '/api/admin/stats', null),
         fetchIf(permitted('products') || permitted('inventory') || permitted('settings'), '/api/admin/products'),
         fetchIf(permitted('products') || permitted('inventory') || permitted('categories'), '/api/admin/categories'),
@@ -1423,13 +1427,15 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
         fetchIf(permitted('online-payments'), '/api/admin/payments'),
         fetchIf(currentUser.role === 'admin', '/api/admin/users'),
         fetchIf(permitted('settings'), '/api/admin/settings', {}),
-        stripeRequest
+        stripeRequest,
+        fetchIf(permitted('showrooms'), '/api/admin/contact', defaultShopContact)
       ])
       if (stripeResult.error && (stripeResult.error.status === 401 || stripeResult.error.status === 403)) throw stripeResult.error
       setStats(statsData)
       setProducts(productData)
       setCategories(categoryData)
       setShowrooms(showroomData)
+      setShopContact(contactData)
       setOrders(orderData)
       setOnlinePayments(paymentData)
       setUsers(userData)
@@ -1744,7 +1750,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
     { id: 'inventory', label: 'Nhập hàng', icon: Upload },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'categories', label: 'Danh mục', icon: ClipboardList },
-    { id: 'showrooms', label: 'Showroom', icon: MapPinned },
+    { id: 'showrooms', label: 'Thông tin', icon: Info },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
     { id: 'users', label: 'Người dùng', icon: Users },
@@ -1824,10 +1830,12 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
 
         {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
 
-        {tab === 'showrooms' && <section className="admin-panel admin-list-panel">
+        {tab === 'showrooms' && <>
+        <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải thông tin liên hệ…</div>}><ContactInfoEditor contact={shopContact} onSaved={updated => { setShopContact(updated); onContactChanged?.(updated) }}/></Suspense>
+        <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>
           <div className="admin-table-wrap"><table className="showrooms-table"><thead><tr><th>Showroom</th><th>Liên hệ</th><th>Giờ mở cửa</th><th>Thứ tự</th><th>Hiển thị</th><th>Thao tác</th></tr></thead><tbody>{visibleShowrooms.map(showroom => <tr key={showroom.id}><td><div className="showroom-admin-cell"><span><MapPinned size={18}/></span><div><b>{showroom.name}</b><small>{showroom.address}</small></div></div></td><td>{showroom.phone || 'Chưa cập nhật'}</td><td>{showroom.openingHours || 'Chưa cập nhật'}</td><td>{showroom.sortOrder}</td><td><span className={`showroom-visibility ${showroom.isActive ? 'active' : 'hidden'}`}>{showroom.isActive ? 'Đang hiện' : 'Đang ẩn'}</span></td><td><div className="row-actions"><button onClick={() => { setShowroomEditor(showroom); setShowroomEditorOpen(true) }} aria-label={`Sửa ${showroom.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeShowroom(showroom)} aria-label={`Xóa ${showroom.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleShowrooms.length && <div className="table-empty">Chưa có showroom phù hợp.</div>}</div>
-        </section>}
+        </section></>}
 
         {tab === 'orders' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>VẬN HÀNH</span><h2>{orders.length} đơn hàng</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng..."/></label></div></header>
