@@ -12,6 +12,7 @@ import { buildProductFolders, getProductFolderPath } from '../product-folders'
 import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/productImage.mjs'
 
 const ContactInfoEditor = lazy(() => import('./ContactInfoEditor'))
+const PromotionsManager = lazy(() => import('./PromotionsManager'))
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -65,7 +66,7 @@ const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif
 const maxImageSize = 10 * 1024 * 1024
 const adminTabStorageKey = 'quadpro-admin-tab'
 const adminNotificationStoragePrefix = 'quadpro-admin-notifications'
-const validAdminTabs = new Set(['overview', 'inventory', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
+const validAdminTabs = new Set(['overview', 'inventory', 'products', 'categories', 'showrooms', 'promotions', 'orders', 'online-payments', 'stripe-dashboard', 'users', 'settings'])
 const bulkProductHeaders = ['name', 'brand', 'category', 'price', 'oldPrice', 'stock', 'image', 'gallery', 'badge', 'policyText', 'description', 'specifications']
 const compareAdminCategories = (left, right) =>
   (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0) || left.name.localeCompare(right.name, 'vi')
@@ -1372,11 +1373,11 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onContactChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
+export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onContactChanged, onFlashSaleChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
   const [requestedTab, setTab] = useState(loadAdminTab)
   const [accessUser, setAccessUser] = useState(user)
   const allowed = permission => hasAdminPermission(accessUser, permission)
-  const availableTabs = ['overview', 'inventory', 'products', 'categories', 'showrooms', 'orders', 'online-payments', 'users', 'settings'].filter(allowed)
+  const availableTabs = ['overview', 'inventory', 'products', 'categories', 'showrooms', 'promotions', 'orders', 'online-payments', 'users', 'settings'].filter(allowed)
   const tab = availableTabs.includes(requestedTab) ? requestedTab : availableTabs[0] || ''
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
@@ -1420,7 +1421,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
         .catch(stripeError => ({ error: stripeError }))
       const [statsData, productData, categoryData, showroomData, orderData, paymentData, userData, settingsData, stripeResult, contactData] = await Promise.all([
         fetchIf(permitted('overview'), '/api/admin/stats', null),
-        fetchIf(permitted('products') || permitted('inventory') || permitted('settings'), '/api/admin/products'),
+        fetchIf(permitted('products') || permitted('inventory') || permitted('settings') || permitted('promotions'), '/api/admin/products'),
         fetchIf(permitted('products') || permitted('inventory') || permitted('categories'), '/api/admin/categories'),
         fetchIf(permitted('showrooms'), '/api/admin/showrooms'),
         fetchIf(permitted('orders'), '/api/admin/orders'),
@@ -1751,6 +1752,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'categories', label: 'Danh mục', icon: ClipboardList },
     { id: 'showrooms', label: 'Thông tin', icon: Info },
+    { id: 'promotions', label: 'Khuyến mãi', icon: Gift },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
     { id: 'users', label: 'Người dùng', icon: Users },
@@ -1829,6 +1831,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
         {tab === 'categories' && <CategoryManager categories={categories} products={products} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory} onRequestBulkDelete={removeCategories}/>}
 
         {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
+        {tab === 'promotions' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải khuyến mãi…</div>}><PromotionsManager products={products} onFlashSaleChanged={onFlashSaleChanged} refreshing={refreshing}/></Suspense>}
 
         {tab === 'showrooms' && <>
         <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải thông tin liên hệ…</div>}><ContactInfoEditor contact={shopContact} onSaved={updated => { setShopContact(updated); onContactChanged?.(updated) }}/></Suspense>

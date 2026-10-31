@@ -71,6 +71,8 @@ import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
 import FooterContact from "./components/FooterContact";
 import ContactButtons from "./components/ContactButtons";
+import FlashSale from "./components/FlashSale";
+import { emptyFlashSale } from "../../shared/promotions.mjs";
 import { defaultShopContact } from "../../shared/shopContact.mjs";
 import PcBuilderPage from "./components/PcBuilderPage";
 import { mergePcBuildCart } from "./pc-builder.mjs";
@@ -942,6 +944,7 @@ function App() {
   const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
   const [shopContact, setShopContact] = useState(defaultShopContact);
+  const [flashSale, setFlashSale] = useState(emptyFlashSale);
   const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1025,6 +1028,7 @@ function App() {
       const settings = await api("/api/settings");
       setTransitionSettings({ ...defaultTransitionSettings, ...settings });
       setShopContact({ ...defaultShopContact, ...settings.contact });
+      setFlashSale(settings.flashSale || emptyFlashSale);
     } catch {
       /* The default interval keeps the gallery usable while settings load. */
     }
@@ -1548,6 +1552,8 @@ function App() {
           })),
           customer: { name: customer.name, phone: customer.phone },
           shipping: { address: customer.address },
+          voucherCode: customer.voucherCode || null,
+          expectedVoucherDiscount: customer.expectedVoucherDiscount,
           paymentMethod,
         }),
       };
@@ -1575,6 +1581,7 @@ function App() {
     } catch (requestError) {
       setToast(requestError.message);
       setTimeout(() => setToast(""), 3500);
+      throw requestError;
     } finally {
       setCheckoutLoading(null);
     }
@@ -1600,6 +1607,7 @@ function App() {
         onCategoriesChanged={refreshCategories}
         onShowroomsChanged={refreshShowrooms}
         onContactChanged={setShopContact}
+        onFlashSaleChanged={setFlashSale}
         onTransitionSettingsChanged={(updated) => setTransitionSettings({ ...defaultTransitionSettings, ...updated })}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -2069,34 +2077,7 @@ function App() {
           </div>
         </section>
 
-        <section className="deal-section" id="deals">
-          <div className="container">
-            <div className="deal-header">
-              <div>
-                <span className="flash">
-                  <Zap fill="currentColor" /> FLASH SALE
-                </span>
-                <p>Kết thúc sau</p>
-                <div className="countdown">
-                  <b>08</b>:<b>24</b>:<b>36</b>
-                </div>
-              </div>
-              <button>
-                Xem tất cả <ArrowRight size={17} />
-              </button>
-            </div>
-            <div className="products-grid">
-              {products.slice(0, 5).map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAdd={addToCart}
-                  onOpen={openProduct}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
+        <FlashSale sale={flashSale} products={products} renderProduct={product => <ProductCard key={product.id} product={product} onAdd={addToCart} onOpen={openProduct}/>}/>
 
         <section className="products-section container" id="products">
           <div className="section-heading">

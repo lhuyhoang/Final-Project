@@ -42,6 +42,10 @@ import {
   findUserBySessionTokenHash,
   getAdminStats,
   getStoreSettings,
+  listVouchers,
+  createVoucher,
+  updateVoucher,
+  previewVoucher,
   healthCheck,
   initializeDatabase,
   listOrders,
@@ -67,6 +71,7 @@ import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs
 import { normalizeProductImage } from '../../shared/productImage.mjs'
 import { canAccessAdminEndpoint, normalizeStaffRole } from '../../shared/adminAccess.mjs'
 import { normalizeShopContact, readShopContact } from '../../shared/shopContact.mjs'
+import { normalizeFlashSale, readFlashSale, normalizeVoucher } from '../../shared/promotions.mjs'
 import { generateResetOtp, getOtpSecret, hashResetValue, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 import { getMailConfiguration, sendPasswordResetOtp } from './mail.js'
 
@@ -763,6 +768,7 @@ function mapPublicStoreSettings(settings) {
   const carouselEasingValue = String(settings.product_carousel_easing?.value || 'smooth')
   return {
     contact: readShopContact(settings),
+    flashSale: readFlashSale(settings),
     productGalleryIntervalSeconds: Number.isInteger(parsedInterval)
       ? Math.min(Math.max(parsedInterval, 2), 60)
       : 5,
@@ -978,6 +984,10 @@ app.get('/api/showrooms', asyncHandler(async (req, res) => {
   res.json(await listShowrooms())
 }))
 
+app.post('/api/vouchers/validate', authenticate, asyncHandler(async (req, res) => {
+  res.json(await previewVoucher(req.body?.code, req.body?.subtotal))
+}))
+
 app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req, res) => {
   const stripeClient = requireStripe()
   const checkoutDetails = validateCheckoutDetails(req.body, req.user)
@@ -985,14 +995,21 @@ app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req,
     userId: req.user.id,
     items: req.body?.items,
     ...checkoutDetails,
-    paymentMethod: 'stripe'
+    paymentMethod: 'stripe',
+    voucherCode: req.body?.voucherCode,
+    expectedVoucherDiscount: req.body?.expectedVoucherDiscount
   })
 
   let checkoutSession
+  let stripeCoupon
   try {
     const appBaseUrl = getAppBaseUrl(req)
+    if (order.discountAmount) {
+      stripeCoupon = await stripeClient.coupons.create({ amount_off: order.discountAmount, currency: 'vnd', duration: 'once', max_redemptions: 1, name: `Voucher ${order.voucherCode}`, metadata: { orderId: order.id } }, { idempotencyKey: `quadpro-voucher-${order.id}` })
+    }
     checkoutSession = await stripeClient.checkout.sessions.create({
       mode: 'payment',
+      ...(stripeCoupon ? { discounts: [{ coupon: stripeCoupon.id }] } : {}),
       line_items: order.items.map(item => ({
         quantity: item.quantity,
         price_data: {
@@ -1020,6 +1037,7 @@ app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req,
     await attachStripeCheckoutSession(order.id, req.user.id, checkoutSession.id)
     res.status(201).json({ orderId: order.id, checkoutUrl: checkoutSession.url })
   } catch (error) {
+    if (stripeCoupon?.id) await stripeClient.coupons.del(stripeCoupon.id).catch(() => {})
     if (checkoutSession?.id) {
       await stripeClient.checkout.sessions.expire(checkoutSession.id).catch(() => {})
     }
@@ -1118,7 +1136,9 @@ app.post('/api/payments/vnpay/checkout', authenticate, asyncHandler(async (req, 
     userId: req.user.id,
     items: req.body?.items,
     ...checkoutDetails,
-    paymentMethod: 'vnpay'
+    paymentMethod: 'vnpay',
+    voucherCode: req.body?.voucherCode,
+    expectedVoucherDiscount: req.body?.expectedVoucherDiscount
   })
   const appBaseUrl = getAppBaseUrl(req)
   const createdAt = new Date()
@@ -1226,7 +1246,9 @@ app.post('/api/orders', authenticate, asyncHandler(async (req, res) => {
     userId: req.user.id,
     items: req.body?.items,
     ...checkoutDetails,
-    paymentMethod: req.body?.paymentMethod
+    paymentMethod: req.body?.paymentMethod,
+    voucherCode: req.body?.voucherCode,
+    expectedVoucherDiscount: req.body?.expectedVoucherDiscount
   })
   res.status(201).json(order)
 }))
@@ -1294,6 +1316,34 @@ app.get('/api/admin/settings', asyncHandler(async (req, res) => {
 
 app.get('/api/admin/contact', asyncHandler(async (req, res) => {
   res.json(readShopContact(await getStoreSettings()))
+}))
+
+app.get('/api/admin/promotions', asyncHandler(async (req, res) => {
+  const [settings, vouchers] = await Promise.all([getStoreSettings(), listVouchers()])
+  res.json({ flashSale: readFlashSale(settings), vouchers })
+}))
+
+app.patch('/api/admin/promotions/flash-sale', asyncHandler(async (req, res) => {
+  let sale
+  try { sale = normalizeFlashSale(req.body) } catch (error) { throw httpError(400, error.message) }
+  const ids = new Set((await listProducts()).map(product => product.id))
+  if (sale.productIds.some(id => !ids.has(id))) throw httpError(400, 'Có sản phẩm đã bị xóa. Vui lòng chọn lại.')
+  await updateStoreSetting('flash_sale', JSON.stringify(sale))
+  res.json(sale)
+}))
+
+app.post('/api/admin/vouchers', asyncHandler(async (req, res) => {
+  let input
+  try { input = normalizeVoucher(req.body) } catch (error) { throw httpError(400, error.message) }
+  res.status(201).json(await createVoucher(input))
+}))
+
+app.patch('/api/admin/vouchers/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, 'Voucher không hợp lệ.')
+  let input
+  try { input = normalizeVoucher(req.body) } catch (error) { throw httpError(400, error.message) }
+  res.json(await updateVoucher(id, input))
 }))
 
 app.patch('/api/admin/contact', asyncHandler(async (req, res) => {

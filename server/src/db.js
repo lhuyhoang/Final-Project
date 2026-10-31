@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
 import { getUpgradeDisplayName } from '../../shared/upgradeDisplayName.mjs'
+import { normalizeVoucherCode, voucherDiscount } from '../../shared/promotions.mjs'
 import { matchesResetHash, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 
 const { Pool } = pg
@@ -296,6 +297,8 @@ export function mapOrderRow(row, items = row?.items || []) {
     shipping: { address: row.shipping_address },
     items: items.map(item => item.productId !== undefined ? item : mapOrderItemRow(item)),
     total: numberValue(row.total),
+    voucherCode: row.voucher_code || null,
+    discountAmount: numberValue(row.discount_amount),
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status || 'unpaid',
     stripeCheckoutSessionId: row.stripe_checkout_session_id || null,
@@ -855,6 +858,43 @@ export async function getStoreSettings() {
   }]))
 }
 
+function mapVoucher(row) {
+  return row ? { id: Number(row.id), code: row.code, amount: Number(row.amount), isActive: row.is_active, createdAt: timestampValue(row.created_at) } : null
+}
+
+export async function listVouchers() {
+  return (await query('SELECT * FROM vouchers ORDER BY id DESC')).rows.map(mapVoucher)
+}
+
+export async function createVoucher(input) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let code
+    do { code = Array.from({ length: 10 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('') } while (!/[A-Z]/.test(code) || !/[0-9]/.test(code))
+    try { return mapVoucher((await query('INSERT INTO vouchers (code, amount, is_active) VALUES ($1, $2, $3) RETURNING *', [code, input.amount, input.isActive])).rows[0]) }
+    catch (error) { if (error.code !== '23505') throw error }
+  }
+  throw repositoryError(503, 'Chưa tạo được mã voucher. Vui lòng thử lại.')
+}
+
+export async function updateVoucher(id, input) {
+  const result = await query('UPDATE vouchers SET amount = $2, is_active = $3, updated_at = NOW() WHERE id = $1 RETURNING *', [id, input.amount, input.isActive])
+  if (!result.rowCount) throw repositoryError(404, 'Không tìm thấy voucher.')
+  return mapVoucher(result.rows[0])
+}
+
+async function resolveVoucher(executor, rawCode, subtotal, lock = false) {
+  try {
+    const code = normalizeVoucherCode(rawCode)
+    const result = await executor.query(`SELECT * FROM vouchers WHERE code = $1${lock ? ' FOR SHARE' : ''}`, [code])
+    const voucher = mapVoucher(result.rows[0])
+    const discountAmount = voucherDiscount(voucher, subtotal)
+    return { code, discountAmount, subtotal, total: subtotal - discountAmount }
+  } catch (error) { if (error.status || error.code) throw error; throw repositoryError(400, error.message, 'INVALID_VOUCHER') }
+}
+
+export async function previewVoucher(code, subtotal) { return resolveVoucher(pool, code, subtotal) }
+
 export async function updateStoreSetting(key, value) {
   const result = await query(`
     INSERT INTO store_settings (key, value, updated_at)
@@ -1177,14 +1217,20 @@ export async function createOrder(input) {
     const orderId = input.id || await generateOrderId(client)
     const customer = input.customer || {}
     const shippingAddress = String(input.shipping?.address ?? input.shippingAddress ?? 'Nhận tại showroom QuadPro').trim().slice(0, 250)
-    const total = snapshots.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const subtotal = snapshots.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const appliedVoucher = input.voucherCode ? await resolveVoucher(client, input.voucherCode, subtotal, true) : null
+    const discountAmount = appliedVoucher?.discountAmount || 0
+    if (appliedVoucher && input.expectedVoucherDiscount !== undefined && input.expectedVoucherDiscount !== discountAmount) {
+      throw repositoryError(409, 'Số tiền giảm của voucher đã thay đổi. Vui lòng áp dụng lại mã trước khi xác nhận.', 'VOUCHER_CHANGED')
+    }
+    const total = subtotal - discountAmount
 
     await client.query(`
       INSERT INTO orders (
         id, user_id, customer_name, customer_email, customer_phone,
-        shipping_address, total, payment_method, payment_status, status, created_at, updated_at
+        shipping_address, total, payment_method, payment_status, status, created_at, updated_at, voucher_code, discount_amount
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unpaid', $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unpaid', $9, $10, $11, $12, $13)
     `, [
       orderId,
       input.userId,
@@ -1196,7 +1242,9 @@ export async function createOrder(input) {
       paymentMethod,
       status,
       createdAt,
-      input.updatedAt || createdAt
+      input.updatedAt || createdAt,
+      appliedVoucher?.code || null,
+      discountAmount
     ])
 
     for (const [index, item] of snapshots.entries()) {

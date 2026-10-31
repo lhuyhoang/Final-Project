@@ -7,6 +7,7 @@ export const staffPermissions = [
   { id: 'orders', name: 'Đơn hàng', description: 'Xem thông tin khách đặt hàng và cập nhật trạng thái đơn.' },
   { id: 'online-payments', name: 'Thanh toán', description: 'Xem giao dịch trực tuyến, báo cáo và số dư Stripe.' },
   { id: 'settings', name: 'Hiệu ứng chuyển cảnh', description: 'Thay đổi hiệu ứng ảnh và dải sản phẩm của cửa hàng.' },
+  { id: 'promotions', name: 'Khuyến mãi', description: 'Chọn sản phẩm, thời gian Flash Sale và quản lý mã voucher giảm tiền.' },
 ]
 
 const validPermissions = new Set(staffPermissions.map(item => item.id))
@@ -36,7 +37,7 @@ export function canAccessAdminEndpoint(user, method, path) {
   const any = (...permissions) => permissions.some(permission => hasAdminPermission(user, permission))
   if (verb === 'GET' && pathname === '/access') return true
   if (verb === 'GET' && pathname === '/stats') return any('overview')
-  if (verb === 'GET' && pathname === '/products') return any('products', 'inventory', 'settings')
+  if (verb === 'GET' && pathname === '/products') return any('products', 'inventory', 'settings', 'promotions')
   if (verb === 'GET' && pathname === '/categories') return any('products', 'inventory', 'categories')
   if (verb === 'POST' && ['/products', '/products/bulk'].includes(pathname)) return any('products', 'inventory')
   if ((verb === 'PUT' && /^\/products\/\d+$/.test(pathname)) || (verb === 'DELETE' && /^\/products(?:\/\d+)?$/.test(pathname))) return any('products')
@@ -44,6 +45,7 @@ export function canAccessAdminEndpoint(user, method, path) {
   if ((verb === 'GET' || verb === 'POST') && pathname === '/showrooms') return any('showrooms')
   if (['PUT', 'DELETE'].includes(verb) && /^\/showrooms\/\d+$/.test(pathname)) return any('showrooms')
   if (['GET', 'PATCH'].includes(verb) && pathname === '/contact') return any('showrooms')
+  if ((verb === 'GET' && pathname === '/promotions') || (verb === 'PATCH' && pathname === '/promotions/flash-sale') || (verb === 'POST' && pathname === '/vouchers') || (verb === 'PATCH' && /^\/vouchers\/\d+$/.test(pathname))) return any('promotions')
   if ((verb === 'GET' && pathname === '/orders') || (verb === 'PATCH' && /^\/orders\/[^/]+\/status$/.test(pathname))) return any('orders')
   if (verb === 'GET' && ['/payments', '/stripe/overview'].includes(pathname)) return any('online-payments')
   if (['GET', 'PATCH'].includes(verb) && pathname === '/settings') return any('settings')

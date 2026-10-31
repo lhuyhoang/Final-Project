@@ -1,0 +1,11 @@
+.checkout-voucher { margin-top: 20px; padding: 18px 20px 0; border-top: 1px solid var(--line); }
+.checkout-voucher > label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+.checkout-voucher > label svg { color: var(--red); }
+.checkout-voucher > div { display: flex; gap: 8px; }
+.checkout-voucher input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); padding: 12px; font-size: 12px; }
+.checkout-voucher > div button { border: 0; background: var(--red); color: white; border-radius: 7px; padding: 10px 13px; font-size: 11px; font-weight: 700; }
+.checkout-voucher button:disabled { opacity: .5; cursor: not-allowed; }
+.checkout-voucher input:focus-visible, .checkout-voucher button:focus-visible { outline: 3px solid #e6332a44; outline-offset: 2px; }
+.checkout-voucher > p { color: var(--red); font-size: 11px; line-height: 1.6; margin: 10px 0 0; }
+.checkout-voucher-applied { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: #14a97810; border: 1px solid #14a97844; color: #078565; border-radius: 7px; margin-top: 10px; padding: 9px 10px; font-size: 11px; }
+.checkout-voucher-applied button { display: grid; place-items: center; padding: 5px; border: 0; background: transparent; color: inherit; }

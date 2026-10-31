@@ -331,7 +331,7 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
                       </div>
                       <div className="account-order-footer">
                         <span>{order.shipping?.address || 'Nhận tại showroom QuadPro'}</span>
-                        <div>Tổng thanh toán <strong>{formatPrice(order.total)}</strong></div>
+                        <div>{order.voucherCode && <small>Voucher {order.voucherCode}: -{formatPrice(order.discountAmount)}<br/></small>}Tổng thanh toán <strong>{formatPrice(order.total)}</strong></div>
                       </div>
                     </article>
                   ))}
