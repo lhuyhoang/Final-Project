@@ -1,7 +1,7 @@
 export const defaultShopContact = {
   phone: '0812077051',
   email: 'quadprosupport@gmail.com',
-  messengerUrl: '',
+  messengerUrl: 'https://m.me/aaa',
   zaloUrl: 'https://zalo.me/0812077051',
   supportHours: '08:00 - 21:30 (Tất cả các ngày)',
 }
