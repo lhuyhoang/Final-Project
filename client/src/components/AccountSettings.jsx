@@ -322,8 +322,8 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
                         <b className={`order-status ${order.status}`}>{statusLabels[order.status] || order.status}</b>
                       </div>
                       <div className="account-order-items">
-                        {order.items.map(item => (
-                          <div className="account-order-item" key={`${order.id}-${item.productId}`}>
+                        {order.items.map((item, index) => (
+                          <div className="account-order-item" key={`${order.id}-${item.lineNumber ?? index}`}>
                             <img src={item.image} alt=""/>
                             <span><b>{item.name}</b><small>Số lượng: {item.quantity}</small></span>
                             <strong>{formatPrice(item.price * item.quantity)}</strong>

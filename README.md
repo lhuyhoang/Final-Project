@@ -39,6 +39,41 @@ Khi nâng cấp từ Neon Better Auth, migration giữ nguyên hồ sơ, vai tr�
 
 Hướng dẫn kết nối Gmail SMTP hoặc Resend và cấu hình Vercel: [docs/EMAIL-OTP.md](docs/EMAIL-OTP.md). Cần điền credential email và `EMAIL_OTP_SECRET` ở server, rồi redeploy để gửi thư thật.
 
+## Kiểm thử
+
+```bash
+node --test shared/*.test.mjs client/src/*.test.mjs server/test/resetOtp.test.mjs
+npm run test:password -w server
+npm run test:access -w server
+npm run test:reset -w server
+npm run test:contact -w server
+npm run test:promotions -w server
+npm run test:appearance -w server
+npm run build
+npm audit
+```
+
+Integration tests tự khởi tạo PGlite, không dùng database production. Để chạy UI tests trên Windows với Microsoft Edge đã cài, mở terminal PowerShell thứ nhất:
+
+```powershell
+$env:VITE_CLOUDINARY_CLOUD_NAME='appearance-ui-test'
+$env:VITE_CLOUDINARY_UPLOAD_PRESET='appearance-test-unsigned'
+npm run dev -w client -- --host 127.0.0.1
+```
+
+Trong terminal thứ hai:
+
+```powershell
+$env:APPEARANCE_UI='1'
+npm run test:appearance -w server
+$env:PROMOTIONS_UI='1'
+npm run test:promotions -w server
+```
+
+Các bài UI dùng Playwright trong devDependencies. Upload, email và cổng thanh toán được giả lập. Các biến Cloudinary trên chỉ dành cho tiến trình Vite kiểm thử, không dùng để build/deploy production.
+
+Kết quả và vấn đề còn lại: [Rà soát ngày 04/11/2026](docs/REVIEW-2026-11-04.md).
+
 ## Upload ảnh Cloudinary
 
 1. Trong Cloudinary, tạo một upload preset và đặt Signing Mode là `Unsigned`.

@@ -10,6 +10,7 @@ export async function runPromotionUI({ base, admin, customer, product, voucher, 
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     const pageErrors = []
     page.on('pageerror', error => pageErrors.push(error.message))
+    page.on('console', message => { if (message.type() === 'error' && message.text().includes('same key')) pageErrors.push(message.text()) })
     await page.route('**/api/**', async route => {
       const req = route.request(), url = new URL(req.url())
       if (url.pathname === '/api/admin/stripe/overview') return route.fulfill({ json: { revenueSeries: [], recentPayments: [] } })
@@ -108,6 +109,10 @@ export async function runPromotionUI({ base, admin, customer, product, voucher, 
     assert.equal(result.status(), 201)
     assert.equal((await result.json()).total, 870000)
     assert.equal((await request('/api/vouchers/validate', { cookie: customer, method: 'POST', body: { code: newCode, subtotal: product.price } })).status, 400)
+    await page.goto('http://127.0.0.1:5173/account/orders')
+    const variantOrder = page.locator('.account-order-card').filter({ hasText: 'Inventory PC variants' }).first()
+    await variantOrder.waitFor()
+    assert.equal(await variantOrder.locator('.account-order-item').count(), 3)
     assert.deepEqual(pageErrors, [])
     console.log('PASS UI: campaign selection/save/reload, random/edit voucher, dark/mobile layout, selected-only Flash Sale, real countdown/auto expiry/empty hide, checkout discount and disabled-code retry.')
   } finally { await browser.close() }

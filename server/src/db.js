@@ -276,6 +276,7 @@ export function mapCategoryRow(row) {
 export function mapOrderItemRow(row) {
   if (!row) return null
   return {
+    lineNumber: numberValue(row.item_line_number ?? row.line_number),
     productId: numberValue(row.product_id_snapshot),
     name: row.product_name,
     image: row.product_image,
@@ -1350,9 +1351,10 @@ async function cancelUnpaidStripeOrderWithClient(client, input) {
 
   if (order.status !== 'cancelled') {
     const itemResult = await client.query(`
-      SELECT product_id, quantity
+      SELECT product_id, SUM(quantity)::integer AS quantity
       FROM order_items
       WHERE order_id = $1 AND product_id IS NOT NULL
+      GROUP BY product_id
       ORDER BY product_id
     `, [input.orderId])
     if (itemResult.rows.length) {
@@ -1420,9 +1422,10 @@ async function cancelUnpaidVnpayOrderWithClient(client, input) {
 
   if (order.status !== 'cancelled') {
     const itemResult = await client.query(`
-      SELECT product_id, quantity
+      SELECT product_id, SUM(quantity)::integer AS quantity
       FROM order_items
       WHERE order_id = $1 AND product_id IS NOT NULL
+      GROUP BY product_id
       ORDER BY product_id
     `, [input.orderId])
     if (itemResult.rows.length) {
@@ -1497,9 +1500,10 @@ export async function updateOrder(id, updates = {}) {
 
     if (isCancelling || isRestoring) {
       const itemResult = await client.query(`
-        SELECT product_id, product_id_snapshot, quantity
+        SELECT product_id, product_id_snapshot, SUM(quantity)::integer AS quantity
         FROM order_items
         WHERE order_id = $1
+        GROUP BY product_id, product_id_snapshot
         ORDER BY product_id_snapshot
       `, [id])
       const liveProductIds = [...new Set(itemResult.rows

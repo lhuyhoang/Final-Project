@@ -144,6 +144,8 @@ try {
   assert.deepEqual((await request('/api/settings')).data.flashSale.productIds, [])
   const { testVoucherUsage } = await import('./voucher-usage.integration.mjs')
   await testVoucherUsage({ db, database, request, write, login, passwordHash, product, extra, customer, fake })
+  const { testOrderInventory } = await import('./order-inventory.integration.mjs')
+  await testOrderInventory({ db, database, userId: customerUser.id })
   if (process.env.PROMOTIONS_UI === '1') {
     const { runPromotionUI } = await import('./promotions.ui.mjs')
     await runPromotionUI({ base, admin, customer, product, extra, voucher, request, write })
