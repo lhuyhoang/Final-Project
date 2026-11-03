@@ -1,0 +1,6 @@
+.quadpro-brand-mark { display: block; flex: 0 0 auto; width: 45px; height: 45px; object-fit: contain; border-radius: 10px; background: #fff; }
+.auth-brand > .quadpro-brand-mark { width: 38px; height: 38px; }
+.admin-logo > .quadpro-brand-mark { width: 39px; height: 39px; }
+.account-page-logo > .quadpro-brand-mark { width: 40px; height: 40px; }
+.checkout-logo > .quadpro-brand-mark { width: 42px; height: 42px; }
+@media (max-width: 760px) { .header-main .logo > .quadpro-brand-mark { width: 37px; height: 37px; } }

@@ -71,6 +71,7 @@ import ProductDetail from "./components/ProductDetail";
 import HomeBanners from "./components/HomeBanners";
 import FooterContact from "./components/FooterContact";
 import ContactButtons from "./components/ContactButtons";
+import BrandMark from "./components/BrandMark";
 import FlashSale from "./components/FlashSale";
 import { emptyFlashSale } from "../../shared/promotions.mjs";
 import { defaultShopContact } from "../../shared/shopContact.mjs";
@@ -1665,7 +1666,7 @@ function App() {
             <Menu />
           </button>
           <a className="logo" href="/" onClick={openStorefront}>
-            <span className="logo-mark">Q</span>
+            <BrandMark />
             <span>
               QUAD<b>PRO</b>
               <small>TECH & GAMING</small>
@@ -2186,7 +2187,7 @@ function App() {
         <div className="container footer-grid">
           <div>
             <a className="logo light" href="/" onClick={openStorefront}>
-              <span className="logo-mark">Q</span>
+              <BrandMark />
               <span>
                 QUAD<b>PRO</b>
                 <small>TECH & GAMING</small>

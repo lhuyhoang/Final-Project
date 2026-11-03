@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound, X } from 'lucide-react'
 import { api, saveSession } from '../api'
+import BrandMark from './BrandMark'
 const PasswordResetForm = lazy(() => import('./PasswordResetForm'))
 
 const emptyForm = { name: '', phone: '', email: '', password: '', confirmPassword: '' }
@@ -93,7 +94,7 @@ export default function AuthModal({ open, initialMode = 'login', onClose, onAuth
     <section ref={dialogRef} className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <button className="auth-close" onClick={onClose} aria-label="Đóng"><X size={20}/></button>
       <div className="auth-visual">
-        <div className="auth-brand"><span>Q</span><b>QUADPRO</b></div>
+        <div className="auth-brand"><BrandMark/><b>QUADPRO</b></div>
         <div>
           <small>QUADPRO MEMBER</small>
           <h2>Một tài khoản.<br/>Trọn hệ sinh thái.</h2>

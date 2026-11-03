@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Moon, ShieldCheck, Sun, Ticket, Truck, X } from 'lucide-react'
 import { api } from '../api'
 import CheckoutWizard from './CheckoutWizard'
+import BrandMark from './BrandMark'
 import '../checkout.css'
 import './checkout-voucher.css'
 
@@ -53,7 +54,7 @@ export default function CheckoutPage({ user, cart, loading, onBack, onSubmit, th
     <div className="checkout-page">
       <header className="checkout-topbar">
         <button className="checkout-logo" type="button" onClick={onBack} aria-label="Về cửa hàng QuadPro">
-          <span>Q</span><b>QUAD<i>PRO</i><small>SECURE CHECKOUT</small></b>
+          <BrandMark/><b>QUAD<i>PRO</i><small>SECURE CHECKOUT</small></b>
         </button>
         <button className="checkout-theme" style={{ marginLeft: 'auto' }} type="button" onClick={onToggleTheme} aria-label="Đổi giao diện">
           {theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === 'dark' ? 'Sáng' : 'Tối'}</span>

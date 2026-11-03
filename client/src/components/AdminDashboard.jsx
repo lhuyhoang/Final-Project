@@ -5,6 +5,7 @@ import { categories as defaultCategories } from '../data'
 import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
 import UserManager from './UserManager'
+import BrandMark from './BrandMark'
 import { defaultShopContact } from '../../../shared/shopContact.mjs'
 import { hasAdminPermission } from '../../../shared/adminAccess.mjs'
 import { getBuildCategoryScope, isPcBuildCategory, normalizeBuildText } from '../../../shared/pcBuild.mjs'
@@ -1764,7 +1765,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
     data-admin-tab={tab}
   >
     <aside className="admin-sidebar">
-      <button className="admin-logo" onClick={onBack}><span>Q</span><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
+      <button className="admin-logo" onClick={onBack}><BrandMark/><div>QUAD<b>PRO</b><small>ADMIN CENTER</small></div></button>
       <div className="admin-nav-label">QUẢN TRỊ</div>
       <nav>{navItems.map(item => { const Icon = item.icon; const count = item.id === 'orders' ? unreadOrders : item.id === 'online-payments' ? unreadOnlinePayments : 0; return <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setQuery('') }}><Icon size={19}/><span>{item.label}</span>{count > 0 && <b aria-label={`${count} thông báo chưa xem`}>{count}</b>}</button> })}</nav>
       <div className="admin-user"><div>{user.name.charAt(0).toUpperCase()}</div><span><b>{user.name}</b><small>{accessUser.role === 'admin' ? 'Quản trị viên' : accessUser.staffRoleName || 'Nhân viên'}</small></span></div>

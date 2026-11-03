@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BrandMark from './BrandMark'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -187,7 +188,7 @@ export default function AccountSettings({ session, initialTab = 'profile', onBac
     <div className="account-page">
       <div className="account-topbar">
         <button className="account-page-logo" type="button" onClick={onBack} aria-label="Về trang chủ QuadPro">
-          <span>Q</span>
+          <BrandMark/>
           <b>QUAD<i>PRO</i><small>TECH & GAMING</small></b>
         </button>
         <div className="account-topbar-title">
