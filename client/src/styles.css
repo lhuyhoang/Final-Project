@@ -4597,6 +4597,42 @@ html[data-theme="dark"] .stripe-checkout-button {
   position: sticky;
   top: 0;
   z-index: 50;
+  background: #fff;
+}
+
+.site-header .header-main {
+  color: #000;
+  background: #fff;
+  color-scheme: light;
+}
+
+.site-header .header-main .logo,
+.site-header .header-main .logo b,
+.site-header .mobile-menu,
+.site-header .header-actions > button,
+.site-header .header-actions .showroom-trigger,
+.site-header .header-actions .account-trigger {
+  color: #000;
+}
+
+.site-header .header-actions > button:hover,
+.site-header .header-actions .showroom-trigger:hover,
+.site-header .header-actions .showroom-trigger[aria-expanded="true"],
+.site-header .header-actions .account-trigger:hover {
+  color: #000;
+  background: #f3f4f6;
+}
+
+.site-header .header-main button:focus-visible,
+.site-header .header-main .logo:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+}
+
+.site-header .cart-trigger > b {
+  color: #000;
+  background: #fff;
+  border: 1px solid #d1d5db;
 }
 
 .search:focus-within {
@@ -4605,6 +4641,16 @@ html[data-theme="dark"] .stripe-checkout-button {
 
 .search {
   position: relative;
+}
+
+.site-header .search {
+  border: 1px solid #d1d5db;
+  box-shadow: none;
+}
+
+.site-header .search:focus-within {
+  border-color: #777;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, .08);
 }
 
 .site-header .search,
