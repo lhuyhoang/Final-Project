@@ -17,13 +17,27 @@ test('Flash Sale validates selection, dates and exact schedule boundaries', () =
 })
 
 test('Vouchers use positive integer amounts, normalize codes and reject inactive or oversized discounts', () => {
-  assert.deepEqual(normalizeVoucher({ amount: '100000' }), { amount: 100000, isActive: true })
+  assert.deepEqual(normalizeVoucher({ amount: '100000' }), { amount: 100000, isActive: true, maxUses: null, expiresAt: null })
   assert.equal(normalizeVoucherCode(' abc123xy '), 'ABC123XY')
   for (const amount of [0, -1, 1.5, 1000000001, NaN, Infinity]) assert.throws(() => normalizeVoucher({ amount }))
   assert.throws(() => normalizeVoucher({ amount: 10, isActive: 'false' }))
   for (const code of ['', 'abc', 'abc-123', 'a'.repeat(25)]) assert.throws(() => normalizeVoucherCode(code))
   assert.equal(voucherDiscount({ amount: 100000, isActive: true }, 1000000), 100000)
   for (const [voucher, subtotal] of [[null, 100], [{ amount: 100, isActive: false }, 1000], [{ amount: 100, isActive: true }, 100], [{ amount: 100, isActive: true }, 1.5]]) assert.throws(() => voucherDiscount(voucher, subtotal))
+})
+
+test('voucher usage limits, one use per account and expiry are enforced at exact boundaries', () => {
+  const expiresAt = '2026-11-05T10:00:00.000Z'
+  const current = normalizeVoucher({ amount: 100000, maxUses: 10, expiresAt })
+  assert.deepEqual(normalizeVoucher({ isActive: false }, current), { ...current, isActive: false })
+  assert.equal(normalizeVoucher({ maxUses: '', expiresAt: '' }, current).maxUses, null)
+  for (const maxUses of [0, -1, 1.5, 1000001]) assert.throws(() => normalizeVoucher({ amount: 100, maxUses }))
+  assert.throws(() => normalizeVoucher({ amount: 100, expiresAt: 'not-a-date' }))
+  for (const body of [null, [], { amount: true }, { amount: 100, maxUses: true }, { amount: 100, expiresAt: false }]) assert.throws(() => normalizeVoucher(body))
+  assert.equal(voucherDiscount({ ...current, usedCount: 9 }, 1000000, Date.parse(expiresAt) - 1), 100000)
+  assert.throws(() => voucherDiscount(current, 1000000, Date.parse(expiresAt)), /hết hạn/)
+  assert.throws(() => voucherDiscount({ ...current, usedCount: 10 }, 1000000, Date.parse(expiresAt) - 1), /hết lượt/)
+  assert.throws(() => voucherDiscount({ ...current, usedByUser: true }, 1000000, Date.parse(expiresAt) - 1), /Mỗi tài khoản/)
 })
 
 test('Promotion staff can manage campaigns/vouchers without changing products or other settings', () => {

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
 import { getUpgradeDisplayName } from '../../shared/upgradeDisplayName.mjs'
-import { normalizeVoucherCode, voucherDiscount } from '../../shared/promotions.mjs'
+import { assertVoucherAvailable, normalizeVoucher, normalizeVoucherCode, voucherDiscount } from '../../shared/promotions.mjs'
 import { matchesResetHash, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 
 const { Pool } = pg
@@ -859,11 +859,15 @@ export async function getStoreSettings() {
 }
 
 function mapVoucher(row) {
-  return row ? { id: Number(row.id), code: row.code, amount: Number(row.amount), isActive: row.is_active, createdAt: timestampValue(row.created_at) } : null
+  return row ? { id: Number(row.id), code: row.code, amount: Number(row.amount), isActive: row.is_active, maxUses: row.max_uses === null || row.max_uses === undefined ? null : Number(row.max_uses), expiresAt: timestampValue(row.expires_at), usedCount: Number(row.used_count || 0), reservedCount: Number(row.reserved_count || 0), createdAt: timestampValue(row.created_at) } : null
 }
 
 export async function listVouchers() {
-  return (await query('SELECT * FROM vouchers ORDER BY id DESC')).rows.map(mapVoucher)
+  return (await query(`SELECT vouchers.*, usage.used_count, usage.reserved_count FROM vouchers LEFT JOIN (
+    SELECT voucher_code, COUNT(*) AS used_count,
+      COUNT(*) FILTER (WHERE payment_method IN ('stripe', 'vnpay') AND payment_status <> 'paid' AND status <> 'cancelled') AS reserved_count
+    FROM orders WHERE voucher_code IS NOT NULL AND (status <> 'cancelled' OR payment_status = 'paid') GROUP BY voucher_code
+  ) AS usage ON usage.voucher_code = vouchers.code ORDER BY vouchers.id DESC`)).rows.map(mapVoucher)
 }
 
 export async function createVoucher(input) {
@@ -871,29 +875,55 @@ export async function createVoucher(input) {
   for (let attempt = 0; attempt < 5; attempt++) {
     let code
     do { code = Array.from({ length: 10 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('') } while (!/[A-Z]/.test(code) || !/[0-9]/.test(code))
-    try { return mapVoucher((await query('INSERT INTO vouchers (code, amount, is_active) VALUES ($1, $2, $3) RETURNING *', [code, input.amount, input.isActive])).rows[0]) }
+    try { return mapVoucher((await query('INSERT INTO vouchers (code, amount, is_active, max_uses, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING *', [code, input.amount, input.isActive, input.maxUses ?? null, input.expiresAt ?? null])).rows[0]) }
     catch (error) { if (error.code !== '23505') throw error }
   }
   throw repositoryError(503, 'Chưa tạo được mã voucher. Vui lòng thử lại.')
 }
 
 export async function updateVoucher(id, input) {
-  const result = await query('UPDATE vouchers SET amount = $2, is_active = $3, updated_at = NOW() WHERE id = $1 RETURNING *', [id, input.amount, input.isActive])
-  if (!result.rowCount) throw repositoryError(404, 'Không tìm thấy voucher.')
-  return mapVoucher(result.rows[0])
+  return withTransaction(async client => {
+    const result = await client.query('SELECT * FROM vouchers WHERE id = $1 FOR UPDATE', [id])
+    const voucher = mapVoucher(result.rows[0])
+    if (!voucher) throw repositoryError(404, 'Không tìm thấy voucher.')
+    let normalized
+    try { normalized = normalizeVoucher(input, voucher) } catch (error) { throw repositoryError(400, error.message) }
+    const usage = await getVoucherUsage(client, voucher.code)
+    if (normalized.maxUses !== null && normalized.maxUses < usage.usedCount) throw repositoryError(409, `Đã có ${usage.usedCount} lượt dùng/giữ. Không thể đặt giới hạn thấp hơn số này.`)
+    const saved = await client.query('UPDATE vouchers SET amount = $2, is_active = $3, max_uses = $4, expires_at = $5, updated_at = NOW() WHERE id = $1 RETURNING *', [id, normalized.amount, normalized.isActive, normalized.maxUses, normalized.expiresAt])
+    return { ...mapVoucher(saved.rows[0]), ...usage }
+  })
 }
 
-async function resolveVoucher(executor, rawCode, subtotal, lock = false) {
+async function getVoucherUsage(executor, code, userId = null) {
+  const result = await executor.query(`SELECT COUNT(*) AS used_count,
+    COUNT(*) FILTER (WHERE payment_method IN ('stripe', 'vnpay') AND payment_status <> 'paid' AND status <> 'cancelled') AS reserved_count,
+    COUNT(*) FILTER (WHERE user_id = $2) AS user_count
+    FROM orders WHERE voucher_code = $1 AND (status <> 'cancelled' OR payment_status = 'paid')`, [code, userId])
+  return { usedCount: Number(result.rows[0].used_count), reservedCount: Number(result.rows[0].reserved_count), usedByUser: Number(result.rows[0].user_count) > 0 }
+}
+
+async function readAvailableVoucher(executor, rawCode, userId, lock = false) {
   try {
     const code = normalizeVoucherCode(rawCode)
-    const result = await executor.query(`SELECT * FROM vouchers WHERE code = $1${lock ? ' FOR SHARE' : ''}`, [code])
+    // Serialize redemptions and edits for this code; the following statement sees committed orders under READ COMMITTED.
+    const result = await executor.query(`SELECT * FROM vouchers WHERE code = $1${lock ? ' FOR UPDATE' : ''}`, [code])
     const voucher = mapVoucher(result.rows[0])
-    const discountAmount = voucherDiscount(voucher, subtotal)
-    return { code, discountAmount, subtotal, total: subtotal - discountAmount }
+    const usage = await getVoucherUsage(executor, code, userId)
+    assertVoucherAvailable(voucher ? { ...voucher, ...usage } : null)
+    return { ...voucher, ...usage }
   } catch (error) { if (error.status || error.code) throw error; throw repositoryError(400, error.message, 'INVALID_VOUCHER') }
 }
 
-export async function previewVoucher(code, subtotal) { return resolveVoucher(pool, code, subtotal) }
+async function resolveVoucher(executor, rawCode, subtotal, userId, lock = false) {
+  try {
+    const voucher = await readAvailableVoucher(executor, rawCode, userId, lock)
+    const discountAmount = voucherDiscount(voucher, subtotal)
+    return { code: voucher.code, discountAmount, subtotal, total: subtotal - discountAmount, expiresAt: voucher.expiresAt }
+  } catch (error) { if (error.status || error.code) throw error; throw repositoryError(400, error.message, 'INVALID_VOUCHER') }
+}
+
+export async function previewVoucher(code, subtotal, userId) { return resolveVoucher(pool, code, subtotal, userId) }
 
 export async function updateStoreSetting(key, value) {
   const result = await query(`
@@ -1218,7 +1248,7 @@ export async function createOrder(input) {
     const customer = input.customer || {}
     const shippingAddress = String(input.shipping?.address ?? input.shippingAddress ?? 'Nhận tại showroom QuadPro').trim().slice(0, 250)
     const subtotal = snapshots.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const appliedVoucher = input.voucherCode ? await resolveVoucher(client, input.voucherCode, subtotal, true) : null
+    const appliedVoucher = input.voucherCode ? await resolveVoucher(client, input.voucherCode, subtotal, input.userId, true) : null
     const discountAmount = appliedVoucher?.discountAmount || 0
     if (appliedVoucher && input.expectedVoucherDiscount !== undefined && input.expectedVoucherDiscount !== discountAmount) {
       throw repositoryError(409, 'Số tiền giảm của voucher đã thay đổi. Vui lòng áp dụng lại mã trước khi xác nhận.', 'VOUCHER_CHANGED')
@@ -1451,7 +1481,7 @@ export async function updateOrder(id, updates = {}) {
   if (!ORDER_STATUSES.includes(status)) throw repositoryError(400, 'Trạng thái đơn hàng không hợp lệ', 'INVALID_ORDER_STATUS')
 
   return withTransaction(async client => {
-    const orderResult = await client.query('SELECT id, status, payment_method, payment_status FROM orders WHERE id = $1 FOR UPDATE', [id])
+    const orderResult = await client.query('SELECT id, status, payment_method, payment_status, voucher_code, user_id FROM orders WHERE id = $1 FOR UPDATE', [id])
     const current = orderResult.rows[0]
     if (!current) throw repositoryError(404, 'Không tìm thấy đơn hàng', 'ORDER_NOT_FOUND')
 
@@ -1482,6 +1512,7 @@ export async function updateOrder(id, updates = {}) {
       const productsById = new Map(productResult.rows.map(row => [numberValue(row.id), row]))
 
       if (isRestoring) {
+        if (current.voucher_code && current.payment_status !== 'paid') await readAvailableVoucher(client, current.voucher_code, current.user_id, true)
         for (const item of itemResult.rows) {
           const productId = item.product_id === null ? null : numberValue(item.product_id)
           const product = productsById.get(productId)

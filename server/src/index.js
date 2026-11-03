@@ -987,7 +987,7 @@ app.get('/api/showrooms', asyncHandler(async (req, res) => {
 }))
 
 app.post('/api/vouchers/validate', authenticate, asyncHandler(async (req, res) => {
-  res.json(await previewVoucher(req.body?.code, req.body?.subtotal))
+  res.json(await previewVoucher(req.body?.code, req.body?.subtotal, req.user.id))
 }))
 
 app.post('/api/payments/stripe/checkout', authenticate, asyncHandler(async (req, res) => {
@@ -1355,9 +1355,7 @@ app.post('/api/admin/vouchers', asyncHandler(async (req, res) => {
 app.patch('/api/admin/vouchers/:id', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, 'Voucher không hợp lệ.')
-  let input
-  try { input = normalizeVoucher(req.body) } catch (error) { throw httpError(400, error.message) }
-  res.json(await updateVoucher(id, input))
+  res.json(await updateVoucher(id, req.body))
 }))
 
 app.patch('/api/admin/contact', asyncHandler(async (req, res) => {

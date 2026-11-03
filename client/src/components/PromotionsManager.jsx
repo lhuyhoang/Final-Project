@@ -9,8 +9,22 @@ const localDate = value => value ? new Date(new Date(value).getTime() - new Date
 
 function VoucherRow({ voucher, onSave, onCopy, busy }) {
   const [amount, setAmount] = useState(voucher.amount)
-  useEffect(() => setAmount(voucher.amount), [voucher.amount])
-  return <tr><td><button type="button" className="promo-code" onClick={() => onCopy(voucher.code)} title="Sao chép mã"><Ticket size={15}/><b>{voucher.code}</b><Copy size={13}/></button></td><td data-label="Số tiền giảm (VNĐ)"><input className="promo-amount" aria-label={`Số tiền giảm của ${voucher.code}`} type="number" min="1" max="1000000000" step="1" value={amount} onChange={event => setAmount(event.target.value)}/></td><td data-label="Trạng thái"><button type="button" className={`promo-status ${voucher.isActive ? 'active' : ''}`} disabled={busy} onClick={() => onSave(voucher, amount, !voucher.isActive)} aria-label={`${voucher.isActive ? 'Tắt' : 'Bật'} voucher ${voucher.code}`} aria-pressed={voucher.isActive}>{voucher.isActive ? 'Đang áp dụng' : 'Đã tắt'}</button></td><td><button type="button" className="admin-secondary" disabled={busy || Number(amount) === voucher.amount} onClick={() => onSave(voucher, amount, voucher.isActive)}><Save size={15}/> Lưu</button></td></tr>
+  const [maxUses, setMaxUses] = useState(voucher.maxUses ?? '')
+  const [expiresAt, setExpiresAt] = useState(localDate(voucher.expiresAt))
+  useEffect(() => { setAmount(voucher.amount); setMaxUses(voucher.maxUses ?? ''); setExpiresAt(localDate(voucher.expiresAt)) }, [voucher.amount, voucher.maxUses, voucher.expiresAt])
+  const changed = Number(amount) !== voucher.amount || String(maxUses) !== String(voucher.maxUses ?? '') || expiresAt !== localDate(voucher.expiresAt)
+  const expired = voucher.expiresAt && Date.parse(voucher.expiresAt) <= Date.now()
+  const full = voucher.maxUses !== null && voucher.maxUses !== undefined && voucher.usedCount >= voucher.maxUses
+  const available = voucher.isActive && !expired && !full
+  const fields = { amount, maxUses, expiresAt }
+  return <tr>
+    <td><button type="button" className="promo-code" onClick={() => onCopy(voucher.code)} title="Sao chép mã"><Ticket size={15}/><b>{voucher.code}</b><Copy size={13}/></button></td>
+    <td data-label="Số tiền giảm (VNĐ)"><input className="promo-amount" aria-label={`Số tiền giảm của ${voucher.code}`} type="number" min="1" max="1000000000" step="1" value={amount} disabled={busy} onChange={event => setAmount(event.target.value)}/></td>
+    <td data-label="Lượt sử dụng"><input className="promo-limit" aria-label={`Giới hạn lượt dùng của ${voucher.code}`} type="number" min="1" max="1000000" step="1" placeholder="Không giới hạn" value={maxUses} disabled={busy} onChange={event => setMaxUses(event.target.value)}/><small className="promo-usage">Đã dùng/giữ: {voucher.usedCount || 0}{voucher.maxUses ? ` / ${voucher.maxUses}` : ''}{voucher.reservedCount > 0 && ` · ${voucher.reservedCount} đang chờ thanh toán`}</small></td>
+    <td data-label="Hết hạn" className="promo-expiry-cell"><input className="promo-expiry" aria-label={`Hết hạn của ${voucher.code}`} type="datetime-local" value={expiresAt} disabled={busy} onChange={event => setExpiresAt(event.target.value)}/><small className="promo-usage">{voucher.expiresAt ? new Date(voucher.expiresAt).toLocaleString('vi-VN') : 'Không hết hạn'}</small></td>
+    <td data-label="Trạng thái"><button type="button" className={`promo-status ${available ? 'active' : ''}`} disabled={busy} onClick={() => onSave(voucher, fields, !voucher.isActive)} aria-label={`${voucher.isActive ? 'Tắt' : 'Bật'} voucher ${voucher.code}`} aria-pressed={voucher.isActive}>{!voucher.isActive ? 'Đã tắt' : expired ? 'Hết hạn' : full ? 'Hết lượt' : 'Đang áp dụng'}</button></td>
+    <td><button type="button" className="admin-secondary" disabled={busy || !changed} onClick={() => onSave(voucher, fields, voucher.isActive)}><Save size={15}/> Lưu</button></td>
+  </tr>
 }
 
 export default function PromotionsManager({ products, onFlashSaleChanged, refreshing }) {
@@ -22,6 +36,8 @@ export default function PromotionsManager({ products, onFlashSaleChanged, refres
   const [page, setPage] = useState(1)
   const [voucherPage, setVoucherPage] = useState(1)
   const [amount, setAmount] = useState('')
+  const [maxUses, setMaxUses] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
   const [busy, setBusy] = useState('load')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -58,13 +74,14 @@ export default function PromotionsManager({ products, onFlashSaleChanged, refres
   function create(event) {
     event.preventDefault()
     act('create', async () => {
-      const voucher = await api('/api/admin/vouchers', { method: 'POST', body: JSON.stringify({ amount: Number(amount) }) })
-      setVouchers(current => [voucher, ...current]); setVoucherPage(1); setAmount(''); setNotice(`Đã tạo mã ${voucher.code}, giảm ${money(voucher.amount)}.`)
+      const voucher = await api('/api/admin/vouchers', { method: 'POST', body: JSON.stringify({ amount: Number(amount), maxUses: maxUses === '' ? null : Number(maxUses), expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }) })
+      setVouchers(current => [voucher, ...current]); setVoucherPage(1); setAmount(''); setMaxUses(''); setExpiresAt(''); setNotice(`Đã tạo mã ${voucher.code}, giảm ${money(voucher.amount)}.`)
     })
   }
-  function saveVoucher(voucher, amount, isActive) {
+  function saveVoucher(voucher, fields, isActive) {
     act(`voucher-${voucher.id}`, async () => {
-      const saved = await api(`/api/admin/vouchers/${voucher.id}`, { method: 'PATCH', body: JSON.stringify({ amount: Number(amount), isActive }) })
+      const expiry = fields.expiresAt ? fields.expiresAt === localDate(voucher.expiresAt) ? voucher.expiresAt : new Date(fields.expiresAt).toISOString() : null
+      const saved = await api(`/api/admin/vouchers/${voucher.id}`, { method: 'PATCH', body: JSON.stringify({ amount: Number(fields.amount), maxUses: fields.maxUses === '' ? null : Number(fields.maxUses), expiresAt: expiry, isActive }) })
       setVouchers(current => current.map(item => item.id === saved.id ? saved : item)); setNotice(`Đã cập nhật voucher ${saved.code}.`)
     })
   }
@@ -83,11 +100,16 @@ export default function PromotionsManager({ products, onFlashSaleChanged, refres
       </form>
     </section>
     <section className="admin-panel promo-panel">
-      <div className="promo-heading"><span className="promo-symbol voucher"><Gift size={23}/></span><div><small>MÃ GIẢM GIÁ</small><h2>Voucher cửa hàng</h2><p>Tạo mã ngẫu nhiên gồm chữ và số. Mỗi đơn áp dụng một mã, giảm trực tiếp theo số tiền.</p></div><button type="button" className="admin-secondary" disabled={Boolean(busy)} onClick={load} aria-label="Làm mới khuyến mãi"><RefreshCw size={16}/></button></div>
-      <form className="promo-create" onSubmit={create}><label>Số tiền giảm (VNĐ)<input type="number" min="1" max="1000000000" step="1" required placeholder="Ví dụ: 100000" value={amount} disabled={Boolean(busy)} onChange={event => setAmount(event.target.value)}/></label><button className="admin-primary" disabled={Boolean(busy)}><Ticket size={17}/>{busy === 'create' ? 'Đang tạo…' : 'Tạo mã ngẫu nhiên'}</button></form>
-      <div className="admin-table-wrap"><table><thead><tr><th>Mã voucher</th><th>Số tiền giảm (VNĐ)</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{vouchers.slice((voucherPage - 1) * 10, voucherPage * 10).map(voucher => <VoucherRow key={voucher.id} voucher={voucher} onSave={saveVoucher} onCopy={copy} busy={Boolean(busy)}/>)}</tbody></table>{!vouchers.length && <div className="promo-empty"><Ticket size={26}/><b>Chưa có voucher</b><span>Nhập số tiền giảm ở trên để tạo mã đầu tiên.</span></div>}</div>
+      <div className="promo-heading"><span className="promo-symbol voucher"><Gift size={23}/></span><div><small>MÃ GIẢM GIÁ</small><h2>Voucher cửa hàng</h2><p>Tạo mã ngẫu nhiên gồm chữ và số. Mỗi tài khoản chỉ dùng mỗi mã một lần.</p></div><button type="button" className="admin-secondary" disabled={Boolean(busy)} onClick={load} aria-label="Làm mới khuyến mãi"><RefreshCw size={16}/></button></div>
+      <form className="promo-create promo-create-voucher" onSubmit={create}>
+        <label>Số tiền giảm (VNĐ)<input type="number" min="1" max="1000000000" step="1" required placeholder="Ví dụ: 100000" value={amount} disabled={Boolean(busy)} onChange={event => setAmount(event.target.value)}/></label>
+        <label>Số lượt tối đa<input type="number" min="1" max="1000000" step="1" placeholder="Trống = không giới hạn" value={maxUses} disabled={Boolean(busy)} onChange={event => setMaxUses(event.target.value)}/></label>
+        <label>Hết hạn<input type="datetime-local" value={expiresAt} disabled={Boolean(busy)} onChange={event => setExpiresAt(event.target.value)}/></label>
+        <button className="admin-primary" disabled={Boolean(busy)}><Ticket size={17}/>{busy === 'create' ? 'Đang tạo…' : 'Tạo mã ngẫu nhiên'}</button>
+      </form>
+      <div className="admin-table-wrap"><table className="promo-voucher-table"><thead><tr><th>Mã voucher</th><th>Số tiền giảm (VNĐ)</th><th>Lượt sử dụng</th><th>Hết hạn</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{vouchers.slice((voucherPage - 1) * 10, voucherPage * 10).map(voucher => <VoucherRow key={voucher.id} voucher={voucher} onSave={saveVoucher} onCopy={copy} busy={Boolean(busy)}/>)}</tbody></table>{!vouchers.length && <div className="promo-empty"><Ticket size={26}/><b>Chưa có voucher</b><span>Nhập số tiền giảm ở trên để tạo mã đầu tiên.</span></div>}</div>
       <div className="promo-pagination"><small>{vouchers.length} voucher</small><button type="button" disabled={voucherPage <= 1} onClick={() => setVoucherPage(value => value - 1)}>Trước</button><span>{voucherPage} / {Math.max(1, Math.ceil(vouchers.length / 10))}</span><button type="button" disabled={voucherPage * 10 >= vouchers.length} onClick={() => setVoucherPage(value => value + 1)}>Sau</button></div>
-      <p className="promo-note">Bấm trạng thái để bật/tắt mã. Giá trị đơn hàng phải lớn hơn số tiền giảm. Việc sửa mã không thay đổi đơn đã đặt.</p>
+      <p className="promo-note">Thời hạn theo giờ trên thiết bị. Để trống giới hạn hoặc thời hạn để không giới hạn. Lượt được giữ khi tạo đơn; đơn hủy chưa thanh toán sẽ trả lượt. Đơn đã thanh toán giữ lịch sử dùng mã. Mỗi tài khoản chỉ dùng mỗi mã một lần; sửa mã không thay đổi đơn đã đặt.</p>
     </section>
   </div>
 }

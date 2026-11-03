@@ -21,7 +21,14 @@ registerHooks({
         if (params === undefined && sql.includes(';')) { const results = await db.exec(sql); return results.at(-1) || { rows: [] }; }
         const result = await db.query(sql, params); return { ...result, rowCount: result.affectedRows ?? result.rows.length };
       };
-      class Pool { query(sql, params) { return execute(sql, params); } async connect() { return { query: execute, release() {} }; } async end() {} }
+      // PGlite has one SQL connection. Queue acquisitions like a pg Pool with max=1.
+      let tail = Promise.resolve();
+      async function acquire() { const previous = tail; let release; tail = new Promise(resolve => { release = resolve; }); await previous; return release; }
+      class Pool {
+        async query(sql, params) { const release = await acquire(); try { return await execute(sql, params); } finally { release(); } }
+        async connect() { const release = await acquire(); return { query: execute, release }; }
+        async end() {}
+      }
       export default { Pool };
     ` }
     if (url === 'promotions-test:stripe') return { format: 'module', shortCircuit: true, source: `
@@ -100,9 +107,12 @@ try {
   assert.equal(cod.data.voucherCode, voucher.code)
   assert.equal(cod.data.items[0].price, 1000000)
   await write(`/api/admin/vouchers/${voucher.id}`, { amount: 200000, isActive: true })
-  assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: { ...checkout, expectedVoucherDiscount: 150000 } })).status, 409, 'Changed discount requires customer to apply the code again')
+  assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: checkout })).status, 400, 'Each account can only redeem a code once')
+  await write(`/api/admin/vouchers/${second.data.id}`, { amount: 200000 })
+  const stripeCheckout = { ...checkout, voucherCode: second.data.code }
+  assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: { ...stripeCheckout, expectedVoucherDiscount: 150000 } })).status, 409, 'Changed discount requires customer to apply the code again')
   assert.equal((await request('/api/orders', { cookie: customer })).data.find(order => order.id === cod.data.id).discountAmount, 150000, 'Old orders retain their discount snapshot')
-  const stripe = await request('/api/payments/stripe/checkout', { cookie: customer, method: 'POST', body: checkout })
+  const stripe = await request('/api/payments/stripe/checkout', { cookie: customer, method: 'POST', body: stripeCheckout })
   assert.equal(stripe.status, 201)
   const stripeOrder = (await db.listOrders({ id: stripe.data.orderId }))[0]
   const fake = globalThis.__promotionStripe
@@ -113,23 +123,27 @@ try {
   assert.equal(session.line_items.reduce((sum, item) => sum + item.quantity * item.price_data.unit_amount, 0) - coupon.amount_off, stripeOrder.total)
   await db.confirmStripeOrderPayment({ orderId: stripeOrder.id, userId: customerUser.id, checkoutSessionId: session.id, paymentIntentId: 'pi_test_only', amountTotal: stripeOrder.total, currency: 'vnd' })
   assert.equal((await db.listOrders({ id: stripeOrder.id }))[0].paymentStatus, 'paid')
-  const vnpay = await request('/api/payments/vnpay/checkout', { cookie: customer, method: 'POST', body: checkout })
+  const vnpayVoucher = (await write('/api/admin/vouchers', { amount: 200000 }, 'POST')).data
+  const vnpay = await request('/api/payments/vnpay/checkout', { cookie: customer, method: 'POST', body: { ...checkout, voucherCode: vnpayVoucher.code } })
   assert.equal(vnpay.status, 201)
   assert.equal(Number(new URL(vnpay.data.paymentUrl).searchParams.get('vnp_Amount')), 1800000 * 100)
   await db.confirmVnpayOrderPayment({ orderId: vnpay.data.orderId, userId: customerUser.id, transactionNo: 'test-only', bankCode: 'TEST', amountTotal: 1800000 })
   assert.equal((await db.listOrders({ id: vnpay.data.orderId }))[0].paymentStatus, 'paid')
   fake.failSession = true
+  const failureVoucher = (await write('/api/admin/vouchers', { amount: 200000, maxUses: 1 }, 'POST')).data
   const stockBeforeFailure = (await db.findProductById(product.id)).stock
-  assert.equal((await request('/api/payments/stripe/checkout', { cookie: customer, method: 'POST', body: checkout })).status, 502)
+  assert.equal((await request('/api/payments/stripe/checkout', { cookie: customer, method: 'POST', body: { ...checkout, voucherCode: failureVoucher.code } })).status, 502)
   assert.equal((await db.findProductById(product.id)).stock, stockBeforeFailure, 'Failed gateway restores inventory')
   assert.equal(fake.deleted.at(-1), fake.coupons.at(-1).id)
   fake.failSession = false
-  await write(`/api/admin/vouchers/${voucher.id}`, { amount: 1000000, isActive: true })
-  assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: { ...checkout, items: [{ productId: product.id, quantity: 1 }] } })).status, 400)
+  const oversizedVoucher = (await write('/api/admin/vouchers', { amount: 1000000 }, 'POST')).data
+  assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: { ...checkout, voucherCode: oversizedVoucher.code, items: [{ productId: product.id, quantity: 1 }] } })).status, 400)
   await write(`/api/admin/vouchers/${voucher.id}`, { amount: 100000, isActive: false })
   assert.equal((await request('/api/orders', { cookie: customer, method: 'POST', body: checkout })).status, 400, 'Disabled code is rechecked at final checkout')
   await write('/api/admin/promotions/flash-sale', { productIds: [] })
   assert.deepEqual((await request('/api/settings')).data.flashSale.productIds, [])
+  const { testVoucherUsage } = await import('./voucher-usage.integration.mjs')
+  await testVoucherUsage({ db, database, request, write, login, passwordHash, product, extra, customer, fake })
   if (process.env.PROMOTIONS_UI === '1') {
     const { runPromotionUI } = await import('./promotions.ui.mjs')
     await runPromotionUI({ base, admin, customer, product, extra, voucher, request, write })
@@ -137,8 +151,10 @@ try {
   const rollback = await readFile(new URL('../migrations/028_add_promotions.down.sql', import.meta.url), 'utf8')
   await assert.rejects(database.exec(rollback), /promotion-only staff roles/, 'Rollback never silently grants a different permission')
   await db.saveStaffRole(role.id, { name: 'Promotion staff', permissions: ['promotions', 'inventory'] })
+  await database.exec(await readFile(new URL('../migrations/029_add_voucher_usage_limits.down.sql', import.meta.url), 'utf8'))
   await database.exec(rollback)
   await database.exec(await readFile(new URL('../migrations/028_add_promotions.up.sql', import.meta.url), 'utf8'))
+  await database.exec(await readFile(new URL('../migrations/029_add_voucher_usage_limits.up.sql', import.meta.url), 'utf8'))
   assert.deepEqual((await request('/api/admin/promotions', { cookie: admin })).data.vouchers, [])
   console.log('PASS: promotion RBAC, schedules, hidden empty Flash Sale, random/edit/disable vouchers, authoritative COD/Stripe/VNPay totals, payment confirmation, stock rollback, order snapshots, migration rollback/reapply. Isolated PostgreSQL and fake gateways.')
 } finally { await new Promise(resolve => server.close(resolve)); await database.close() }
