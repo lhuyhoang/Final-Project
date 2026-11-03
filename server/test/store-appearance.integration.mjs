@@ -40,6 +40,8 @@ const passwordHash = await hashPassword('TestPassword123!')
 const adminUser = await db.createUser({ name: 'Appearance Admin', email: 'appearance-admin@example.com', passwordHash, role: 'admin' })
 const role = await db.saveStaffRole(null, { name: 'Cài đặt', permissions: ['settings'] })
 await db.createUser({ name: 'Appearance Staff', email: 'appearance-staff@example.com', passwordHash, role: 'staff', staffRoleId: role.id })
+const informationRole = await db.saveStaffRole(null, { name: 'Information only', permissions: ['showrooms'] })
+await db.createUser({ name: 'Information Staff', email: 'information-staff@example.com', passwordHash, role: 'staff', staffRoleId: informationRole.id })
 const inventoryRole = await db.saveStaffRole(null, { name: 'Inventory only', permissions: ['inventory'] })
 await db.createUser({ name: 'Inventory Staff', email: 'appearance-inventory@example.com', passwordHash, role: 'staff', staffRoleId: inventoryRole.id })
 const server = app.listen(0, '127.0.0.1')
@@ -87,7 +89,8 @@ try {
   assert.equal((await request('/api/settings')).data.productGalleryIntervalSeconds, 9)
   if (process.env.APPEARANCE_UI === '1') {
     const { runAppearanceUI } = await import('./store-appearance.ui.mjs')
-    await runAppearanceUI({ base, admin, staff, request, write })
+    const information = await login('information-staff@example.com')
+    await runAppearanceUI({ base, admin, staff, information, request, write })
   }
   console.log('PASS: appearance authorization, defaults, partial logo/banner/hover edits, public persistence, validation rollback, empty banners, logo reset and independent transition settings. Isolated PostgreSQL only.')
 } finally { await new Promise(resolve => server.close(resolve)); await database.close() }

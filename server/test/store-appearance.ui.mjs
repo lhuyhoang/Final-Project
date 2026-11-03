@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-export async function runAppearanceUI({ base, admin, staff, request, write }) {
+export async function runAppearanceUI({ base, admin, staff, information, request, write }) {
   const browser = await chromium.launch({ channel: 'msedge', headless: true })
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
@@ -23,9 +23,24 @@ export async function runAppearanceUI({ base, admin, staff, request, write }) {
     await page.goto('http://127.0.0.1:5173/admin')
     await page.locator('.admin-sidebar nav button').filter({ hasText: 'Cài đặt' }).click()
     await page.locator('.settings-function-grid').waitFor()
-    assert.equal(await page.locator('.settings-function-grid > button').count(), 4)
-    assert.equal(await page.locator('.settings-function-grid .lucide-settings').count(), 4)
+    assert.equal(await page.locator('.settings-function-grid > button').count(), 5)
+    assert.equal(await page.locator('.settings-function-grid .lucide-settings').count(), 5)
+    assert.equal(await page.locator('.admin-sidebar nav button').filter({ hasText: 'Thông tin' }).count(), 0)
     const select = name => page.locator('.settings-function-grid > button').filter({ hasText: name }).click()
+    await select('Thông tin cửa hàng')
+    await page.locator('.contact-info-fields input[name="phone"]').fill('0812345678')
+    await page.getByRole('button', { name: 'Lưu thông tin', exact: true }).click()
+    await page.locator('.contact-info-success').waitFor()
+    assert.equal((await request('/api/admin/contact', { cookie: admin })).data.phone, '0812345678')
+    await page.getByRole('button', { name: 'Thêm showroom', exact: true }).click()
+    await page.getByRole('dialog').getByLabel('Tên showroom', { exact: true }).fill('Settings Test Showroom')
+    await page.getByRole('dialog').getByLabel('Địa chỉ', { exact: true }).fill('123 Test Street')
+    await page.getByRole('button', { name: 'Lưu showroom', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    await page.locator('.showrooms-table').getByText('Settings Test Showroom', { exact: true }).waitFor()
+    await page.reload()
+    await page.locator('.contact-info-fields input[name="phone"]').waitFor()
+    assert.equal(await page.locator('.contact-info-fields input[name="phone"]').inputValue(), '0812345678')
     await select('Hiệu ứng chuyển cảnh')
     await page.locator('.transition-playground').waitFor()
     assert.equal(await page.locator('.transition-hover-showcase').count(), 0)
@@ -92,7 +107,24 @@ export async function runAppearanceUI({ base, admin, staff, request, write }) {
     await page.locator('.settings-function-grid').waitFor()
     assert.equal(await page.locator('.admin-sidebar nav > button').count(), 1)
     assert.ok((await page.locator('.admin-sidebar nav').innerText()).includes('Cài đặt'))
+    assert.equal(await page.locator('.settings-function-grid > button').count(), 4)
+    assert.equal(await page.locator('.settings-function-grid > button').filter({ hasText: 'Thông tin cửa hàng' }).count(), 0)
+    cookie = information
+    await page.evaluate(() => { sessionStorage.setItem('quadpro-admin-tab', 'showrooms'); sessionStorage.setItem('quadpro-settings-section', 'logo') })
+    await page.reload()
+    await page.locator('.contact-info-panel').waitFor()
+    assert.equal(await page.locator('.admin-sidebar nav > button').count(), 1)
+    assert.ok((await page.locator('.admin-sidebar nav').innerText()).includes('Cài đặt'))
+    assert.equal(await page.locator('.settings-function-grid > button').count(), 1)
+    assert.equal(await page.locator('.settings-function-grid > button[aria-pressed="true"]').innerText().then(text => text.includes('Thông tin cửa hàng')), true)
+    assert.equal((await request('/api/admin/appearance', { cookie: information })).status, 403)
+    await page.locator('.contact-info-fields input[name="email"]').fill('settings-contact@example.com')
+    await page.getByRole('button', { name: 'Lưu thông tin', exact: true }).click()
+    await page.locator('.contact-info-success').waitFor()
+    await page.setViewportSize({ width: 390, height: 844 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: path.join(os.tmpdir(), 'quadpro-settings-information-mobile.png'), fullPage: true })
     assert.deepEqual(errors, [])
-    console.log('PASS UI: four gear settings, preserved transitions, save/reload hover/logo/favicon, mocked upload, banner order/interval/empty hide, live product hover/reduced motion, dark mobile and settings-only staff.')
+    console.log('PASS UI: merged information settings, contact save/reload, showroom creation, legacy navigation, separate staff permissions, five gear settings, transitions/hover/logo/banner, dark mobile.')
   } finally { await browser.close() }
 }

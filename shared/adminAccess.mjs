@@ -3,7 +3,7 @@ export const staffPermissions = [
   { id: 'inventory', name: 'Nhập hàng', description: 'Thêm sản phẩm mới hoặc nhập hàng loạt bằng Excel; không sửa, xóa sản phẩm cũ.' },
   { id: 'products', name: 'Sản phẩm', description: 'Xem, thêm, sửa, xóa và nhập Excel sản phẩm.' },
   { id: 'categories', name: 'Danh mục', description: 'Quản lý danh mục cha, con và hiển thị trang chủ.' },
-  { id: 'showrooms', name: 'Thông tin', description: 'Quản lý showroom, số điện thoại, email và link Messenger/Zalo của cửa hàng.' },
+  { id: 'showrooms', name: 'Thông tin cửa hàng', description: 'Trong Cài đặt: quản lý showroom, số điện thoại, email và link Messenger/Zalo.' },
   { id: 'orders', name: 'Đơn hàng', description: 'Xem thông tin khách đặt hàng và cập nhật trạng thái đơn.' },
   { id: 'online-payments', name: 'Thanh toán', description: 'Xem giao dịch trực tuyến, báo cáo và số dư Stripe.' },
   { id: 'settings', name: 'Cài đặt', description: 'Chỉnh hiệu ứng chuyển cảnh, hover, banner và logo của cửa hàng.' },

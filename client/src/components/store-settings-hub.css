@@ -2,7 +2,10 @@
 .admin-theme-dark .store-settings-hub { --settings-bg: #1c2027; --settings-soft: #171b22; --settings-line: #39414e; --settings-text: #eef1f6; --settings-muted: #acb5c3; }
 .settings-hub-heading h2 { margin: 0 0 8px; font-size: 24px; }
 .settings-hub-heading p { margin: 0; color: var(--settings-muted); font-size: 12px; line-height: 1.7; }
-.settings-function-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.settings-function-grid { display: grid; grid-template-columns: repeat(var(--settings-function-count, 4), minmax(0, 1fr)); gap: 14px; }
+.settings-function-grid[data-count="1"] { grid-template-columns: 1fr; }
+.settings-information-panel { display: grid; gap: 22px; min-width: 0; }
+.settings-information-panel .contact-info-panel { margin-bottom: 0; }
 .settings-function-grid > button { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 22px; border: 1px solid var(--settings-line); border-radius: 13px; text-align: left; color: var(--settings-text); background: var(--settings-bg); transition: border-color 160ms ease, box-shadow 160ms ease; }
 .settings-function-grid > button:hover { border-color: #e88680; box-shadow: 0 6px 20px #00000009; }
 .settings-function-grid > button.active { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }

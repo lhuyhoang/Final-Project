@@ -8,6 +8,7 @@ import './store-settings-hub.css'
 
 const TransitionPlayground = lazy(() => import('./TransitionPlayground'))
 const sections = [
+  { id: 'information', title: 'Thông tin cửa hàng', description: 'Showroom, liên hệ, Messenger và Zalo.' },
   { id: 'transitions', title: 'Hiệu ứng chuyển cảnh', description: 'Chuyển ảnh chi tiết và dải sản phẩm.' },
   { id: 'hover', title: 'Hiệu ứng hover', description: 'Chuyển động khi rê chuột lên sản phẩm.' },
   { id: 'banners', title: 'Thay đổi banner', description: 'Ảnh, thứ tự và thời gian chuyển banner.' },
@@ -65,9 +66,22 @@ function HoverEditor({ appearance, onSaved, products }) {
   return <section className="admin-panel settings-editor"><div className="settings-editor-heading"><span>TƯƠNG TÁC SẢN PHẨM</span><h2>Hiệu ứng hover</h2><p>Rê chuột lên ảnh mẫu để xem trước. Hiệu ứng áp dụng cho thẻ sản phẩm ở trang chủ và danh sách sản phẩm.</p></div><form onSubmit={event => { event.preventDefault(); model.save({ hoverEffect: effect, hoverDurationMs: Number(duration) }) }}><fieldset className="settings-hover-options" disabled={model.busy}><legend className="settings-sr-only">Chọn hiệu ứng hover</legend>{hoverEffects.map(option => <label key={option.id} className={effect === option.id ? 'selected' : ''}><input type="radio" name="hoverEffect" value={option.id} checked={effect === option.id} onChange={() => setEffect(option.id)}/><div className={`settings-hover-preview ${option.id}`} style={{ '--product-hover-duration': `${duration}ms` }}><img src={image} alt=""/><i/></div><b>{option.name}</b><small>{option.description}</small></label>)}</fieldset><label className="settings-hover-duration">Thời lượng chuyển động: <strong>{duration} ms</strong><input type="range" min="150" max="1200" step="50" value={duration} disabled={model.busy || effect === 'none'} onChange={event => setDuration(Number(event.target.value))}/></label><Feedback model={model}/><div className="settings-editor-footer"><small>Tự giảm chuyển động theo tùy chọn trợ năng của thiết bị.</small><button className="settings-primary" disabled={model.busy}><Save size={16}/>{model.busy ? 'Đang lưu…' : 'Lưu hover'}</button></div></form></section>
 }
 
-export default function StoreSettingsHub({ products, settings, onTransitionSaved, onAppearanceSaved }) {
+export default function StoreSettingsHub({ products, settings, onTransitionSaved, onAppearanceSaved, canManageAppearance, canManageInformation, children }) {
   const { appearance } = useStoreAppearance()
-  const [section, setSection] = useState(() => { try { const saved = sessionStorage.getItem('quadpro-settings-section'); return sections.some(item => item.id === saved) ? saved : null } catch { return null } })
+  const availableSections = sections.filter(item => item.id === 'information' ? canManageInformation : canManageAppearance)
+  const [requestedSection, setSection] = useState(() => { try { return sessionStorage.getItem('quadpro-settings-section') } catch { return null } })
+  const section = availableSections.some(item => item.id === requestedSection) ? requestedSection : availableSections.length === 1 ? availableSections[0].id : null
   useEffect(() => { try { if (section) sessionStorage.setItem('quadpro-settings-section', section) } catch {} }, [section])
-  return <div className="store-settings-hub"><div className="settings-hub-heading"><h2>Cài đặt cửa hàng</h2><p>Chọn chức năng để tùy chỉnh giao diện và trải nghiệm của website.</p></div><div className="settings-function-grid">{sections.map(item => <button type="button" key={item.id} className={section === item.id ? 'active' : ''} aria-pressed={section === item.id} aria-controls="store-settings-panel" onClick={() => setSection(item.id)}><span className="settings-function-icon"><Settings size={24}/></span><strong>{item.title}</strong><small>{item.description}</small><ChevronRight size={17}/></button>)}</div><div id="store-settings-panel" className="settings-function-panel">{!section && <div className="admin-panel settings-empty"><Settings size={34}/><b>Chọn một chức năng để bắt đầu</b><p>Các thay đổi chỉ được áp dụng khi bạn nhấn lưu trong từng mục.</p></div>}{section === 'transitions' && <Suspense fallback={<div className="admin-panel settings-empty" role="status">Đang tải bộ chỉnh chuyển cảnh…</div>}><TransitionPlayground products={products} settings={settings} onSaved={onTransitionSaved}/></Suspense>}{section === 'hover' && <HoverEditor appearance={appearance} products={products} onSaved={onAppearanceSaved}/>} {section === 'banners' && <BannerEditor appearance={appearance} onSaved={onAppearanceSaved}/>} {section === 'logo' && <LogoEditor appearance={appearance} onSaved={onAppearanceSaved}/>}</div></div>
+  return <div className="store-settings-hub">
+    <div className="settings-hub-heading"><h2>Cài đặt cửa hàng</h2><p>Quản lý thông tin cửa hàng, giao diện và trải nghiệm của website.</p></div>
+    <div className="settings-function-grid" data-count={availableSections.length} style={{ '--settings-function-count': availableSections.length }}>{availableSections.map(item => <button type="button" key={item.id} className={section === item.id ? 'active' : ''} aria-pressed={section === item.id} aria-controls="store-settings-panel" onClick={() => setSection(item.id)}><span className="settings-function-icon"><Settings size={24}/></span><strong>{item.title}</strong><small>{item.description}</small><ChevronRight size={17}/></button>)}</div>
+    <div id="store-settings-panel" className="settings-function-panel">
+      {!section && <div className="admin-panel settings-empty"><Settings size={34}/><b>Chọn một chức năng để bắt đầu</b><p>Các thay đổi chỉ được áp dụng khi bạn nhấn lưu trong từng mục.</p></div>}
+      {section === 'information' && children}
+      {section === 'transitions' && <Suspense fallback={<div className="admin-panel settings-empty" role="status">Đang tải bộ chỉnh chuyển cảnh…</div>}><TransitionPlayground products={products} settings={settings} onSaved={onTransitionSaved}/></Suspense>}
+      {section === 'hover' && <HoverEditor appearance={appearance} products={products} onSaved={onAppearanceSaved}/>}
+      {section === 'banners' && <BannerEditor appearance={appearance} onSaved={onAppearanceSaved}/>}
+      {section === 'logo' && <LogoEditor appearance={appearance} onSaved={onAppearanceSaved}/>}
+    </div>
+  </div>
 }

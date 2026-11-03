@@ -274,6 +274,10 @@ function parseImportedRows(sheetRows) {
 function loadAdminTab() {
   try {
     const savedTab = sessionStorage.getItem(adminTabStorageKey)
+    if (savedTab === 'showrooms') {
+      sessionStorage.setItem('quadpro-settings-section', 'information')
+      return 'settings'
+    }
     if (savedTab === 'stripe-dashboard') return 'online-payments'
     return validAdminTabs.has(savedTab) ? savedTab : 'overview'
   } catch {
@@ -1378,7 +1382,8 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
   const [requestedTab, setTab] = useState(loadAdminTab)
   const [accessUser, setAccessUser] = useState(user)
   const allowed = permission => hasAdminPermission(accessUser, permission)
-  const availableTabs = ['overview', 'inventory', 'products', 'categories', 'showrooms', 'promotions', 'orders', 'online-payments', 'users', 'settings'].filter(allowed)
+  const canOpenTab = id => id === 'settings' ? allowed('settings') || allowed('showrooms') : allowed(id)
+  const availableTabs = ['overview', 'inventory', 'products', 'categories', 'promotions', 'orders', 'online-payments', 'users', 'settings'].filter(canOpenTab)
   const tab = availableTabs.includes(requestedTab) ? requestedTab : availableTabs[0] || ''
   const [notificationReads, setNotificationReads] = useState(() => loadAdminNotificationReads(user.id))
   const [stats, setStats] = useState(null)
@@ -1753,13 +1758,12 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
     { id: 'inventory', label: 'Nhập hàng', icon: Upload },
     { id: 'products', label: 'Sản phẩm', icon: Boxes },
     { id: 'categories', label: 'Danh mục', icon: ClipboardList },
-    { id: 'showrooms', label: 'Thông tin', icon: Info },
     { id: 'promotions', label: 'Khuyến mãi', icon: Gift },
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
     { id: 'users', label: 'Người dùng', icon: Users },
     { id: 'settings', label: 'Cài đặt', icon: Settings }
-  ].filter(item => allowed(item.id))
+  ].filter(item => canOpenTab(item.id))
 
   return <div
     className={`admin-shell admin-theme-${theme}`}
@@ -1832,15 +1836,15 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
 
         {tab === 'categories' && <CategoryManager categories={categories} products={products} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory} onRequestBulkDelete={removeCategories}/>}
 
-        {tab === 'settings' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải cài đặt…</div>}><StoreSettingsHub products={products} settings={transitionSettings} onTransitionSaved={saveTransitionSettings} onAppearanceSaved={onAppearanceChanged}/></Suspense>}
-        {tab === 'promotions' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải khuyến mãi…</div>}><PromotionsManager products={products} onFlashSaleChanged={onFlashSaleChanged} refreshing={refreshing}/></Suspense>}
-
-        {tab === 'showrooms' && <>
+        {tab === 'settings' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải cài đặt…</div>}><StoreSettingsHub products={products} settings={transitionSettings} onTransitionSaved={saveTransitionSettings} onAppearanceSaved={onAppearanceChanged} canManageAppearance={allowed('settings')} canManageInformation={allowed('showrooms')}>
+        {allowed('showrooms') && <div className="settings-information-panel">
         <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải thông tin liên hệ…</div>}><ContactInfoEditor contact={shopContact} onSaved={updated => { setShopContact(updated); onContactChanged?.(updated) }}/></Suspense>
         <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>HỆ THỐNG CỬA HÀNG</span><h2>{showrooms.length} showroom</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên, địa chỉ, số điện thoại..."/></label><button className="admin-primary" onClick={() => { setShowroomEditor(null); setShowroomEditorOpen(true) }}><Plus size={18}/> Thêm showroom</button></div></header>
           <div className="admin-table-wrap"><table className="showrooms-table"><thead><tr><th>Showroom</th><th>Liên hệ</th><th>Giờ mở cửa</th><th>Thứ tự</th><th>Hiển thị</th><th>Thao tác</th></tr></thead><tbody>{visibleShowrooms.map(showroom => <tr key={showroom.id}><td><div className="showroom-admin-cell"><span><MapPinned size={18}/></span><div><b>{showroom.name}</b><small>{showroom.address}</small></div></div></td><td>{showroom.phone || 'Chưa cập nhật'}</td><td>{showroom.openingHours || 'Chưa cập nhật'}</td><td>{showroom.sortOrder}</td><td><span className={`showroom-visibility ${showroom.isActive ? 'active' : 'hidden'}`}>{showroom.isActive ? 'Đang hiện' : 'Đang ẩn'}</span></td><td><div className="row-actions"><button onClick={() => { setShowroomEditor(showroom); setShowroomEditorOpen(true) }} aria-label={`Sửa ${showroom.name}`}><Pencil size={16}/></button><button className="danger" onClick={() => removeShowroom(showroom)} aria-label={`Xóa ${showroom.name}`}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{!visibleShowrooms.length && <div className="table-empty">Chưa có showroom phù hợp.</div>}</div>
-        </section></>}
+        </section></div>}
+        </StoreSettingsHub></Suspense>}
+        {tab === 'promotions' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải khuyến mãi…</div>}><PromotionsManager products={products} onFlashSaleChanged={onFlashSaleChanged} refreshing={refreshing}/></Suspense>}
 
         {tab === 'orders' && <section className="admin-panel admin-list-panel">
           <header className="list-header"><div><span>VẬN HÀNH</span><h2>{orders.length} đơn hàng</h2></div><div className="list-actions"><label><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Mã đơn, khách hàng..."/></label></div></header>
