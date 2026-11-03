@@ -6,7 +6,7 @@ export const staffPermissions = [
   { id: 'showrooms', name: 'Thông tin', description: 'Quản lý showroom, số điện thoại, email và link Messenger/Zalo của cửa hàng.' },
   { id: 'orders', name: 'Đơn hàng', description: 'Xem thông tin khách đặt hàng và cập nhật trạng thái đơn.' },
   { id: 'online-payments', name: 'Thanh toán', description: 'Xem giao dịch trực tuyến, báo cáo và số dư Stripe.' },
-  { id: 'settings', name: 'Hiệu ứng chuyển cảnh', description: 'Thay đổi hiệu ứng ảnh và dải sản phẩm của cửa hàng.' },
+  { id: 'settings', name: 'Cài đặt', description: 'Chỉnh hiệu ứng chuyển cảnh, hover, banner và logo của cửa hàng.' },
   { id: 'promotions', name: 'Khuyến mãi', description: 'Chọn sản phẩm, thời gian Flash Sale và quản lý mã voucher giảm tiền.' },
 ]
 
@@ -49,5 +49,6 @@ export function canAccessAdminEndpoint(user, method, path) {
   if ((verb === 'GET' && pathname === '/orders') || (verb === 'PATCH' && /^\/orders\/[^/]+\/status$/.test(pathname))) return any('orders')
   if (verb === 'GET' && ['/payments', '/stripe/overview'].includes(pathname)) return any('online-payments')
   if (['GET', 'PATCH'].includes(verb) && pathname === '/settings') return any('settings')
+  if (['GET', 'PATCH'].includes(verb) && pathname === '/appearance') return any('settings')
   return false
 }

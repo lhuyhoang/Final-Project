@@ -1,0 +1,20 @@
+@media (hover: hover) and (pointer: fine) {
+  html[data-product-hover] .product-card { transition: transform var(--product-hover-duration, 350ms) cubic-bezier(.2,.8,.2,1), box-shadow var(--product-hover-duration, 350ms) ease; }
+  html[data-product-hover] .product-card:hover { transform: none; }
+  html[data-product-hover] .product-card .product-media > img { transition: transform var(--product-hover-duration, 350ms) cubic-bezier(.2,.8,.2,1); }
+  html[data-product-hover] .product-card:hover .product-media > img,
+  html[data-product-hover] .product-card .product-media.quick-view-active > img { transform: none; }
+  html[data-product-hover="zoom"] .product-card:hover .product-media > img,
+  html[data-product-hover="zoom"] .product-card .product-media.quick-view-active > img { transform: scale(1.06); }
+  html[data-product-hover="lift"] .product-card:hover { transform: translateY(-5px); }
+  html[data-product-hover="shine"] .product-card .product-media::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(110deg, transparent 20%, #fff7 50%, transparent 80%); transform: translateX(-120%); pointer-events: none; }
+  html[data-product-hover="shine"] .product-card:hover .product-media::after { transform: translateX(120%); transition: transform var(--product-hover-duration, 350ms) ease; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-product-hover] .product-card:hover,
+  html[data-product-hover] .product-card:hover .product-media > img,
+  html[data-product-hover] .product-card .product-media.quick-view-active > img { transform: none; }
+  html[data-product-hover] .product-card,
+  html[data-product-hover] .product-card .product-media > img { transition: none; }
+  html[data-product-hover="shine"] .product-card .product-media::after { display: none; }
+}

@@ -71,6 +71,7 @@ import { normalizePcComponents, validatePcBuild } from '../../shared/pcBuild.mjs
 import { normalizeProductImage } from '../../shared/productImage.mjs'
 import { canAccessAdminEndpoint, normalizeStaffRole } from '../../shared/adminAccess.mjs'
 import { normalizeShopContact, readShopContact } from '../../shared/shopContact.mjs'
+import { normalizeStoreAppearance, readStoreAppearance } from '../../shared/storeAppearance.mjs'
 import { normalizeFlashSale, readFlashSale, normalizeVoucher } from '../../shared/promotions.mjs'
 import { generateResetOtp, getOtpSecret, hashResetValue, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 import { getMailConfiguration, sendPasswordResetOtp } from './mail.js'
@@ -768,6 +769,7 @@ function mapPublicStoreSettings(settings) {
   const carouselEasingValue = String(settings.product_carousel_easing?.value || 'smooth')
   return {
     contact: readShopContact(settings),
+    appearance: readStoreAppearance(settings),
     flashSale: readFlashSale(settings),
     productGalleryIntervalSeconds: Number.isInteger(parsedInterval)
       ? Math.min(Math.max(parsedInterval, 2), 60)
@@ -1316,6 +1318,18 @@ app.get('/api/admin/settings', asyncHandler(async (req, res) => {
 
 app.get('/api/admin/contact', asyncHandler(async (req, res) => {
   res.json(readShopContact(await getStoreSettings()))
+}))
+
+app.get('/api/admin/appearance', asyncHandler(async (req, res) => {
+  res.json(readStoreAppearance(await getStoreSettings()))
+}))
+
+app.patch('/api/admin/appearance', asyncHandler(async (req, res) => {
+  let appearance
+  try { appearance = normalizeStoreAppearance(req.body, readStoreAppearance(await getStoreSettings())) }
+  catch (error) { throw httpError(400, error.message) }
+  await updateStoreSetting('store_appearance', JSON.stringify(appearance))
+  res.json(appearance)
 }))
 
 app.get('/api/admin/promotions', asyncHandler(async (req, res) => {

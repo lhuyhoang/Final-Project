@@ -72,6 +72,7 @@ import HomeBanners from "./components/HomeBanners";
 import FooterContact from "./components/FooterContact";
 import ContactButtons from "./components/ContactButtons";
 import BrandMark from "./components/BrandMark";
+import { StoreAppearanceProvider, useStoreAppearance } from "./components/StoreAppearance";
 import FlashSale from "./components/FlashSale";
 import { emptyFlashSale } from "../../shared/promotions.mjs";
 import { defaultShopContact } from "../../shared/shopContact.mjs";
@@ -940,6 +941,7 @@ function CategoryCatalog({
 }
 
 function App() {
+  const { setAppearance } = useStoreAppearance();
   const [theme, setTheme] = useState(loadTheme);
   const [products, setProducts] = useState(fallbackProducts);
   const [categories, setCategories] = useState(defaultCategories);
@@ -1029,6 +1031,7 @@ function App() {
       const settings = await api("/api/settings");
       setTransitionSettings({ ...defaultTransitionSettings, ...settings });
       setShopContact({ ...defaultShopContact, ...settings.contact });
+      if (settings.appearance) setAppearance(settings.appearance);
       setFlashSale(settings.flashSale || emptyFlashSale);
     } catch {
       /* The default interval keeps the gallery usable while settings load. */
@@ -1608,6 +1611,7 @@ function App() {
         onCategoriesChanged={refreshCategories}
         onShowroomsChanged={refreshShowrooms}
         onContactChanged={setShopContact}
+        onAppearanceChanged={setAppearance}
         onFlashSaleChanged={setFlashSale}
         onTransitionSettingsChanged={(updated) => setTransitionSettings({ ...defaultTransitionSettings, ...updated })}
         theme={theme}
@@ -2326,4 +2330,4 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(<StoreAppearanceProvider><App /></StoreAppearanceProvider>);

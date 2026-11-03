@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, BarChart3, Boxes, Check, ChevronRight, ClipboardList, CreditCard, Download, ExternalLink, Eye, EyeOff, FileSpreadsheet, Folder, FolderOpen, Gift, ImageIcon, Info, LogOut, MapPinned, Moon, Package, Pencil, Plus, RefreshCw, Save, Search, Settings, ShoppingBag, Sun, Trash2, Upload, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { api } from '../api'
 import { categories as defaultCategories } from '../data'
-import TransitionPlayground from './TransitionPlayground'
 import PcBuildEditor from './PcBuildEditor'
 import UserManager from './UserManager'
 import BrandMark from './BrandMark'
@@ -14,6 +13,7 @@ import { DEFAULT_PRODUCT_IMAGE, normalizeProductImage } from '../../../shared/pr
 
 const ContactInfoEditor = lazy(() => import('./ContactInfoEditor'))
 const PromotionsManager = lazy(() => import('./PromotionsManager'))
+const StoreSettingsHub = lazy(() => import('./StoreSettingsHub'))
 
 const formatPrice = value => new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 const formatDate = value => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -1374,7 +1374,7 @@ function StoreSettings({ settings, onSaved }) {
   </section>
 }
 
-export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onContactChanged, onFlashSaleChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
+export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, onProductsChanged, onCategoriesChanged, onShowroomsChanged, onContactChanged, onAppearanceChanged, onFlashSaleChanged, onTransitionSettingsChanged, theme, onToggleTheme }) {
   const [requestedTab, setTab] = useState(loadAdminTab)
   const [accessUser, setAccessUser] = useState(user)
   const allowed = permission => hasAdminPermission(accessUser, permission)
@@ -1442,6 +1442,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
       setOnlinePayments(paymentData)
       setUsers(userData)
       setTransitionSettings({ ...defaultTransitionSettings, ...settingsData })
+      if (settingsData.appearance) onAppearanceChanged?.(settingsData.appearance)
       setStripeOverview(stripeResult.data || { error: stripeResult.error?.message || 'Không thể tải dữ liệu Stripe Sandbox' })
     } catch (requestError) {
       setError(requestError.message)
@@ -1757,7 +1758,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
     { id: 'orders', label: 'Đơn hàng', icon: ClipboardList },
     { id: 'online-payments', label: 'Thanh toán', icon: CreditCard },
     { id: 'users', label: 'Người dùng', icon: Users },
-    { id: 'settings', label: 'Hiệu ứng chuyển cảnh', icon: Settings }
+    { id: 'settings', label: 'Cài đặt', icon: Settings }
   ].filter(item => allowed(item.id))
 
   return <div
@@ -1831,7 +1832,7 @@ export default function AdminDashboard({ user, onUserUpdated, onBack, onLogout, 
 
         {tab === 'categories' && <CategoryManager categories={categories} products={products} onCreated={saveCategory} onUpdated={updateCategoryState} onRequestDelete={removeCategory} onRequestBulkDelete={removeCategories}/>}
 
-        {tab === 'settings' && <TransitionPlayground products={products} settings={transitionSettings} onSaved={saveTransitionSettings}/>}
+        {tab === 'settings' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải cài đặt…</div>}><StoreSettingsHub products={products} settings={transitionSettings} onTransitionSaved={saveTransitionSettings} onAppearanceSaved={onAppearanceChanged}/></Suspense>}
         {tab === 'promotions' && <Suspense fallback={<div className="admin-panel table-empty" role="status">Đang tải khuyến mãi…</div>}><PromotionsManager products={products} onFlashSaleChanged={onFlashSaleChanged} refreshing={refreshing}/></Suspense>}
 
         {tab === 'showrooms' && <>
