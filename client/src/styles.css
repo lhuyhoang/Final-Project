@@ -81,8 +81,6 @@ html[data-theme="dark"] :where(
 }
 
 html[data-theme="dark"] :where(
-  .search,
-  .search input,
   .product-media,
   .heart,
   .product-badge,
@@ -4607,6 +4605,27 @@ html[data-theme="dark"] .stripe-checkout-button {
 
 .search {
   position: relative;
+}
+
+.site-header .search,
+.site-header .search > input[type="search"] {
+  color: #000;
+  background: #fff;
+  color-scheme: light;
+}
+
+.site-header .search > input[type="search"] {
+  caret-color: #000;
+}
+
+.site-header .search > input[type="search"]::placeholder {
+  color: #555;
+  opacity: 1;
+}
+
+.site-header .search > input[type="search"]:is(:-webkit-autofill, :autofill) {
+  -webkit-text-fill-color: #000;
+  box-shadow: 0 0 0 1000px #fff inset;
 }
 
 .search > input[type="search"]::-webkit-search-cancel-button {
