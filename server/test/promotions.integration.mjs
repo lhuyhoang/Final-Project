@@ -47,6 +47,8 @@ Object.assign(process.env, { DATABASE_URL: 'postgres://isolated:isolated@127.0.0
 const db = await import('../src/db.js')
 const { hashPassword } = await import('../src/password.js')
 const { default: app } = await import('../src/index.js')
+// Browser requests represent a separate client from the many API regression requests.
+if (process.env.PROMOTIONS_UI === '1') app.set('trust proxy', 1)
 await db.initializeDatabase()
 const passwordHash = await hashPassword('TestPassword123!')
 const adminUser = await db.createUser({ name: 'Promotion Admin', email: 'promotion-admin@example.com', passwordHash, role: 'admin' })
@@ -146,6 +148,8 @@ try {
   await testVoucherUsage({ db, database, request, write, login, passwordHash, product, extra, customer, fake })
   const { testOrderInventory } = await import('./order-inventory.integration.mjs')
   await testOrderInventory({ db, database, userId: customerUser.id })
+  const { testFlashSalePrices } = await import('./flash-sale-prices.integration.mjs')
+  await testFlashSalePrices({ db, request, write, customer, fake })
   if (process.env.PROMOTIONS_UI === '1') {
     const { runPromotionUI } = await import('./promotions.ui.mjs')
     await runPromotionUI({ base, admin, customer, product, extra, voucher, request, write })

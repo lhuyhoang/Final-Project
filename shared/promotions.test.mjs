@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { normalizeFlashSale, readFlashSale, isFlashSaleActive, normalizeVoucher, normalizeVoucherCode, voucherDiscount } from './promotions.mjs'
+import { normalizeFlashSale, readFlashSale, isFlashSaleActive, normalizeVoucher, normalizeVoucherCode, voucherDiscount, flashSalePrice, applyFlashSalePrice } from './promotions.mjs'
 import { canAccessAdminEndpoint } from './adminAccess.mjs'
 
 test('Flash Sale validates selection, dates and exact schedule boundaries', () => {
@@ -14,6 +14,21 @@ test('Flash Sale validates selection, dates and exact schedule boundaries', () =
   assert.equal(isFlashSaleActive(normalizeFlashSale({ productIds: [] })), false)
   assert.deepEqual(readFlashSale({}), { productIds: [], startsAt: null, endsAt: null })
   for (const body of [{ productIds: [0] }, { productIds: ['1'] }, { productIds: [1], startsAt: 'invalid', endsAt: sale.endsAt }, { productIds: [1], startsAt: sale.endsAt, endsAt: sale.startsAt }, { productIds: Array.from({ length: 201 }, (_, index) => index + 1) }]) assert.throws(() => normalizeFlashSale(body))
+})
+
+test('per-product sale prices are validated, persisted and only applied during the campaign', () => {
+  const sale = normalizeFlashSale({ productIds: [1, 2], prices: { 1: 800000 }, startsAt: '2026-11-01T00:00:00Z', endsAt: '2026-11-02T00:00:00Z' })
+  assert.deepEqual(readFlashSale({ flash_sale: { value: JSON.stringify(sale) } }), sale)
+  const product = { id: 1, price: 1000000, oldPrice: 1200000, discount: 17 }
+  const time = Date.parse(sale.startsAt)
+  assert.equal(flashSalePrice(product, sale, time - 1), 1000000)
+  assert.equal(flashSalePrice(product, sale, time), 800000)
+  assert.equal(flashSalePrice(product, sale, Date.parse(sale.endsAt)), 1000000)
+  assert.equal(flashSalePrice({ ...product, id: 2 }, sale, time), 1000000)
+  assert.equal(flashSalePrice({ ...product, price: 700000 }, sale, time), 700000, 'Never charge more than a newly lowered inventory price')
+  assert.deepEqual(applyFlashSalePrice(product, sale, time), { ...product, price: 800000, discount: 33 })
+  assert.equal(product.price, 1000000)
+  for (const prices of [{ 1: 0 }, { 1: -1 }, { 1: 1.5 }, { 1: '100' }, { 1: true }, { 1: 1000000001 }, { 3: 100 }, { '01': 100 }, []]) assert.throws(() => normalizeFlashSale({ ...sale, prices }))
 })
 
 test('Vouchers use positive integer amounts, normalize codes and reject inactive or oversized discounts', () => {

@@ -61,11 +61,25 @@ export default function PromotionsManager({ products, onFlashSaleChanged, refres
   const filtered = products.filter(product => `${product.name} ${product.category} ${product.brand}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 15))
   const currentPage = Math.min(page, pageCount)
-  function toggle(id) { setSale(current => ({ ...current, productIds: current.productIds.includes(id) ? current.productIds.filter(value => value !== id) : [...current.productIds, id] })) }
+  function toggle(id) {
+    setSale(current => {
+      const prices = { ...current.prices }
+      if (current.productIds.includes(id)) delete prices[id]
+      return { ...current, prices, productIds: current.productIds.includes(id) ? current.productIds.filter(value => value !== id) : [...current.productIds, id] }
+    })
+  }
+  function updateSalePrice(id, value) {
+    setSale(current => {
+      const prices = { ...current.prices }
+      if (value === '') delete prices[id]
+      else prices[id] = Number(value)
+      return { ...current, prices }
+    })
+  }
   function saveSale(event) {
     event.preventDefault()
     act('sale', async () => {
-      const body = normalizeFlashSale({ productIds: sale.productIds, startsAt: startsAt ? new Date(startsAt).toISOString() : null, endsAt: endsAt ? new Date(endsAt).toISOString() : null })
+      const body = normalizeFlashSale({ productIds: sale.productIds, prices: sale.prices, startsAt: startsAt ? new Date(startsAt).toISOString() : null, endsAt: endsAt ? new Date(endsAt).toISOString() : null })
       const saved = await api('/api/admin/promotions/flash-sale', { method: 'PATCH', body: JSON.stringify(body) })
       setSale(saved); setSavedSale(saved); setStartsAt(localDate(saved.startsAt)); setEndsAt(localDate(saved.endsAt)); onFlashSaleChanged?.(saved)
       setNotice(saved.productIds.length ? 'Đã lưu sản phẩm và thời gian Flash Sale.' : 'Đã ẩn Flash Sale khỏi trang chủ.')
@@ -93,10 +107,13 @@ export default function PromotionsManager({ products, onFlashSaleChanged, refres
       <div className="promo-heading"><span className="promo-symbol"><Zap size={23}/></span><div><small>CHIẾN DỊCH TRANG CHỦ</small><h2>Flash Sale</h2><p>Chọn sản phẩm và lên lịch hiển thị. Không chọn sản phẩm để ẩn khu vực này.</p></div><span className="promo-status">{status}</span></div>
       <form onSubmit={saveSale}>
         <fieldset disabled={Boolean(busy)} className="promo-dates"><label>Bắt đầu<input type="datetime-local" value={startsAt} onChange={event => setStartsAt(event.target.value)} required={Boolean(ids.size)}/></label><label>Kết thúc<input type="datetime-local" value={endsAt} onChange={event => setEndsAt(event.target.value)} required={Boolean(ids.size)}/></label><p>Giờ địa phương trên thiết bị của bạn.<br/>Tự ẩn khi chiến dịch kết thúc.</p></fieldset>
-        <div className="promo-products-heading"><b>{ids.size} sản phẩm đã chọn</b><button type="button" className="admin-secondary" disabled={Boolean(busy) || !ids.size} onClick={() => setSale(current => ({ ...current, productIds: [] }))}>Bỏ chọn tất cả</button><label><Search size={16}/><input aria-label="Tìm sản phẩm Flash Sale" placeholder="Tìm tên, danh mục, thương hiệu…" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }}/></label></div>
-        <div className="promo-product-list">{filtered.slice((currentPage - 1) * 15, currentPage * 15).map(product => <label key={product.id} className={ids.has(product.id) ? 'selected' : ''}><input type="checkbox" checked={ids.has(product.id)} disabled={Boolean(busy) || (!ids.has(product.id) && ids.size >= 200)} onChange={() => toggle(product.id)}/><img src={product.image} alt="" loading="lazy"/><span><b>{product.name}</b><small>{product.category} · Còn {product.stock}</small></span><strong>{money(product.price)}</strong></label>)}{!filtered.length && <p className="promo-empty">Không tìm thấy sản phẩm.</p>}</div>
+        <div className="promo-products-heading"><b>{ids.size} sản phẩm đã chọn</b><button type="button" className="admin-secondary" disabled={Boolean(busy) || !ids.size} onClick={() => setSale(current => ({ ...current, productIds: [], prices: {} }))}>Bỏ chọn tất cả</button><label><Search size={16}/><input aria-label="Tìm sản phẩm Flash Sale" placeholder="Tìm tên, danh mục, thương hiệu…" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }}/></label></div>
+        <div className="promo-product-list">{filtered.slice((currentPage - 1) * 15, currentPage * 15).map(product => <div key={product.id} className={`promo-product-option${ids.has(product.id) ? ' selected' : ''}`}>
+          <label><input type="checkbox" checked={ids.has(product.id)} disabled={Boolean(busy) || (!ids.has(product.id) && ids.size >= 200)} onChange={() => toggle(product.id)}/><img src={product.image} alt="" loading="lazy"/><span><b>{product.name}</b><small>{product.category} · Còn {product.stock}</small></span><strong>{money(product.price)}</strong></label>
+          {ids.has(product.id) && <label className="promo-sale-price"><span>Giá Flash Sale (VNĐ)</span><input aria-label={`Giá Flash Sale của ${product.name}`} type="number" min="1" max={Math.min(product.price, 1000000000)} step="1" value={sale.prices?.[product.id] ?? ''} placeholder={String(product.price)} disabled={Boolean(busy)} onChange={event => updateSalePrice(product.id, event.target.value)}/><small>Để trống để dùng giá bán hiện tại.</small></label>}
+        </div>)}{!filtered.length && <p className="promo-empty">Không tìm thấy sản phẩm.</p>}</div>
         <div className="promo-pagination"><small>{filtered.length} sản phẩm</small><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</button><span>{currentPage} / {pageCount}</span><button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</button></div>
-        <div className="promo-actions"><small>Flash Sale sử dụng giá bán hiện tại trong kho hàng.</small><button className="admin-primary" disabled={Boolean(busy)}><Save size={16}/>{busy === 'sale' ? 'Đang lưu…' : 'Lưu Flash Sale'}</button></div>
+        <div className="promo-actions"><small>Giá Flash Sale áp dụng khi chiến dịch đang diễn ra. Giá bán gốc trong kho hàng được giữ nguyên.</small><button className="admin-primary" disabled={Boolean(busy)}><Save size={16}/>{busy === 'sale' ? 'Đang lưu…' : 'Lưu Flash Sale'}</button></div>
       </form>
     </section>
     <section className="admin-panel promo-panel">

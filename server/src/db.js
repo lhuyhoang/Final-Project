@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { DEFAULT_PRODUCT_IMAGE } from '../../shared/productImage.mjs'
 import { getUpgradeDisplayName } from '../../shared/upgradeDisplayName.mjs'
-import { assertVoucherAvailable, normalizeVoucher, normalizeVoucherCode, voucherDiscount } from '../../shared/promotions.mjs'
+import { assertVoucherAvailable, normalizeVoucher, normalizeVoucherCode, voucherDiscount, readFlashSale, flashSalePrice } from '../../shared/promotions.mjs'
 import { matchesResetHash, OTP_EXPIRY_SECONDS, OTP_RESEND_SECONDS, RESET_TOKEN_EXPIRY_SECONDS } from './resetOtp.js'
 
 const { Pool } = pg
@@ -1089,6 +1089,8 @@ function normalizeRequestedItems(items) {
   for (const item of items) {
     const productId = Number(item.productId ?? item.id)
     const quantity = Number(item.quantity)
+    const expectedPrice = item.expectedPrice
+    if (expectedPrice !== undefined && (!Number.isSafeInteger(expectedPrice) || expectedPrice < 1)) throw repositoryError(400, 'Giá xác nhận của sản phẩm không hợp lệ', 'INVALID_ORDER_PRICE')
     if (!Number.isInteger(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       throw repositoryError(400, 'Sản phẩm hoặc số lượng không hợp lệ', 'INVALID_ORDER_ITEM')
     }
@@ -1109,8 +1111,10 @@ function normalizeRequestedItems(items) {
     }
     const variantKey = `${productId}:${upgrades.map(upgrade => `${upgrade.groupIndex}-${upgrade.productId}`).join(',')}`
     const existing = variants.get(variantKey)
-    if (existing) existing.quantity += quantity
-    else variants.set(variantKey, { productId, quantity, upgrades })
+    if (existing) {
+      if (existing.expectedPrice !== expectedPrice) throw repositoryError(400, 'Giá xác nhận của cùng cấu hình không đồng nhất', 'INVALID_ORDER_PRICE')
+      existing.quantity += quantity
+    } else variants.set(variantKey, { productId, quantity, upgrades, expectedPrice })
   }
 
   const normalized = [...variants.values()]
@@ -1185,6 +1189,9 @@ export async function createOrder(input) {
       }
     }
 
+    const saleRow = (await client.query("SELECT value FROM store_settings WHERE key = 'flash_sale'")).rows[0]
+    const sale = readFlashSale({ flash_sale: saleRow })
+    const pricingTime = Date.now()
     const snapshots = requestedItems.map(item => {
       const product = productsById.get(item.productId)
       const groups = Array.isArray(product.upgrade_options) ? product.upgrade_options : []
@@ -1214,7 +1221,7 @@ export async function createOrder(input) {
         if (selectedProductId !== baseProductId && numberValue(selectedUpgradeProduct.stock) < item.quantity) {
           throw repositoryError(409, `${selectedUpgradeProduct.name} không đủ tồn kho để nâng cấp`, 'UPGRADE_INSUFFICIENT_STOCK')
         }
-        upgradePrice += Math.max(0, numberValue(selectedUpgradeProduct.price) - numberValue(baseUpgradeProduct.price))
+        upgradePrice += Math.max(0, flashSalePrice(selectedUpgradeProduct, sale, pricingTime) - flashSalePrice(baseUpgradeProduct, sale, pricingTime))
         normalizedUpgrades.push({ groupIndex, productId: selectedProductId })
         if (selectedProductId !== baseProductId) upgradedNames.push(getUpgradeDisplayName(selectedOption, selectedUpgradeProduct))
       })
@@ -1224,11 +1231,13 @@ export async function createOrder(input) {
       const configuredName = upgradedNames.length
         ? `${product.name} (Nâng cấp lên ${upgradedNames.join(', ')})`
         : product.name
+      const price = flashSalePrice(product, sale, pricingTime) + upgradePrice
+      if (item.expectedPrice !== undefined && item.expectedPrice !== price) throw repositoryError(409, `Giá của ${product.name} đã thay đổi. Vui lòng kiểm tra lại giỏ hàng và xác nhận.`, 'PRODUCT_PRICE_CHANGED')
       return {
         productId: item.productId,
         name: configuredName,
         image: product.image,
-        price: numberValue(product.price) + upgradePrice,
+        price,
         quantity: item.quantity,
         upgrades: normalizedUpgrades
       }

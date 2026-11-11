@@ -1340,8 +1340,10 @@ app.get('/api/admin/promotions', asyncHandler(async (req, res) => {
 app.patch('/api/admin/promotions/flash-sale', asyncHandler(async (req, res) => {
   let sale
   try { sale = normalizeFlashSale(req.body) } catch (error) { throw httpError(400, error.message) }
-  const ids = new Set((await listProducts()).map(product => product.id))
+  const products = await listProducts()
+  const ids = new Set(products.map(product => product.id))
   if (sale.productIds.some(id => !ids.has(id))) throw httpError(400, 'Có sản phẩm đã bị xóa. Vui lòng chọn lại.')
+  if (products.some(product => sale.prices?.[product.id] > product.price)) throw httpError(400, 'Giá Flash Sale không được cao hơn giá bán hiện tại của sản phẩm.')
   await updateStoreSetting('flash_sale', JSON.stringify(sale))
   res.json(sale)
 }))

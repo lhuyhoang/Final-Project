@@ -74,6 +74,8 @@ import ContactButtons from "./components/ContactButtons";
 import BrandMark from "./components/BrandMark";
 import { StoreAppearanceProvider, useStoreAppearance } from "./components/StoreAppearance";
 import FlashSale from "./components/FlashSale";
+import useFlashSaleProducts from "./components/useFlashSaleProducts";
+import { repriceCart } from "./flash-sale-pricing.mjs";
 import { emptyFlashSale } from "../../shared/promotions.mjs";
 import { defaultShopContact } from "../../shared/shopContact.mjs";
 import PcBuilderPage from "./components/PcBuilderPage";
@@ -943,11 +945,12 @@ function CategoryCatalog({
 function App() {
   const { setAppearance } = useStoreAppearance();
   const [theme, setTheme] = useState(loadTheme);
-  const [products, setProducts] = useState(fallbackProducts);
+  const [inventoryProducts, setProducts] = useState(fallbackProducts);
   const [categories, setCategories] = useState(defaultCategories);
   const [showrooms, setShowrooms] = useState([]);
   const [shopContact, setShopContact] = useState(defaultShopContact);
   const [flashSale, setFlashSale] = useState(emptyFlashSale);
+  const products = useFlashSaleProducts(inventoryProducts, flashSale);
   const [transitionSettings, setTransitionSettings] = useState(defaultTransitionSettings);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1147,6 +1150,9 @@ function App() {
     () => localStorage.setItem("quadpro-cart", JSON.stringify(cart)),
     [cart],
   );
+  useEffect(() => {
+    if (productsLoaded) setCart(current => repriceCart(current, products));
+  }, [products, productsLoaded]);
   useEffect(() => {
     if (!sessionReady) return;
     const isAdminRoute = window.location.pathname.startsWith("/admin");
@@ -1552,6 +1558,7 @@ function App() {
           items: cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
+            expectedPrice: item.price,
             upgrades: item.upgrades || [],
           })),
           customer: { name: customer.name, phone: customer.phone },
@@ -1583,6 +1590,9 @@ function App() {
       setToast(`Đặt hàng thành công: #${order.id}`);
       setTimeout(() => setToast(""), 3500);
     } catch (requestError) {
+      if (requestError.code === "PRODUCT_PRICE_CHANGED") {
+        await Promise.allSettled([refreshProducts(), refreshSettings()]);
+      }
       setToast(requestError.message);
       setTimeout(() => setToast(""), 3500);
       throw requestError;
