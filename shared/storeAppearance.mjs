@@ -1,10 +1,10 @@
 export const defaultStoreAppearance = {
   logoUrl: '/images/brand/quadpro-logo.png',
   banners: [
-    { image: '/images/banners/build-pc-gaming.jpg', label: 'Build PC Gaming giá tốt tại QuadShop' },
-    { image: '/images/banners/pc-delta-force.jpg', label: 'Cấu hình PC chiến Delta Force và quà tặng' },
-    { image: '/images/banners/halloween-pc.jpg', label: 'Halloween săn deal, build PC cực chill' },
-    { image: '/images/banners/halloween-deals.jpg', label: 'Ưu đãi Halloween và miễn phí vận chuyển toàn quốc' },
+    { image: '/images/banners/build-pc-gaming.jpg', label: 'Build PC Gaming giá tốt tại QuadShop', href: '' },
+    { image: '/images/banners/pc-delta-force.jpg', label: 'Cấu hình PC chiến Delta Force và quà tặng', href: '' },
+    { image: '/images/banners/halloween-pc.jpg', label: 'Halloween săn deal, build PC cực chill', href: '' },
+    { image: '/images/banners/halloween-deals.jpg', label: 'Ưu đãi Halloween và miễn phí vận chuyển toàn quốc', href: '' },
   ],
   bannerIntervalSeconds: 6,
   hoverEffect: 'zoom',
@@ -35,6 +35,22 @@ export function normalizeAppearanceImage(value) {
   } catch { throw new Error('Ảnh phải dùng URL HTTPS hoặc đường dẫn /images/ của website.') }
 }
 
+function normalizeBannerLink(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  try {
+    if (raw.length > 2000 || /[\\\u0000-\u001f\u007f]/.test(decodeURIComponent(raw))) throw new Error()
+    const base = 'https://quadpro.invalid'
+    const url = new URL(raw, base)
+    if (/^[/#?]/.test(raw)) {
+      if (raw.startsWith('//') || url.origin !== base) throw new Error()
+      return url.pathname + url.search + url.hash
+    }
+    if (!/^https:\/\//i.test(raw) || url.protocol !== 'https:' || url.username || url.password) throw new Error()
+    return url.href
+  } catch { throw new Error('Đường dẫn banner phải là URL HTTPS hoặc đường dẫn trên website bắt đầu bằng /, # hoặc ?.') }
+}
+
 export function normalizeStoreAppearance(body = {}, current = defaultStoreAppearance) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Cấu hình giao diện không hợp lệ.')
   const logoUrl = normalizeAppearanceImage(body.logoUrl === '' ? defaultStoreAppearance.logoUrl : body.logoUrl ?? current.logoUrl)
@@ -44,7 +60,8 @@ export function normalizeStoreAppearance(body = {}, current = defaultStoreAppear
     const image = normalizeAppearanceImage(banner?.image)
     const label = String(banner?.label || `Banner ${index + 1}`).trim()
     if (label.length > 120) throw new Error('Mô tả banner tối đa 120 ký tự.')
-    return { image, label }
+    const href = normalizeBannerLink(banner?.href)
+    return { image, label, href }
   })
   const bannerIntervalSeconds = Number(body.bannerIntervalSeconds ?? current.bannerIntervalSeconds)
   const hoverDurationMs = Number(body.hoverDurationMs ?? current.hoverDurationMs)

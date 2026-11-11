@@ -22,6 +22,25 @@ test('validates image destinations, banner limits, hover selection and durations
   assert.throws(() => normalizeStoreAppearance(null))
 })
 
+test('banner destinations persist independently and older banners without links remain valid', () => {
+  const banner = defaultStoreAppearance.banners[0]
+  for (const href of ['', '/build-pc', '/products/165?campaign=banner#details', 'https://example.com/sale?from=banner']) {
+    const saved = normalizeStoreAppearance({ banners: [{ ...banner, href }] })
+    assert.equal(saved.banners[0].href, href)
+    assert.deepEqual(readStoreAppearance({ store_appearance: { value: JSON.stringify(saved) } }), saved)
+    assert.equal(normalizeStoreAppearance({ hoverEffect: 'lift' }, saved).banners[0].href, href)
+  }
+  assert.equal(normalizeStoreAppearance({ banners: [{ image: banner.image, label: banner.label }] }).banners[0].href, '')
+  assert.equal(normalizeStoreAppearance({ banners: [{ ...banner, href: '#products' }] }).banners[0].href, '/#products')
+  assert.equal(normalizeStoreAppearance({ banners: [{ ...banner, href: '?category=RAM' }] }).banners[0].href, '/?category=RAM')
+})
+
+test('rejects unsafe and malformed banner destinations', () => {
+  for (const href of ['javascript:alert(1)', 'data:text/html,test', '//evil.example', '/\\evil.example', '/%5cevil.example', 'https://user:pass@example.com', 'http://example.com', 'ftp://example.com', 'example.com', 'https:example.com', '/%ZZ', 'https://example.com/a\nb', '/%0afoo', 'https://example.com/' + 'a'.repeat(2000)]) {
+    assert.throws(() => normalizeStoreAppearance({ banners: [{ ...defaultStoreAppearance.banners[0], href }] }), /Đường dẫn banner/)
+  }
+})
+
 test('existing settings permission controls all appearance changes without granting inventory access', () => {
   const staff = permissions => ({ role: 'staff', permissions })
   for (const method of ['GET', 'PATCH']) {

@@ -51,10 +51,10 @@ export default function HomeBanners() {
           {banners.map((banner, index) => (
             <a
               className={`home-banners-slide${index === activeIndex ? " is-active" : ""}`}
-              href="#products"
+              href={banner.href || undefined}
               key={`${banner.image}-${index}`}
               aria-hidden={index !== activeIndex}
-              tabIndex={index === activeIndex ? 0 : -1}
+              tabIndex={index === activeIndex && banner.href ? 0 : -1}
             >
               <img
                 src={banner.image}

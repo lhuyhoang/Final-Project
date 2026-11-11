@@ -70,7 +70,7 @@ try {
   assert.equal((await request('/api/settings')).data.appearance.logoUrl, logo)
   assert.deepEqual((await request('/api/settings')).data.appearance.banners, initial.banners)
   assert.equal((await write({ hoverEffect: 'lift', hoverDurationMs: 650 }, staff)).status, 200)
-  const slides = [...initial.banners].reverse().slice(0, 2)
+  const slides = [...initial.banners].reverse().slice(0, 2).map((banner, index) => ({ ...banner, href: index ? 'https://offers.example.test/sale' : '/build-pc' }))
   assert.equal((await write({ banners: slides, bannerIntervalSeconds: 3 })).status, 200)
   const saved = (await request('/api/admin/appearance', { cookie: staff })).data
   assert.equal(saved.logoUrl, logo)
@@ -79,7 +79,7 @@ try {
   assert.deepEqual(saved.banners, slides)
   assert.equal(saved.bannerIntervalSeconds, 3)
   assert.deepEqual((await request('/api/settings')).data.appearance, saved)
-  for (const body of [{ logoUrl: 'javascript:alert(1)' }, { hoverEffect: 'bad' }, { banners: [{ image: 'http://example.com/a.png' }] }, { bannerIntervalSeconds: 100 }]) assert.equal((await write(body)).status, 400)
+  for (const body of [{ logoUrl: 'javascript:alert(1)' }, { hoverEffect: 'bad' }, { banners: [{ image: 'http://example.com/a.png' }] }, { banners: [{ ...slides[0], href: 'javascript:alert(1)' }] }, { banners: [{ ...slides[0], href: '//evil.example' }] }, { bannerIntervalSeconds: 100 }]) assert.equal((await write(body)).status, 400)
   assert.deepEqual((await request('/api/settings')).data.appearance, saved, 'Invalid edits do not mutate saved settings')
   await request('/api/admin/settings', { cookie: staff, method: 'PATCH', body: { productGalleryIntervalSeconds: 9 } })
   assert.deepEqual((await request('/api/settings')).data.appearance, saved, 'Transition edits preserve logo/banner/hover settings')

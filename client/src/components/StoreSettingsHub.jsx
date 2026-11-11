@@ -54,7 +54,33 @@ function BannerEditor({ appearance, onSaved }) {
   useEffect(() => { setBanners(appearance.banners); setInterval(appearance.bannerIntervalSeconds) }, [appearance.banners, appearance.bannerIntervalSeconds])
   function update(index, patch) { setBanners(current => current.map((banner, i) => i === index ? { ...banner, ...patch } : banner)) }
   function move(index, offset) { setBanners(current => { const next = [...current]; [next[index], next[index + offset]] = [next[index + offset], next[index]]; return next }) }
-  return <section className="admin-panel settings-editor"><div className="settings-editor-heading"><span>TRANG CHỦ</span><h2>Banner cửa hàng</h2><p>Banner hiển thị trong một khung duy nhất trên trang chủ, theo thứ tự bên dưới.</p></div><form onSubmit={event => { event.preventDefault(); model.save({ banners, bannerIntervalSeconds: Number(interval) }) }}><div className="settings-banner-toolbar"><label>Thời gian chuyển banner (giây)<input type="number" min="2" max="60" step="1" required value={interval} disabled={model.busy} onChange={event => setInterval(event.target.value)}/></label><button type="button" className="settings-primary" disabled={model.busy || banners.length >= 12} onClick={() => setBanners(current => [...current, { image: '', label: `Banner ${current.length + 1}` }])}><Plus size={16}/>Thêm banner</button></div><div className="settings-banner-list">{banners.map((banner, index) => <article className="settings-banner-row" key={index}><ImagePreview src={banner.image}/><div className="settings-fields"><label>URL ảnh banner {index + 1}<input inputMode="url" required value={banner.image} maxLength={2000} placeholder="https://… hoặc /images/…" disabled={model.busy} onChange={event => update(index, { image: event.target.value })}/></label><label>Mô tả ảnh<input value={banner.label} maxLength={120} disabled={model.busy} onChange={event => update(index, { label: event.target.value })}/></label><FileButton disabled={model.busy} label={`Tải ảnh banner ${index + 1}`} onSelect={file => model.perform(async () => update(index, { image: await uploadAppearanceImage(file) }), 'Đã tải ảnh lên. Nhấn Lưu banner để áp dụng.')}/></div><div className="settings-banner-actions"><button type="button" aria-label={`Đưa banner ${index + 1} lên`} disabled={model.busy || index === 0} onClick={() => move(index, -1)}><ArrowUp size={16}/></button><button type="button" aria-label={`Đưa banner ${index + 1} xuống`} disabled={model.busy || index === banners.length - 1} onClick={() => move(index, 1)}><ArrowDown size={16}/></button><button type="button" className="danger" aria-label={`Xóa banner ${index + 1}`} disabled={model.busy} onClick={() => setBanners(current => current.filter((_, i) => i !== index))}><Trash2 size={16}/></button></div></article>)}</div>{!banners.length && <div className="settings-empty"><ImageIcon size={30}/><b>Chưa có banner</b><p>Lưu danh sách trống để ẩn banner khỏi trang chủ.</p></div>}<Feedback model={model}/><div className="settings-editor-footer"><small>Tối đa 12 banner. Ưu tiên ảnh ngang, cùng tỉ lệ để hiển thị đẹp.</small><button className="settings-primary" disabled={model.busy}><Save size={16}/>{model.busy ? 'Đang xử lý…' : 'Lưu banner'}</button></div></form></section>
+  return <section className="admin-panel settings-editor">
+    <div className="settings-editor-heading"><span>TRANG CHỦ</span><h2>Banner cửa hàng</h2><p>Banner hiển thị trong một khung duy nhất trên trang chủ, theo thứ tự bên dưới.</p></div>
+    <form onSubmit={event => { event.preventDefault(); model.save({ banners, bannerIntervalSeconds: Number(interval) }) }}>
+      <div className="settings-banner-toolbar">
+        <label>Thời gian chuyển banner (giây)<input type="number" min="2" max="60" step="1" required value={interval} disabled={model.busy} onChange={event => setInterval(event.target.value)}/></label>
+        <button type="button" className="settings-primary" disabled={model.busy || banners.length >= 12} onClick={() => setBanners(current => [...current, { image: '', label: `Banner ${current.length + 1}`, href: '' }])}><Plus size={16}/>Thêm banner</button>
+      </div>
+      <div className="settings-banner-list">{banners.map((banner, index) => <article className="settings-banner-row" key={index}>
+        <ImagePreview src={banner.image}/>
+        <div className="settings-fields">
+          <label>URL ảnh banner {index + 1}<input inputMode="url" required value={banner.image} maxLength={2000} placeholder="https://… hoặc /images/…" disabled={model.busy} onChange={event => update(index, { image: event.target.value })}/></label>
+          <label>Mô tả ảnh<input value={banner.label} maxLength={120} disabled={model.busy} onChange={event => update(index, { label: event.target.value })}/></label>
+          <label>Đường dẫn khi bấm vào ảnh<input inputMode="url" value={banner.href || ''} maxLength={2000} placeholder="/build-pc hoặc https://…" disabled={model.busy} onChange={event => update(index, { href: event.target.value })}/></label>
+          <p>Để trống nếu không gắn liên kết cho ảnh này.</p>
+          <FileButton disabled={model.busy} label={`Tải ảnh banner ${index + 1}`} onSelect={file => model.perform(async () => update(index, { image: await uploadAppearanceImage(file) }), 'Đã tải ảnh lên. Nhấn Lưu banner để áp dụng.')}/>
+        </div>
+        <div className="settings-banner-actions">
+          <button type="button" aria-label={`Đưa banner ${index + 1} lên`} disabled={model.busy || index === 0} onClick={() => move(index, -1)}><ArrowUp size={16}/></button>
+          <button type="button" aria-label={`Đưa banner ${index + 1} xuống`} disabled={model.busy || index === banners.length - 1} onClick={() => move(index, 1)}><ArrowDown size={16}/></button>
+          <button type="button" className="danger" aria-label={`Xóa banner ${index + 1}`} disabled={model.busy} onClick={() => setBanners(current => current.filter((_, i) => i !== index))}><Trash2 size={16}/></button>
+        </div>
+      </article>)}</div>
+      {!banners.length && <div className="settings-empty"><ImageIcon size={30}/><b>Chưa có banner</b><p>Lưu danh sách trống để ẩn banner khỏi trang chủ.</p></div>}
+      <Feedback model={model}/>
+      <div className="settings-editor-footer"><small>Tối đa 12 banner. Ưu tiên ảnh ngang, cùng tỉ lệ để hiển thị đẹp.</small><button className="settings-primary" disabled={model.busy}><Save size={16}/>{model.busy ? 'Đang xử lý…' : 'Lưu banner'}</button></div>
+    </form>
+  </section>
 }
 
 function HoverEditor({ appearance, onSaved, products }) {
