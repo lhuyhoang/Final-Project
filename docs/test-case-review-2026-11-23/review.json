@@ -1,0 +1,3310 @@
+{
+  "reviewedOn": "2026-11-23",
+  "sourceName": "QuadPro_Test_CasesFinal.xlsx",
+  "sourceHash": "e6b1c19824192f9ec4d75660b8b5d76cb7e6a6f8403936264e011c7566009a0b",
+  "baselineCommit": "e3102bd",
+  "total": 94,
+  "counts": {
+    "Phù hợp cục bộ": 72,
+    "Chưa phù hợp": 3,
+    "Phù hợp theo mã nguồn": 2,
+    "Cần cập nhật test case": 7,
+    "Cần kiểm thử dịch vụ thật": 6,
+    "Kiểm thử một phần": 4
+  },
+  "warning": "Phù hợp cục bộ không đồng nghĩa đã chạy mọi bước với dịch vụ production; không kế thừa cột Pass trong file nguồn.",
+  "cases": [
+    {
+      "id": "AUTH-01",
+      "title": "Authentication — Open login popup when not logged in",
+      "sourceRow": 16,
+      "steps": [
+        {
+          "action": "Click \"Account\" when not logged in",
+          "expected": "Show login popup"
+        },
+        {
+          "action": "Look at the header and the page behind the popup",
+          "expected": "User is still shown as a guest; no account data is displayed"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-01",
+            "SEC-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Authentication — Register with valid new account details",
+      "sourceRow": 36,
+      "steps": [
+        {
+          "action": "Register with name, new email, and valid password",
+          "expected": "Create account, log in immediately, toast \"Hello, ...\""
+        },
+        {
+          "action": "Check the header after registration",
+          "expected": "Header shows the new user's name and the \"Member\" role"
+        },
+        {
+          "action": "Reload the page (F5)",
+          "expected": "Session persists; the user is still logged in"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-02",
+            "AUTH-03",
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Authentication — Reject registration with an existing email",
+      "sourceRow": 57,
+      "steps": [
+        {
+          "action": "Register with an existing email",
+          "expected": "Report error that email is already in use; do not create account"
+        },
+        {
+          "action": "Log in to Admin > Users tab and search for the email",
+          "expected": "Only one account exists for that email"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-02",
+            "AUTH-03",
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-04",
+      "title": "Authentication — Customer login with valid credentials",
+      "sourceRow": 77,
+      "steps": [
+        {
+          "action": "Log in with correct customer email and password",
+          "expected": "Login successful; header shows name and \"Member\""
+        },
+        {
+          "action": "Check which page is shown after login",
+          "expected": "Customer stays on the storefront (not redirected to /admin)"
+        },
+        {
+          "action": "Navigate directly to /admin as this customer",
+          "expected": "Redirected to homepage; Admin Dashboard is not visible"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-02",
+            "AUTH-03",
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-08"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "AUTH-04",
+            "AUTH-08",
+            "ACC-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-05",
+      "title": "Authentication — Reject login with an incorrect password",
+      "sourceRow": 98,
+      "steps": [
+        {
+          "action": "Log in with incorrect password",
+          "expected": "Report error; do not log in"
+        },
+        {
+          "action": "Check the header after the failed attempt",
+          "expected": "Header still shows the guest state; no session is created"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-02",
+            "AUTH-03",
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-06",
+      "title": "Authentication — Admin login and dashboard redirect",
+      "sourceRow": 118,
+      "steps": [
+        {
+          "action": "Log in with admin account",
+          "expected": "Automatically redirect to /admin, show Admin Dashboard"
+        },
+        {
+          "action": "Reload /admin (F5)",
+          "expected": "Admin Dashboard is still displayed; session is maintained"
+        },
+        {
+          "action": "Open the Overview, Products, Orders and Users tabs",
+          "expected": "Each tab loads and shows its data"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-07",
+            "AUTH-06"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-07",
+      "title": "Authentication — Log out from account or admin page",
+      "sourceRow": 139,
+      "steps": [
+        {
+          "action": "Click Logout while on /account or /admin",
+          "expected": "Toast \"Successfully logged out securely\", return to homepage"
+        },
+        {
+          "action": "Navigate directly to /account (or /admin) after logging out",
+          "expected": "Login popup is shown; no protected content is displayed"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-07",
+            "AUTH-06"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-08",
+      "title": "Authentication — Preserve login session after page reload",
+      "sourceRow": 159,
+      "steps": [
+        {
+          "action": "Log in and reload the page (F5)",
+          "expected": "Maintain login session; header still shows name"
+        },
+        {
+          "action": "Open /account after the reload",
+          "expected": "Account page opens without asking the user to log in again"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AuthModal, main.jsx, index.js: session cookie HttpOnly; đã kiểm tra API đăng ký/login và UI login, F5, chặn /admin cho customer, logout.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-02",
+            "AUTH-03",
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-08"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "AUTH-04",
+            "AUTH-08",
+            "ACC-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-01",
+      "title": "Product Browsing — Load homepage product catalogue",
+      "sourceRow": 182,
+      "steps": [
+        {
+          "action": "Open homepage",
+          "expected": "Show product list fetched from GET /api/products, grouped by category."
+        },
+        {
+          "action": "Open DevTools > Network and reload the page",
+          "expected": "A GET /api/products request is sent and returns 200 with the product list"
+        },
+        {
+          "action": "Scroll through the homepage",
+          "expected": "Products are grouped by category and show name, image and price"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-01",
+            "PRD-03",
+            "PRD-04"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-02",
+      "title": "Product Browsing — Fallback products when backend is unavailable",
+      "sourceRow": 203,
+      "steps": [
+        {
+          "action": "Turn off backend and open homepage",
+          "expected": "Still show fallback products (fallbackProducts); layout does not break."
+        },
+        {
+          "action": "Click a product on the fallback list",
+          "expected": "Product detail page opens normally"
+        },
+        {
+          "action": "Click the add-to-cart button on a product",
+          "expected": "Product is added to the cart"
+        },
+        {
+          "action": "Restart the backend and reload the page (Ctrl+F5)",
+          "expected": "Real products from the API are displayed again"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-02"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-03",
+      "title": "Product Browsing — Search products by name, brand, or category",
+      "sourceRow": 225,
+      "steps": [
+        {
+          "action": "Type product name or brand into search box",
+          "expected": "Only show products matching name, brand, or category."
+        },
+        {
+          "action": "Search by a category name",
+          "expected": "Only products of that category are shown"
+        },
+        {
+          "action": "Clear the search box",
+          "expected": "The full product list is shown again"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-01",
+            "PRD-03",
+            "PRD-04"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-04",
+      "title": "Product Browsing — Display no-results state",
+      "sourceRow": 246,
+      "steps": [
+        {
+          "action": "Search for a keyword with no results",
+          "expected": "Show \"Product not found\"; the \"View All\" button clears the search."
+        },
+        {
+          "action": "Click the \"View All\" button",
+          "expected": "Search is cleared and the full product list is shown"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-01",
+            "PRD-03",
+            "PRD-04"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-05",
+      "title": "Product Browsing — Desktop product quick view",
+      "sourceRow": 266,
+      "steps": [
+        {
+          "action": "Hover over product image (desktop)",
+          "expected": "Show quick-view popup with price, savings, stock, promotion, and rating."
+        },
+        {
+          "action": "Move the mouse away from the product image",
+          "expected": "Quick-view popup closes"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-05",
+            "PRD-06",
+            "PRD-07"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-06",
+      "title": "Product Browsing — Keyboard-accessible quick view",
+      "sourceRow": 286,
+      "steps": [
+        {
+          "action": "Tab to product card, then press Escape",
+          "expected": "Popup shows on focus and closes when Escape is pressed."
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-05",
+            "PRD-06",
+            "PRD-07"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-07",
+      "title": "Product Browsing — Quick-view viewport positioning",
+      "sourceRow": 305,
+      "steps": [
+        {
+          "action": "Hover over a product near the right edge of the screen",
+          "expected": "Popup automatically shifts to the left without overflowing the screen."
+        },
+        {
+          "action": "Hover over a product in the middle of the screen",
+          "expected": "Popup is displayed fully inside the screen"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-05",
+            "PRD-06",
+            "PRD-07"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-08",
+      "title": "Product Browsing — Open product detail page",
+      "sourceRow": 325,
+      "steps": [
+        {
+          "action": "Click on product image or name",
+          "expected": "URL changes to /products/{id}-{slug}; the detail page is shown and the page scrolls to the top."
+        },
+        {
+          "action": "Check the content of the detail page",
+          "expected": "Name, image and price match the product that was clicked; quantity selector is shown"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-08",
+            "PRD-12",
+            "PRD-14"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-09",
+      "title": "Product Browsing — Handle out-of-stock products",
+      "sourceRow": 345,
+      "steps": [
+        {
+          "action": "Open product detail with stock = 0",
+          "expected": "Show \"Temporarily out of stock\"; Add to Cart and Buy Now buttons are disabled."
+        },
+        {
+          "action": "Click the \"Add to Cart\" button",
+          "expected": "Nothing happens; the cart count does not change"
+        },
+        {
+          "action": "Click the \"Buy Now\" button",
+          "expected": "Nothing happens; the cart drawer does not open"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-09",
+            "CART-05",
+            "PRD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-10",
+      "title": "Product Browsing — Enforce purchase quantity limits",
+      "sourceRow": 366,
+      "steps": [
+        {
+          "action": "Click the + / − quantity controls on the detail page",
+          "expected": "Quantity remains between 1 and stock; the buttons are disabled at both limits."
+        },
+        {
+          "action": "Click + repeatedly",
+          "expected": "Quantity stops at the available stock; the + button is disabled"
+        },
+        {
+          "action": "Click − repeatedly",
+          "expected": "Quantity stops at 1; the − button is disabled"
+        },
+        {
+          "action": "Open a product with stock = 1",
+          "expected": "Both + and − are disabled; quantity stays at 1"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-09",
+            "CART-05",
+            "PRD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-11",
+      "title": "Product Browsing — Handle invalid product URL",
+      "sourceRow": 388,
+      "steps": [
+        {
+          "action": "Directly navigate to /products/99999",
+          "expected": "Show \"Product not found\" and a button to return to the store."
+        },
+        {
+          "action": "Click the button to return to the store",
+          "expected": "The store page is displayed"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-11"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-12",
+      "title": "Product Browsing — Show and navigate related products",
+      "sourceRow": 408,
+      "steps": [
+        {
+          "action": "View the \"Related Products\" section and click a product",
+          "expected": "Show a maximum of four products of the same type; clicking a product opens its detail page."
+        },
+        {
+          "action": "Compare the type of the related products with the current product",
+          "expected": "All related products are of the same type"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-08",
+            "PRD-12",
+            "PRD-14"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-13",
+      "title": "Product Browsing — Filter and sort laptop category",
+      "sourceRow": 428,
+      "steps": [
+        {
+          "action": "Go to /categories/laptop, filter by price range and brand, then change sorting",
+          "expected": "Show the correct product list and \"Found N products\" count; Reset Filters clears the applied filters."
+        },
+        {
+          "action": "Click \"Reset Filters\"",
+          "expected": "Applied filters are cleared; the full list and the original count are shown"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-09",
+            "SEC-10",
+            "PRD-13"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "PRD-14",
+      "title": "Product Browsing — Browser Back and Forward navigation",
+      "sourceRow": 448,
+      "steps": [
+        {
+          "action": "Open product detail and click browser Back / Forward",
+          "expected": "URL and UI match after Back/Forward navigation; the page does not reload."
+        },
+        {
+          "action": "Watch the DevTools Network tab while using Back / Forward",
+          "expected": "No full document reload occurs; navigation happens inside the app"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx, ProductDetail.jsx: đã kiểm tra UI tìm kiếm, popup hover/bàn phím, chi tiết, giới hạn số lượng, related, URL không tồn tại và Back/Forward bằng fixture cục bộ.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-08",
+            "PRD-12",
+            "PRD-14"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-01",
+      "title": "Shopping Cart — Add an in-stock product to the cart",
+      "sourceRow": 471,
+      "steps": [
+        {
+          "action": "Click add to cart button on in-stock product",
+          "expected": "Toast \"Added ... to cart\", cart icon count increases by 1"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "The product is listed with quantity 1 and the correct price"
+        },
+        {
+          "action": "Check the subtotal",
+          "expected": "Subtotal equals the product price"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-02",
+      "title": "Shopping Cart — Merge duplicate products into one row",
+      "sourceRow": 492,
+      "steps": [
+        {
+          "action": "Add the same product twice",
+          "expected": "Do not create new row, quantity of that row increases to 2"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "Only one row exists for that product, with quantity 2"
+        },
+        {
+          "action": "Check the subtotal",
+          "expected": "Subtotal equals 2 x the unit price"
+        }
+      ],
+      "status": "Chưa phù hợp",
+      "evidence": "Thêm cùng sản phẩm từ trang chi tiết rồi từ thẻ trang chủ tạo 2 dòng dù không chọn nâng cấp.",
+      "next": "Chuẩn hóa cartKey của cấu hình gốc ở mọi nơi thêm vào giỏ; giữ tách dòng cho cấu hình nâng cấp khác nhau.",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        },
+        {
+          "ids": [
+            "CART-02"
+          ],
+          "result": "confirmed-gap",
+          "detail": "Adding the same base product from detail then product card creates 2 rows."
+        }
+      ]
+    },
+    {
+      "id": "CART-03",
+      "title": "Shopping Cart — Add multiple units from the detail page",
+      "sourceRow": 513,
+      "steps": [
+        {
+          "action": "Select quantity 3 on detail page, click Add to Cart",
+          "expected": "Toast \"Added 3 × ...\", cart contains 3 of that product"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "One row for the product with quantity 3"
+        },
+        {
+          "action": "Check the subtotal",
+          "expected": "Subtotal equals 3 x the unit price"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-03",
+            "CART-04",
+            "CART-02-cross-page"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-04",
+      "title": "Shopping Cart — Buy Now opens the cart drawer",
+      "sourceRow": 534,
+      "steps": [
+        {
+          "action": "Click Buy Now on detail page",
+          "expected": "Add to cart and immediately open cart drawer"
+        },
+        {
+          "action": "Check the cart contents in the drawer",
+          "expected": "The product is in the cart with the selected quantity"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-03",
+            "CART-04",
+            "CART-02-cross-page"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-05",
+      "title": "Shopping Cart — Disable add to cart for out-of-stock products",
+      "sourceRow": 554,
+      "steps": [
+        {
+          "action": "Click cart button on out-of-stock product",
+          "expected": "Button is disabled, nothing happens"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "The cart is unchanged; the out-of-stock product was not added"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "PRD-09",
+            "CART-05",
+            "PRD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-06",
+      "title": "Shopping Cart — Increase and decrease item quantity",
+      "sourceRow": 574,
+      "steps": [
+        {
+          "action": "In cart, click + then −",
+          "expected": "Quantity and Subtotal update accordingly"
+        },
+        {
+          "action": "Compare the subtotal with price x quantity after each click",
+          "expected": "Subtotal always matches"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-07",
+      "title": "Shopping Cart — Remove item by decreasing quantity below one",
+      "sourceRow": 594,
+      "steps": [
+        {
+          "action": "Click − when quantity is 1",
+          "expected": "Product is removed from cart"
+        },
+        {
+          "action": "Check the cart count and subtotal",
+          "expected": "Cart count decreases and subtotal is recalculated"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-08",
+      "title": "Shopping Cart — Remove item with the trash can icon",
+      "sourceRow": 614,
+      "steps": [
+        {
+          "action": "Click trash can icon",
+          "expected": "Product is removed from cart"
+        },
+        {
+          "action": "Check the cart count and subtotal",
+          "expected": "Cart count decreases and subtotal is recalculated without the removed product"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-09",
+      "title": "Shopping Cart — Persist cart after page reload",
+      "sourceRow": 634,
+      "steps": [
+        {
+          "action": "Add product then reload page (F5)",
+          "expected": "Cart remains intact"
+        },
+        {
+          "action": "Open the cart drawer after the reload",
+          "expected": "Same products and quantities as before the reload"
+        },
+        {
+          "action": "Open DevTools > Application > Local Storage",
+          "expected": "Key \"quadpro-cart\" contains the cart items"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "main.jsx: đã kiểm tra UI thêm, gộp cùng điểm thêm, tăng/giảm, xóa, Buy Now, số lượng từ chi tiết và Local Storage sau F5.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CART-01",
+            "CART-02",
+            "CART-06",
+            "CART-07",
+            "CART-08",
+            "CART-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CART-10",
+      "title": "Shopping Cart — Display the empty cart state",
+      "sourceRow": 655,
+      "steps": [
+        {
+          "action": "Remove all products from cart",
+          "expected": "Show \"Your cart is empty\" and Continue Shopping button; Subtotal = 0 VND"
+        },
+        {
+          "action": "Click the \"Continue Shopping\" button",
+          "expected": "Cart drawer closes and the store is shown"
+        }
+      ],
+      "status": "Phù hợp theo mã nguồn",
+      "evidence": "Đã kiểm tra xóa hết sản phẩm; mã nguồn có thông báo giỏ trống và nút tiếp tục mua. Subtotal nội bộ bằng 0 nhưng không hiển thị hàng Tạm tính khi giỏ trống.",
+      "next": "Nếu bắt buộc nhìn thấy số 0₫, cần bổ sung UI hoặc chỉnh Expected Results; chạy riêng nút Tiếp tục mua sắm.",
+      "execution": []
+    },
+    {
+      "id": "CHK-01",
+      "title": "Checkout & COD — Require login before checkout",
+      "sourceRow": 678,
+      "steps": [
+        {
+          "action": "Not logged in, click \"Login to order\" in cart",
+          "expected": "Show login popup, do not enter checkout page"
+        },
+        {
+          "action": "Log in through the popup, then click \"Proceed to Checkout\"",
+          "expected": "URL changes to /checkout"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-05",
+            "CHK-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-02",
+      "title": "Checkout & COD — Open checkout with auto-filled customer info",
+      "sourceRow": 698,
+      "steps": [
+        {
+          "action": "Logged in, cart has items, click \"Proceed to Checkout\"",
+          "expected": "URL changes to /checkout, form auto-fills name, phone, address from profile"
+        },
+        {
+          "action": "Check the order summary on the checkout page",
+          "expected": "Items, quantities and total match the cart; shipping fee is shown as free"
+        },
+        {
+          "action": "Check the payment method options",
+          "expected": "COD, Stripe and VNPay are listed; COD is selected by default"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-03",
+      "title": "Checkout & COD — Validate required full name",
+      "sourceRow": 719,
+      "steps": [
+        {
+          "action": "Leave full name blank and submit",
+          "expected": "Browser reports required input, does not submit to server"
+        },
+        {
+          "action": "Enter a 1-character name and submit",
+          "expected": "Browser reports the minimum length of 2 characters; form is not submitted"
+        },
+        {
+          "action": "Enter a valid name and submit",
+          "expected": "Name field is accepted"
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Wizard có noValidate và hiển thị lỗi inline, không dùng bong bóng validation gốc của browser. Trường rỗng/1 ký tự vẫn bị chặn.",
+      "next": "Đổi Expected Results thành lỗi inline, không chuyển bước và không gửi POST tạo đơn.",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-04",
+      "title": "Checkout & COD — Validate phone number format",
+      "sourceRow": 740,
+      "steps": [
+        {
+          "action": "Enter incorrectly formatted phone number (e.g., 12345)",
+          "expected": "Report incorrect format, do not submit"
+        },
+        {
+          "action": "Enter 091234567 (9 digits)",
+          "expected": "Reported as incorrect format; form is not submitted"
+        },
+        {
+          "action": "Enter 0912345678",
+          "expected": "Phone number is accepted"
+        },
+        {
+          "action": "Enter +84912345678",
+          "expected": "Phone number is accepted"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-05",
+      "title": "Checkout & COD — Validate minimum address length",
+      "sourceRow": 762,
+      "steps": [
+        {
+          "action": "Enter address shorter than 8 characters",
+          "expected": "Report length error, do not submit"
+        },
+        {
+          "action": "Enter an address of exactly 8 characters",
+          "expected": "Address is accepted"
+        },
+        {
+          "action": "Try to enter an address longer than 250 characters",
+          "expected": "Input is limited to 250 characters"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-06",
+      "title": "Checkout & COD — Place a COD order successfully",
+      "sourceRow": 783,
+      "steps": [
+        {
+          "action": "Select COD, enter correct info, click Place Order",
+          "expected": "Toast \"Order placed successfully: #QP...\", cart is cleared, product stock decreases by correct quantity"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "The cart is empty"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock decreased by the ordered quantity"
+        },
+        {
+          "action": "Open Admin > Orders and search the new order number",
+          "expected": "Order is listed with the correct customer, item count and total"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-06",
+            "AORD-02",
+            "AORD-03",
+            "AORD-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-07",
+      "title": "Checkout & COD — Reject order quantity greater than stock",
+      "sourceRow": 805,
+      "steps": [
+        {
+          "action": "Order quantity greater than stock (admin previously reduced stock)",
+          "expected": "Report \"... only N products left\", do not create order, cart is kept"
+        },
+        {
+          "action": "Open the cart after the error",
+          "expected": "Cart items are kept"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "No new order was created for this attempt"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-08",
+      "title": "Checkout & COD — Reject excessive quantity via API",
+      "sourceRow": 826,
+      "steps": [
+        {
+          "action": "Send create order request with quantity 21 for a product (via Postman)",
+          "expected": "Backend returns 400 \"Invalid product or quantity\""
+        },
+        {
+          "action": "Resend the request with quantity 20 for a product that has stock of at least 20",
+          "expected": "Backend returns 201 and the order is created"
+        },
+        {
+          "action": "Resend the request with quantity 0",
+          "expected": "Backend returns 400 \"Invalid product or quantity\""
+        },
+        {
+          "action": "Check Admin > Orders after the rejected requests",
+          "expected": "No order was created by the rejected requests"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-09",
+      "title": "Checkout & COD — Prevent duplicate orders on double click",
+      "sourceRow": 848,
+      "steps": [
+        {
+          "action": "Click Place Order button twice consecutively",
+          "expected": "Button is locked \"PROCESSING...\", creates exactly one order"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Exactly one new order exists for this checkout"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock decreased only once, by the ordered quantity"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "CHK-10",
+      "title": "Checkout & COD — Reject order with empty cart via API",
+      "sourceRow": 869,
+      "steps": [
+        {
+          "action": "Send create order request with empty cart (via Postman)",
+          "expected": "Backend returns 400 \"Cart is empty\""
+        },
+        {
+          "action": "Resend the request with the \"items\" field omitted",
+          "expected": "Backend returns 400 \"Cart is empty\""
+        },
+        {
+          "action": "Check Admin > Orders",
+          "expected": "No order was created"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "CheckoutWizard.jsx + API /api/orders: đã kiểm tra thông tin nhận hàng, validation, chống bấm hai lần và giao dịch tồn kho trên PGlite.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "CHK-07",
+            "CHK-08",
+            "CHK-10"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-01",
+      "title": "Stripe Payment — Redirect to Stripe Checkout",
+      "sourceRow": 893,
+      "steps": [
+        {
+          "action": "Select Stripe, enter valid info, click Proceed to Payment",
+          "expected": "Redirect to Stripe Checkout page; unpaid order exists in DB, stock is reserved"
+        },
+        {
+          "action": "Check the items and total shown on the Stripe page",
+          "expected": "They match the cart"
+        },
+        {
+          "action": "Open Admin > Orders (or DB) and find the new order",
+          "expected": "Order exists with payment status unpaid"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock is reduced (reserved) for this order"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "Đã xác minh API tạo session, URL redirect giả lập, đơn unpaid và giữ tồn; chưa mở Stripe hosted Checkout thật.",
+      "next": "Dùng Stripe Test mode, so giỏ với trang hosted và kiểm tra cấu hình domain/webhook.",
+      "execution": [
+        {
+          "ids": [
+            "STR-01",
+            "STR-04",
+            "SEC-05",
+            "SEC-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-02",
+      "title": "Stripe Payment — Pay successfully with a test card",
+      "sourceRow": 915,
+      "steps": [
+        {
+          "action": "Pay with card 4242...",
+          "expected": "Return to website, toast \"Payment successful\", cart is cleared, order has payment_status = paid and status = confirmed"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "The cart is empty"
+        },
+        {
+          "action": "Open Admin > Online Payments",
+          "expected": "Order is listed as paid with a Stripe transaction ID"
+        },
+        {
+          "action": "Open Admin > Orders and check the order status",
+          "expected": "Order status is Confirmed"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "Backend xác nhận paid/confirmed đã được kiểm thử cục bộ, nhưng chưa dùng thẻ 4242 trên Stripe hosted Checkout trong lượt này.",
+      "next": "Chạy thanh toán test end-to-end, return, xóa giỏ và bảng giao dịch.",
+      "execution": []
+    },
+    {
+      "id": "STR-03",
+      "title": "Stripe Payment — Handle a declined card",
+      "sourceRow": 937,
+      "steps": [
+        {
+          "action": "Pay with a declined card",
+          "expected": "Stripe reports card error, user remains on Stripe page, order not marked as paid"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Order remains unpaid"
+        },
+        {
+          "action": "Pay again on the same Stripe page with card 4242 4242 4242 4242",
+          "expected": "Payment succeeds"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "Thông báo card declined nằm ở Stripe hosted Checkout; chưa thực hiện bằng thẻ declined thật trong test mode.",
+      "next": "Kiểm tra thẻ declined, giữ unpaid và retry thẻ 4242 trên cùng session.",
+      "execution": []
+    },
+    {
+      "id": "STR-04",
+      "title": "Stripe Payment — Cancel payment on the Stripe page",
+      "sourceRow": 958,
+      "steps": [
+        {
+          "action": "Click back (cancel) on Stripe page",
+          "expected": "Return to /checkout, toast \"Stripe payment cancelled and stock restored\", order cancelled, cart kept"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock is restored to the value before the order"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "Cart items are kept"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Order status is Cancelled"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API Stripe dùng session giả lập; webhook kiểm tra bằng Stripe SDK và chữ ký HMAC thật tạo offline, có kiểm tra trùng event và hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-01",
+            "STR-04",
+            "SEC-05",
+            "SEC-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-05",
+      "title": "Stripe Payment — Cancel payment after losing login session",
+      "sourceRow": 980,
+      "steps": [
+        {
+          "action": "Cancel on Stripe but lose login session upon return",
+          "expected": "Only show toast \"You cancelled the payment\", do not call cancel API"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Order is not cancelled by this action; it remains unpaid"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API Stripe dùng session giả lập; webhook kiểm tra bằng Stripe SDK và chữ ký HMAC thật tạo offline, có kiểm tra trùng event và hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-05",
+            "CHK-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-06",
+      "title": "Stripe Payment — Webhook marks order paid when tab is closed",
+      "sourceRow": 1000,
+      "steps": [
+        {
+          "action": "Complete payment successfully then close tab before returning to website",
+          "expected": "Webhook checkout.session.completed still marks order as paid"
+        },
+        {
+          "action": "Open Admin > Online Payments",
+          "expected": "Order is listed as paid"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API Stripe dùng session giả lập; webhook kiểm tra bằng Stripe SDK và chữ ký HMAC thật tạo offline, có kiểm tra trùng event và hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-06",
+            "STR-07",
+            "STR-08",
+            "AORD-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-07",
+      "title": "Stripe Payment — Handle expired Stripe session",
+      "sourceRow": 1020,
+      "steps": [
+        {
+          "action": "Let Stripe session expire (or use Stripe CLI to send checkout.session.expired)",
+          "expected": "Order status changes to cancelled, stock is restored"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock is restored"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Order status is Cancelled"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API Stripe dùng session giả lập; webhook kiểm tra bằng Stripe SDK và chữ ký HMAC thật tạo offline, có kiểm tra trùng event và hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-06",
+            "STR-07",
+            "STR-08",
+            "AORD-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "STR-08",
+      "title": "Stripe Payment — Validate webhook signature and duplicate events",
+      "sourceRow": 1041,
+      "steps": [
+        {
+          "action": "Send webhook with invalid signature, then resend the same event twice",
+          "expected": "Invalid signature returns 400; duplicate event returns duplicate: true, do not process twice"
+        },
+        {
+          "action": "Send the event with a valid signature for the first time",
+          "expected": "Response is 200 with duplicate: false; order is processed"
+        },
+        {
+          "action": "Send the exact same event again",
+          "expected": "Response is 200 with duplicate: true; event is not processed a second time"
+        },
+        {
+          "action": "Check the order and stock",
+          "expected": "Order is paid once; stock is unchanged by the second call"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API Stripe dùng session giả lập; webhook kiểm tra bằng Stripe SDK và chữ ký HMAC thật tạo offline, có kiểm tra trùng event và hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-06",
+            "STR-07",
+            "STR-08",
+            "AORD-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-01",
+      "title": "VNPay Payment — Redirect to VNPay sandbox",
+      "sourceRow": 1066,
+      "steps": [
+        {
+          "action": "Select VNPay, enter valid info, click Proceed to Payment",
+          "expected": "Redirect to VNPay sandbox page; unpaid order exists in DB, stock is reserved"
+        },
+        {
+          "action": "Check the amount and order reference on the VNPay page",
+          "expected": "Amount equals the cart total; reference is the new order ID"
+        },
+        {
+          "action": "Open Admin > Orders (or DB) and find the new order",
+          "expected": "Order exists with payment status unpaid"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock is reduced (reserved) for this order"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "API tạo URL sandbox ký hợp lệ, đơn unpaid và giữ tồn đã được xác minh cục bộ; chưa mở merchant sandbox thật.",
+      "next": "Kiểm tra URL/merchant/domain sandbox và dữ liệu hiển thị ở VNPay.",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-02",
+      "title": "VNPay Payment — Pay successfully with sandbox test card",
+      "sourceRow": 1088,
+      "steps": [
+        {
+          "action": "Pay successfully with sandbox test card",
+          "expected": "Backend verifies signature, order paid, redirects to /checkout?payment=vnpay-success, cart cleared, success toast"
+        },
+        {
+          "action": "Open the cart drawer",
+          "expected": "The cart is empty"
+        },
+        {
+          "action": "Open Admin > Online Payments",
+          "expected": "Order is listed as paid with a VNPay transaction number"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "IPN/return ký hợp lệ xử lý paid đã có mã nguồn và kiểm thử callback cục bộ; chưa thanh toán thẻ sandbox thật.",
+      "next": "Chạy thẻ sandbox với merchant thật, return/IPN và xóa giỏ.",
+      "execution": []
+    },
+    {
+      "id": "VNP-03",
+      "title": "VNPay Payment — Cancel or fail payment on VNPay",
+      "sourceRow": 1109,
+      "steps": [
+        {
+          "action": "Cancel or fail payment on VNPay",
+          "expected": "Redirect back with payment=vnpay-failed, order cancelled, stock restored, cart kept"
+        },
+        {
+          "action": "Check the stock of the ordered product",
+          "expected": "Stock is restored"
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "Order status is Cancelled"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API VNPay dùng callback ký SHA-512 cục bộ; đã kiểm tra checksum sai, amount sai, IPN lặp và return thất bại hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-04",
+      "title": "VNPay Payment — Detect tampered return URL",
+      "sourceRow": 1130,
+      "steps": [
+        {
+          "action": "Modify a parameter in return URL and reopen",
+          "expected": "Invalid signature, returns code 97, order unchanged"
+        },
+        {
+          "action": "Open Admin > Orders and find the order",
+          "expected": "Order is unchanged (still unpaid)"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API VNPay dùng callback ký SHA-512 cục bộ; đã kiểm tra checksum sai, amount sai, IPN lặp và return thất bại hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-05",
+      "title": "VNPay Payment — Detect tampered payment amount",
+      "sourceRow": 1150,
+      "steps": [
+        {
+          "action": "Modify vnp_Amount while keeping correct signature (using test signing tool)",
+          "expected": "Reports code 04 (incorrect amount), order not marked as paid"
+        },
+        {
+          "action": "Open Admin > Orders and find the order",
+          "expected": "Order is not marked as paid"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API VNPay dùng callback ký SHA-512 cục bộ; đã kiểm tra checksum sai, amount sai, IPN lặp và return thất bại hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-06",
+      "title": "VNPay Payment — Handle duplicate IPN calls",
+      "sourceRow": 1170,
+      "steps": [
+        {
+          "action": "Call valid IPN twice",
+          "expected": "First time returns RspCode 00, second time returns 02 (order already confirmed)"
+        },
+        {
+          "action": "Open Admin > Online Payments",
+          "expected": "Order is listed as paid once, with the VNPay transaction number"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API VNPay dùng callback ký SHA-512 cục bộ; đã kiểm tra checksum sai, amount sai, IPN lặp và return thất bại hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-07",
+      "title": "VNPay Payment — Reject IPN with incorrect checksum",
+      "sourceRow": 1190,
+      "steps": [
+        {
+          "action": "Call IPN with incorrect checksum",
+          "expected": "Returns RspCode 97, do not update order"
+        },
+        {
+          "action": "Open Admin > Orders and find the order",
+          "expected": "Order is unchanged (still unpaid)"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "API VNPay dùng callback ký SHA-512 cục bộ; đã kiểm tra checksum sai, amount sai, IPN lặp và return thất bại hoàn tồn.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "VNP-01",
+            "VNP-03",
+            "VNP-04",
+            "VNP-05",
+            "VNP-06",
+            "VNP-07"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "VNP-08",
+      "title": "VNPay Payment — Handle unpaid VNPay session timeout",
+      "sourceRow": 1210,
+      "steps": [
+        {
+          "action": "Open VNPay page and leave unpaid for over 15 minutes",
+          "expected": "VNPay disallows further payment; check if order auto-cancels and restores stock (backend lacks cleanup mechanism, record as bug if stock remains locked)"
+        },
+        {
+          "action": "Try to complete the payment on the expired VNPay page",
+          "expected": "VNPay does not allow the payment"
+        },
+        {
+          "action": "Check the order in Admin > Orders and the product stock",
+          "expected": "Order should be cancelled and stock restored; if the order stays unpaid with stock locked, record it as a bug"
+        }
+      ],
+      "status": "Chưa phù hợp",
+      "evidence": "Đã tạo đơn VNPay, cho created_at lùi 20 phút và đọc lại: đơn vẫn pending/unpaid, tồn vẫn bị giữ. Không có job cleanup TTL.",
+      "next": "Lưu hạn thanh toán và thêm xử lý hết hạn/hoàn tồn idempotent. Chưa kiểm tra hành vi trang VNPay thật sau 15 phút.",
+      "execution": [
+        {
+          "ids": [
+            "VNP-08"
+          ],
+          "result": "confirmed-gap",
+          "detail": "After ageing an unpaid VNPay order by 20 minutes, order remains pending and stock remains reserved; no cleanup route/job exists."
+        },
+        {
+          "ids": [
+            "VNP-08",
+            "AORD-08-observation"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-01",
+      "title": "User Account — Open account settings",
+      "sourceRow": 1234,
+      "steps": [
+        {
+          "action": "Log in, open account menu, select Account Settings",
+          "expected": "URL changes to /account, shows current profile information"
+        },
+        {
+          "action": "Compare the displayed information with the saved profile",
+          "expected": "Name, phone and address match the saved profile"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AccountSettings.jsx + PUT/GET /api/auth/me: đã kiểm tra lưu profile, từ chối phone/landline/email sai và checkout điền profile mới.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "AUTH-04",
+            "AUTH-08",
+            "ACC-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-02",
+      "title": "User Account — Update profile with valid information",
+      "sourceRow": 1254,
+      "steps": [
+        {
+          "action": "Edit valid full name, phone number, address and save",
+          "expected": "Save successfully, reloading page retains new values"
+        },
+        {
+          "action": "Log out, log in again and open /account",
+          "expected": "New values are still displayed"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AccountSettings.jsx + PUT/GET /api/auth/me: đã kiểm tra lưu profile, từ chối phone/landline/email sai và checkout điền profile mới.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "ACC-02",
+            "ACC-03",
+            "ACC-04",
+            "ACC-05"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-03",
+      "title": "User Account — Validate mobile phone number format",
+      "sourceRow": 1274,
+      "steps": [
+        {
+          "action": "Enter incorrectly formatted mobile phone number",
+          "expected": "Report \"Invalid mobile phone number\", do not save"
+        },
+        {
+          "action": "Enter a valid mobile number (e.g. 0912345678) and save",
+          "expected": "Saved successfully"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AccountSettings.jsx + PUT/GET /api/auth/me: đã kiểm tra lưu profile, từ chối phone/landline/email sai và checkout điền profile mới.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "ACC-02",
+            "ACC-03",
+            "ACC-04",
+            "ACC-05"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-04",
+      "title": "User Account — Validate landline phone number format",
+      "sourceRow": 1294,
+      "steps": [
+        {
+          "action": "Enter incorrectly formatted landline phone number",
+          "expected": "Report corresponding error, do not save"
+        },
+        {
+          "action": "Enter a valid landline number (e.g. 02412345678) and save",
+          "expected": "Saved successfully"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AccountSettings.jsx + PUT/GET /api/auth/me: đã kiểm tra lưu profile, từ chối phone/landline/email sai và checkout điền profile mới.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "ACC-02",
+            "ACC-03",
+            "ACC-04",
+            "ACC-05"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-05",
+      "title": "User Account — Prevent email change via API",
+      "sourceRow": 1314,
+      "steps": [
+        {
+          "action": "Attempt to change email (via Postman calling PUT /api/auth/me)",
+          "expected": "Backend rejects because email is managed by Neon Auth"
+        },
+        {
+          "action": "Send PUT /api/auth/me with the current email and a new name",
+          "expected": "Backend returns 200 and the profile is updated"
+        },
+        {
+          "action": "Send PUT /api/auth/me with an invalidly formatted email",
+          "expected": "Backend returns 400 \"Invalid email\""
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Email vẫn không đổi được; API từ chối email khác và email sai định dạng. Lý do Neon Auth trong test đã lỗi thời.",
+      "next": "Đổi mô tả thành email đăng nhập của hệ thống session truyền thống; giữ các bước kiểm tra bất biến email.",
+      "execution": [
+        {
+          "ids": [
+            "ACC-02",
+            "ACC-03",
+            "ACC-04",
+            "ACC-05"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "ACC-06",
+      "title": "User Account — Auto-fill checkout with updated address",
+      "sourceRow": 1335,
+      "steps": [
+        {
+          "action": "Update address then go to checkout page",
+          "expected": "Checkout form auto-fills new address"
+        },
+        {
+          "action": "Check the name and phone fields on the checkout page",
+          "expected": "They also match the saved profile"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AccountSettings.jsx + PUT/GET /api/auth/me: đã kiểm tra lưu profile, từ chối phone/landline/email sai và checkout điền profile mới.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-02",
+            "CHK-03",
+            "CHK-04",
+            "CHK-05",
+            "ACC-06",
+            "CHK-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-01",
+      "title": "Admin: Products — Block non-admin access to /admin",
+      "sourceRow": 1358,
+      "steps": [
+        {
+          "action": "Regular customer directly navigates to /admin",
+          "expected": "Redirected to homepage, Admin Dashboard not visible"
+        },
+        {
+          "action": "Call GET /api/admin/products with the customer token",
+          "expected": "Backend returns 403"
+        },
+        {
+          "action": "Log in as admin and open /admin",
+          "expected": "Admin Dashboard is displayed"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx + CRUD API: API kiểm tra trường bắt buộc, ASUS viết hoa, discount, giá niêm yết, sửa và snapshot sau xóa; UI kiểm tra thêm sản phẩm và upload giả lập.",
+      "next": "",
+      "execution": []
+    },
+    {
+      "id": "APRD-02",
+      "title": "Admin: Products — Search products in admin table",
+      "sourceRow": 1379,
+      "steps": [
+        {
+          "action": "Admin opens Products tab, types keyword into search box",
+          "expected": "Table lists all products correctly filtered by name, brand, category"
+        },
+        {
+          "action": "Search by a brand name",
+          "expected": "Table shows only products of that brand"
+        },
+        {
+          "action": "Search with a keyword that matches nothing",
+          "expected": "Table shows an empty-state message"
+        },
+        {
+          "action": "Clear the search box",
+          "expected": "All products are listed again"
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Tab Sản phẩm hiện là cây thư mục danh mục, sau đó bảng của thư mục được mở; không còn bảng phẳng toàn bộ kho.",
+      "next": "Thêm bước mở danh mục cha/con; kiểm tra tìm thư mục ở cấp đầu, tìm sản phẩm và phân trang 15 dòng trong thư mục.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-02",
+            "AORD-01",
+            "AORD-05",
+            "AORD-07",
+            "AORD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-03",
+      "title": "Admin: Products — Add a product with valid information",
+      "sourceRow": 1401,
+      "steps": [
+        {
+          "action": "Click Add Product, enter valid info, Save",
+          "expected": "Product appears at top of table, toast \"Product added\", new product visible on homepage"
+        },
+        {
+          "action": "Check the new row in the table",
+          "expected": "Name, category, selling price, list price and stock match the entered values"
+        },
+        {
+          "action": "Open the storefront and search for the new product",
+          "expected": "Product is visible with the correct price and image"
+        }
+      ],
+      "status": "Chưa phù hợp",
+      "evidence": "Sản phẩm mới được lưu đúng nhưng không đứng đầu bảng sau loadDashboard(): UI tạm prepend rồi API trả ORDER BY id ASC.",
+      "next": "Sắp xếp nhất quán để sản phẩm mới đứng đầu thư mục, hoặc sửa kỳ vọng nếu chấp nhận thứ tự tăng dần.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-03"
+          ],
+          "result": "confirmed-gap",
+          "detail": "New product position after dashboard reload: 5; expected first row."
+        },
+        {
+          "ids": [
+            "APRD-03",
+            "APRD-08",
+            "APRD-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-04",
+      "title": "Admin: Products — Reject product with missing required data",
+      "sourceRow": 1422,
+      "steps": [
+        {
+          "action": "Add product missing name or selling price = 0",
+          "expected": "Browser or backend reports error, product not created"
+        },
+        {
+          "action": "Check the products table",
+          "expected": "No new product was added"
+        },
+        {
+          "action": "Enter only spaces as the product name and save",
+          "expected": "Rejected; product is not created"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx + CRUD API: API kiểm tra trường bắt buộc, ASUS viết hoa, discount, giá niêm yết, sửa và snapshot sau xóa; UI kiểm tra thêm sản phẩm và upload giả lập.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-05",
+      "title": "Admin: Products — Calculate discount from list and selling price",
+      "sourceRow": 1443,
+      "steps": [
+        {
+          "action": "Enter selling price 8,000,000, list price 10,000,000, brand asus",
+          "expected": "Saved successfully with ASUS brand and 20% discount"
+        },
+        {
+          "action": "Check the new row in the table",
+          "expected": "Brand shows ASUS; selling price and list price are displayed"
+        },
+        {
+          "action": "Open the storefront",
+          "expected": "Product shows a 20% discount"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx + CRUD API: API kiểm tra trường bắt buộc, ASUS viết hoa, discount, giá niêm yết, sửa và snapshot sau xóa; UI kiểm tra thêm sản phẩm và upload giả lập.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-06",
+      "title": "Admin: Products — Handle list price lower than selling price",
+      "sourceRow": 1464,
+      "steps": [
+        {
+          "action": "Enter list price lower than selling price",
+          "expected": "List price raised to equal selling price, discount = 0%"
+        },
+        {
+          "action": "Check the saved product row",
+          "expected": "List price equals the selling price"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx + CRUD API: API kiểm tra trường bắt buộc, ASUS viết hoa, discount, giá niêm yết, sửa và snapshot sau xóa; UI kiểm tra thêm sản phẩm và upload giả lập.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-07",
+      "title": "Admin: Products — Edit product price and stock",
+      "sourceRow": 1484,
+      "steps": [
+        {
+          "action": "Click Edit product, change price and stock, Save",
+          "expected": "Table updates, toast \"Product updated\", homepage shows new price"
+        },
+        {
+          "action": "Reload the admin page",
+          "expected": "Updated price and stock persist"
+        },
+        {
+          "action": "Open the product detail page on the storefront",
+          "expected": "New price is shown; quantity limit follows the new stock"
+        }
+      ],
+      "status": "Kiểm thử một phần",
+      "evidence": "API sửa giá/tồn và lưu DB đã qua; UI xem chi tiết/giới hạn stock đã qua, nhưng chưa thao tác trọn form Edit rồi kiểm tra storefront trong cùng kịch bản.",
+      "next": "Chạy thêm toàn bộ luồng sửa qua dashboard, F5 rồi mở chi tiết tương ứng.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-08",
+      "title": "Admin: Products — Upload a valid product image",
+      "sourceRow": 1505,
+      "steps": [
+        {
+          "action": "Upload valid JPG image under 10 MB from device",
+          "expected": "Image uploaded to Cloudinary, URL field auto-filled, preview image shown"
+        },
+        {
+          "action": "Check DevTools > Network",
+          "expected": "Upload request to api.cloudinary.com returns 200"
+        },
+        {
+          "action": "Save the product",
+          "expected": "Product is saved with the Cloudinary image URL; image is shown in the table and the storefront"
+        }
+      ],
+      "status": "Cần kiểm thử dịch vụ thật",
+      "evidence": "UI đã kiểm tra chọn JPG, upload request, điền URL/preview và lưu bằng Cloudinary mock. Chưa xác minh preset/quyền Cloudinary thật.",
+      "next": "Upload 1 ảnh thử qua cấu hình Cloudinary hiện dùng; xác minh URL tồn tại sau reload.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-03",
+            "APRD-08",
+            "APRD-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-09",
+      "title": "Admin: Products — Reject invalid image upload",
+      "sourceRow": 1526,
+      "steps": [
+        {
+          "action": "Upload non-image file (PDF) or image larger than 10 MB",
+          "expected": "Report format or size error, do not call Cloudinary"
+        },
+        {
+          "action": "Check DevTools > Network",
+          "expected": "No request is sent to Cloudinary"
+        },
+        {
+          "action": "Check the image URL field",
+          "expected": "The field is unchanged"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx + CRUD API: API kiểm tra trường bắt buộc, ASUS viết hoa, discount, giá niêm yết, sửa và snapshot sau xóa; UI kiểm tra thêm sản phẩm và upload giả lập.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-03",
+            "APRD-08",
+            "APRD-09"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "APRD-10",
+      "title": "Admin: Products — Cancel and confirm product deletion",
+      "sourceRow": 1547,
+      "steps": [
+        {
+          "action": "Click Delete, select Cancel; then click Delete and confirm",
+          "expected": "Cancel makes no change; confirm removes product, old orders still show correct name, image, price"
+        },
+        {
+          "action": "Check the storefront after confirming deletion",
+          "expected": "Deleted product is no longer displayed"
+        },
+        {
+          "action": "Open Admin > Orders for an order that contained the product",
+          "expected": "Name, image and price are still correct"
+        },
+        {
+          "action": "Call DELETE /api/admin/products/{id} with a customer token",
+          "expected": "Backend returns 403"
+        }
+      ],
+      "status": "Kiểm thử một phần",
+      "evidence": "API DELETE, quyền customer 403 và snapshot đơn cũ sau xóa đã qua. Chưa tự động chạy cả hai nhánh Cancel/Confirm của popup trong lượt này.",
+      "next": "Chạy thêm nhánh Hủy rồi Xóa của popup, kiểm tra storefront và lịch sử đơn.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-01",
+      "title": "Admin: Orders, Users & Stats — Search orders by ID or customer name",
+      "sourceRow": 1572,
+      "steps": [
+        {
+          "action": "Open Orders tab, search by order ID or customer name",
+          "expected": "Table filters correctly, shows product count, total amount, status"
+        },
+        {
+          "action": "Search with a keyword that matches no order",
+          "expected": "Table shows an empty-state message"
+        },
+        {
+          "action": "Clear the search box",
+          "expected": "All orders are listed again"
+        }
+      ],
+      "status": "Phù hợp theo mã nguồn",
+      "evidence": "visibleOrders lọc theo id, tên/email khách; UI bảng Orders đã mở, nhưng chưa chạy riêng mọi từ khóa và clear search của case.",
+      "next": "Chạy bổ sung 3 bước tìm/không có kết quả/xóa truy vấn bằng UI.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-02",
+            "AORD-01",
+            "AORD-05",
+            "AORD-07",
+            "AORD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-02",
+      "title": "Admin: Orders, Users & Stats — Progress a COD order to Completed",
+      "sourceRow": 1593,
+      "steps": [
+        {
+          "action": "Change COD order status successively up to \"Completed\"",
+          "expected": "Order status changes, payment_status = paid, revenue increases by order total"
+        },
+        {
+          "action": "Compare the Overview revenue with the value noted before step 1",
+          "expected": "Revenue increased by exactly the order total"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx, db.js: đã kiểm tra tăng doanh thu COD delivered, hủy/khôi phục tồn kho, cấm hủy online paid và khóa dropdown unpaid.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-06",
+            "AORD-02",
+            "AORD-03",
+            "AORD-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-03",
+      "title": "Admin: Orders, Users & Stats — Cancel a COD order and restore stock",
+      "sourceRow": 1613,
+      "steps": [
+        {
+          "action": "Change COD order status to \"Cancelled\"",
+          "expected": "Product stock in order is restored"
+        },
+        {
+          "action": "Check the stock of the products in the order",
+          "expected": "Stock increased by the quantity in the order"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx, db.js: đã kiểm tra tăng doanh thu COD delivered, hủy/khôi phục tồn kho, cấm hủy online paid và khóa dropdown unpaid.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-06",
+            "AORD-02",
+            "AORD-03",
+            "AORD-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-04",
+      "title": "Admin: Orders, Users & Stats — Reopen a cancelled order",
+      "sourceRow": 1633,
+      "steps": [
+        {
+          "action": "Reopen cancelled order; test when a product has insufficient stock",
+          "expected": "Sufficient stock deducts stock; insufficient stock returns 409 error, order unchanged"
+        },
+        {
+          "action": "Reopen the cancelled order when stock is sufficient",
+          "expected": "Order status changes; stock is deducted again"
+        },
+        {
+          "action": "Reduce a product's stock below the ordered quantity, then reopen the order",
+          "expected": "Backend returns 409; order stays cancelled; stock is unchanged"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx, db.js: đã kiểm tra tăng doanh thu COD delivered, hủy/khôi phục tồn kho, cấm hủy online paid và khóa dropdown unpaid.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "CHK-06",
+            "AORD-02",
+            "AORD-03",
+            "AORD-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-05",
+      "title": "Admin: Orders, Users & Stats — Lock status of unpaid online orders",
+      "sourceRow": 1654,
+      "steps": [
+        {
+          "action": "View unpaid online orders",
+          "expected": "Status dropdown is locked, tooltip states payment gateway auto-updates"
+        },
+        {
+          "action": "Check the status dropdown of a COD order in the same table",
+          "expected": "Dropdown is enabled"
+        },
+        {
+          "action": "Check the status dropdown of a paid online order",
+          "expected": "Dropdown is enabled and has no \"Cancelled\" option"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx, db.js: đã kiểm tra tăng doanh thu COD delivered, hủy/khôi phục tồn kho, cấm hủy online paid và khóa dropdown unpaid.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-02",
+            "AORD-01",
+            "AORD-05",
+            "AORD-07",
+            "AORD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-06",
+      "title": "Admin: Orders, Users & Stats — Prevent cancelling paid online orders",
+      "sourceRow": 1675,
+      "steps": [
+        {
+          "action": "Paid online order: check status list; call API to change to cancelled (via Postman)",
+          "expected": "UI has no \"Cancelled\" option; API returns 409 requiring refund via gateway"
+        },
+        {
+          "action": "Check the order after the API call",
+          "expected": "Order is unchanged (still paid, not cancelled)"
+        },
+        {
+          "action": "Check the stock of the ordered products",
+          "expected": "Stock is unchanged"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "AdminDashboard.jsx, db.js: đã kiểm tra tăng doanh thu COD delivered, hủy/khôi phục tồn kho, cấm hủy online paid và khóa dropdown unpaid.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-06",
+            "STR-07",
+            "STR-08",
+            "AORD-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-07",
+      "title": "Admin: Orders, Users & Stats — Show Online Payments notification",
+      "sourceRow": 1696,
+      "steps": [
+        {
+          "action": "Open Online Payments tab when there is a newly paid order",
+          "expected": "List paid orders, notification badge disappears after opening tab"
+        },
+        {
+          "action": "Check the rows in the Online Payments tab",
+          "expected": "Each row shows gateway, transaction ID, paid time and revenue"
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Thanh toán online nằm trong tab Thanh toán kết hợp với tổng quan Stripe, bảng đơn đã thanh toán nằm phía dưới.",
+      "next": "Đổi đường dẫn UI sang Thanh toán; giữ kiểm tra giao dịch, thời điểm thanh toán, doanh thu và badge. Badge đọc/chưa đọc chưa được tái hiện đầy đủ trong lượt này.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-02",
+            "AORD-01",
+            "AORD-05",
+            "AORD-07",
+            "AORD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "AORD-08",
+      "title": "Admin: Orders, Users & Stats — Lock and unlock customer accounts",
+      "sourceRow": 1716,
+      "steps": [
+        {
+          "action": "Lock a customer account; test calling API with that account; unlock; attempt to self-lock admin",
+          "expected": "After locking, API returns 401 \"Account no longer active\"; unlock restores usage; self-lock button is disabled"
+        },
+        {
+          "action": "While the account is locked, call GET /api/auth/me with that customer's token",
+          "expected": "Backend returns 401 \"Account no longer active\""
+        },
+        {
+          "action": "Unlock the account and call the API again",
+          "expected": "Request succeeds (200)"
+        },
+        {
+          "action": "Check the admin's own row in the Users tab",
+          "expected": "Lock button is disabled"
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Khóa tài khoản thu hồi toàn bộ session. Mở khóa không làm cookie cũ sống lại: API vẫn 401 cho tới khi đăng nhập lại.",
+      "next": "Sau mở khóa, thêm bước login mới rồi xác nhận 200. Không yêu cầu hồi sinh session đã thu hồi.",
+      "execution": [
+        {
+          "ids": [
+            "AORD-08"
+          ],
+          "result": "test-update",
+          "detail": "Unlock does not revive revoked sessions. A new login is required."
+        }
+      ]
+    },
+    {
+      "id": "AORD-09",
+      "title": "Admin: Orders, Users & Stats — Verify Overview statistics",
+      "sourceRow": 1738,
+      "steps": [
+        {
+          "action": "Open Overview tab, cross-check with DB data",
+          "expected": "Revenue, order count, customer count, low stock products, and 7-day chart match"
+        }
+      ],
+      "status": "Kiểm thử một phần",
+      "evidence": "Đã kiểm tra delta totalRevenue bằng đúng tổng đơn COD delivered. Query tổng số khách/đơn, low-stock và chart 7 ngày đã đọc mã nguồn.",
+      "next": "Cần bộ dữ liệu ngày cố định để đối chiếu độc lập toàn bộ chỉ số và chart, gồm múi giờ.",
+      "execution": []
+    },
+    {
+      "id": "AORD-10",
+      "title": "Admin: Orders, Users & Stats — Stripe Sandbox tab with and without keys",
+      "sourceRow": 1757,
+      "steps": [
+        {
+          "action": "Open Stripe Sandbox tab with and without Stripe keys",
+          "expected": "With keys, shows balance and transactions; without keys, shows error message; other tabs remain usable"
+        },
+        {
+          "action": "With valid Stripe keys, open the Stripe Sandbox tab",
+          "expected": "Balance and recent payments (last 7 days) are listed"
+        },
+        {
+          "action": "Without Stripe keys, open the Stripe Sandbox tab",
+          "expected": "An error message is shown"
+        },
+        {
+          "action": "Open the other admin tabs",
+          "expected": "They remain usable"
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Stripe Sandbox không còn là tab riêng; báo cáo Stripe đã nằm trong tab Thanh toán. UI lỗi nhà cung cấp và các tab khác vẫn hoạt động.",
+      "next": "Đổi bước sang Thanh toán; cần kiểm tra riêng với key test thật hợp lệ và cấu hình không có key. Lượt này dùng provider giả lập lỗi.",
+      "execution": [
+        {
+          "ids": [
+            "APRD-02",
+            "AORD-01",
+            "AORD-05",
+            "AORD-07",
+            "AORD-10"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-01",
+      "title": "Security & Non-Functional — Protect pages for unauthenticated users",
+      "sourceRow": 1782,
+      "steps": [
+        {
+          "action": "Not logged in, navigate to /admin, /account, /checkout",
+          "expected": "Show login popup, do not expose content"
+        },
+        {
+          "action": "Log in as a customer and open /account and /checkout (cart not empty)",
+          "expected": "Both pages are displayed normally"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-01",
+            "SEC-02",
+            "SEC-03",
+            "SEC-04"
+          ],
+          "result": "verified"
+        },
+        {
+          "ids": [
+            "AUTH-01",
+            "SEC-01"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-02",
+      "title": "Security & Non-Functional — Block admin API for customer token",
+      "sourceRow": 1802,
+      "steps": [
+        {
+          "action": "Use customer token to call GET /api/admin/products",
+          "expected": "Backend returns 403 \"You do not have administrative privileges\""
+        },
+        {
+          "action": "Call GET /api/admin/orders with the customer token",
+          "expected": "Backend returns 403"
+        },
+        {
+          "action": "Call GET /api/admin/users with the customer token",
+          "expected": "Backend returns 403"
+        },
+        {
+          "action": "Call DELETE /api/admin/products/{id} with the customer token",
+          "expected": "Backend returns 403; the product still exists"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-01",
+            "SEC-02",
+            "SEC-03",
+            "SEC-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-03",
+      "title": "Security & Non-Functional — Require token to create an order",
+      "sourceRow": 1824,
+      "steps": [
+        {
+          "action": "Call POST /api/orders without token",
+          "expected": "Backend returns 401 \"Please log in\""
+        },
+        {
+          "action": "Open Admin > Orders",
+          "expected": "No new order was created"
+        },
+        {
+          "action": "Call POST /api/payments/stripe/checkout without a token",
+          "expected": "Backend returns 401 \"Please log in\""
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-01",
+            "SEC-02",
+            "SEC-03",
+            "SEC-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-04",
+      "title": "Security & Non-Functional — Reject invalid or expired token",
+      "sourceRow": 1845,
+      "steps": [
+        {
+          "action": "Call API with invalid or expired token",
+          "expected": "Backend returns 401 \"Invalid or expired login session\""
+        },
+        {
+          "action": "Call GET /api/auth/me with a token missing the \"Bearer \" prefix",
+          "expected": "Backend returns 401 \"Please log in\""
+        },
+        {
+          "action": "Call GET /api/auth/me with a real token whose last characters were changed",
+          "expected": "Backend returns 401 \"Invalid or expired login session\""
+        }
+      ],
+      "status": "Cần cập nhật test case",
+      "evidence": "Ứng dụng dùng cookie session, không đọc Authorization: Bearer. Đã kiểm tra cookie session giả/hết hiệu lực trả 401.",
+      "next": "Dùng cookie thiếu/sai/hết hạn trong test; không dùng tiền tố Bearer để xác nhận một phiên hợp lệ.",
+      "execution": [
+        {
+          "ids": [
+            "SEC-01",
+            "SEC-02",
+            "SEC-03",
+            "SEC-04"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-05",
+      "title": "Security & Non-Functional — Protect other customers' Stripe orders",
+      "sourceRow": 1866,
+      "steps": [
+        {
+          "action": "Customer A calls API to cancel Customer B's Stripe order",
+          "expected": "Backend returns 404, B's order remains unchanged"
+        },
+        {
+          "action": "Open Admin > Orders and check Customer B's order",
+          "expected": "Order is unchanged: still unpaid and not cancelled; stock is still reserved"
+        },
+        {
+          "action": "Call the same endpoint with Customer A's token and a non-existent order ID",
+          "expected": "Backend returns the same 404"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-01",
+            "STR-04",
+            "SEC-05",
+            "SEC-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-06",
+      "title": "Security & Non-Functional — Protect other customers' Stripe sessions",
+      "sourceRow": 1887,
+      "steps": [
+        {
+          "action": "Customer A calls to check Customer B's Stripe session",
+          "expected": "Backend returns 403 \"Payment session does not belong to this account\""
+        },
+        {
+          "action": "Call the same URL with Customer B's token",
+          "expected": "Backend returns 200 with the payment status"
+        },
+        {
+          "action": "Call the endpoint with a malformed session ID (not starting with cs_)",
+          "expected": "Backend returns 400 \"Invalid Stripe session ID\""
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "STR-01",
+            "STR-04",
+            "SEC-05",
+            "SEC-06"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-07",
+      "title": "Security & Non-Functional — Apply API rate limiting",
+      "sourceRow": 1908,
+      "steps": [
+        {
+          "action": "Send over 180 requests in one minute to /api",
+          "expected": "Requests exceeding threshold return 429"
+        },
+        {
+          "action": "Check the response headers of an API call",
+          "expected": "RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset are present"
+        },
+        {
+          "action": "Wait about 60 seconds and call the API again",
+          "expected": "Request succeeds (200)"
+        }
+      ],
+      "status": "Kiểm thử một phần",
+      "evidence": "Đã gửi 181 request/IP cô lập: request vượt hạn trả 429; RateLimit-Limit, Remaining, Reset tồn tại. Chưa chờ đủ 60 giây để thử lại.",
+      "next": "Chờ hết cửa sổ rồi gọi lại xác nhận 200; kiểm tra trust proxy theo môi trường triển khai.",
+      "execution": []
+    },
+    {
+      "id": "SEC-08",
+      "title": "Security & Non-Functional — Resist SQL injection input",
+      "sourceRow": 1929,
+      "steps": [
+        {
+          "action": "Enter ' OR 1=1 -- into search box and form fields",
+          "expected": "Treated as regular string, no error, no data leakage"
+        },
+        {
+          "action": "Check the product list after the search",
+          "expected": "No data leakage; only matching products or the empty state are shown"
+        },
+        {
+          "action": "Check the data in Admin",
+          "expected": "No records were altered or deleted"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "APRD-04",
+            "APRD-05",
+            "APRD-06",
+            "APRD-07",
+            "APRD-10",
+            "SEC-08"
+          ],
+          "result": "verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-09",
+      "title": "Security & Non-Functional — Responsive layout at 375 px",
+      "sourceRow": 1950,
+      "steps": [
+        {
+          "action": "Open page at 375 px screen (mobile)",
+          "expected": "Menu, cart drawer, category filters, and checkout page work, no horizontal overflow"
+        },
+        {
+          "action": "Open the cart drawer and go to /checkout",
+          "expected": "Form and order summary are usable; no horizontal scrolling"
+        },
+        {
+          "action": "Open /categories/laptop and use the filters",
+          "expected": "Filters are usable; no horizontal scrolling"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-09",
+            "SEC-10",
+            "PRD-13"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    },
+    {
+      "id": "SEC-10",
+      "title": "Security & Non-Functional — Persist light/dark theme",
+      "sourceRow": 1971,
+      "steps": [
+        {
+          "action": "Toggle light/dark theme then reload page",
+          "expected": "UI is preserved according to selection"
+        },
+        {
+          "action": "Toggle the theme back and reload the page",
+          "expected": "The selected theme is preserved"
+        },
+        {
+          "action": "Open /checkout",
+          "expected": "The same theme is applied"
+        }
+      ],
+      "status": "Phù hợp cục bộ",
+      "evidence": "Cookie HttpOnly, SQL tham số hóa, kiểm tra quyền API và kiểm thử Edge 375 px; không chạy tấn công hoặc ghi dữ liệu trên production.",
+      "next": "",
+      "execution": [
+        {
+          "ids": [
+            "SEC-09",
+            "SEC-10",
+            "PRD-13"
+          ],
+          "result": "ui-verified"
+        }
+      ]
+    }
+  ],
+  "execution": [
+    {
+      "ids": [
+        "AUTH-02",
+        "AUTH-03",
+        "AUTH-04",
+        "AUTH-05",
+        "AUTH-08"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "ACC-02",
+        "ACC-03",
+        "ACC-04",
+        "ACC-05"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-04"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "CHK-03",
+        "CHK-04",
+        "CHK-05",
+        "CHK-07",
+        "CHK-08",
+        "CHK-10"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "CHK-06",
+        "AORD-02",
+        "AORD-03",
+        "AORD-04"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "STR-01",
+        "STR-04",
+        "SEC-05",
+        "SEC-06"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "STR-06",
+        "STR-07",
+        "STR-08",
+        "AORD-06"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "VNP-01",
+        "VNP-03",
+        "VNP-04",
+        "VNP-05",
+        "VNP-06",
+        "VNP-07"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "VNP-08"
+      ],
+      "result": "confirmed-gap",
+      "detail": "After ageing an unpaid VNPay order by 20 minutes, order remains pending and stock remains reserved; no cleanup route/job exists."
+    },
+    {
+      "ids": [
+        "AORD-08"
+      ],
+      "result": "test-update",
+      "detail": "Unlock does not revive revoked sessions. A new login is required."
+    },
+    {
+      "ids": [
+        "VNP-08",
+        "AORD-08-observation"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "APRD-04",
+        "APRD-05",
+        "APRD-06",
+        "APRD-07",
+        "APRD-10",
+        "SEC-08"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "SEC-07-threshold"
+      ],
+      "result": "verified"
+    },
+    {
+      "ids": [
+        "AUTH-01",
+        "SEC-01"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "AUTH-04",
+        "AUTH-08",
+        "ACC-01"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-01",
+        "PRD-03",
+        "PRD-04"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-05",
+        "PRD-06",
+        "PRD-07"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-08",
+        "PRD-12",
+        "PRD-14"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-09",
+        "CART-05",
+        "PRD-10"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-11"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "CART-01",
+        "CART-02",
+        "CART-06",
+        "CART-07",
+        "CART-08",
+        "CART-09"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "CART-02"
+      ],
+      "result": "confirmed-gap",
+      "detail": "Adding the same base product from detail then product card creates 2 rows."
+    },
+    {
+      "ids": [
+        "CART-03",
+        "CART-04",
+        "CART-02-cross-page"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "CHK-02",
+        "CHK-03",
+        "CHK-04",
+        "CHK-05",
+        "ACC-06",
+        "CHK-09"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "SEC-09",
+        "SEC-10",
+        "PRD-13"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "AUTH-07",
+        "AUTH-06"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "APRD-02",
+        "AORD-01",
+        "AORD-05",
+        "AORD-07",
+        "AORD-10"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "APRD-03"
+      ],
+      "result": "confirmed-gap",
+      "detail": "New product position after dashboard reload: 5; expected first row."
+    },
+    {
+      "ids": [
+        "APRD-03",
+        "APRD-08",
+        "APRD-09"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "STR-05",
+        "CHK-01"
+      ],
+      "result": "ui-verified"
+    },
+    {
+      "ids": [
+        "PRD-02"
+      ],
+      "result": "ui-verified"
+    }
+  ]
+}
