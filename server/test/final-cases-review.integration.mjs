@@ -20,7 +20,13 @@ registerHooks({
         if (params === undefined && sql.includes(';')) return (await db.exec(sql)).at(-1) || { rows: [] };
         const result = await db.query(sql, params); return { ...result, rowCount: result.rows.length || result.affectedRows || 0 };
       }
-      class Pool { query(sql, params) { return query(sql, params); } async connect() { return { query, release() {} }; } async end() {} }
+      let tail = Promise.resolve();
+      async function acquire() { const previous = tail; let release; tail = new Promise(resolve => { release = resolve; }); await previous; return release; }
+      class Pool {
+        async query(sql, params) { const release = await acquire(); try { return await query(sql, params); } finally { release(); } }
+        async connect() { const release = await acquire(); return { query, release }; }
+        async end() {}
+      }
       export default { Pool };
     ` }
     if (url === 'review:stripe') return { format: 'module', shortCircuit: true, source: `
@@ -163,7 +169,7 @@ try {
     const text = Object.entries(params).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value)).replace(/%20/g, '+')}`).join('&')
     return text + '&vnp_SecureHash=' + crypto.createHmac('sha512', 'review-only-key').update(text).digest('hex')
   }
-  const callback = async created => ({ vnp_TmnCode: 'REVIEW', vnp_TxnRef: created.orderId, vnp_Amount: (await db.findOrderById(created.orderId)).total * 100, vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '123456', vnp_BankCode: 'NCB' })
+  const callback = async created => ({ vnp_TmnCode: 'REVIEW', vnp_TxnRef: created.orderId, vnp_Amount: (await db.findOrderById(created.orderId)).total * 100, vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: created.orderId.slice(2), vnp_BankCode: 'NCB' })
   await check(['VNP-01', 'VNP-03', 'VNP-04', 'VNP-05', 'VNP-06', 'VNP-07'], async () => {
     const created = await vnpayOrder(), params = await callback(created)
     const bad = await request('/api/payments/vnpay/ipn?' + signed(params).replace(/vnp_SecureHash=./, 'vnp_SecureHash=x'))
@@ -178,13 +184,45 @@ try {
     assert.equal(new URL(returned.headers.location).searchParams.get('payment'), 'vnpay-failed')
     assert.equal(await stock(), before + 1)
   })
-  await check(['VNP-08', 'AORD-08-observation'], async () => {
-    const timed = await vnpayOrder(), before = await stock()
-    await db.query("UPDATE orders SET created_at=NOW()-INTERVAL '20 minutes' WHERE id=$1", [timed.orderId])
-    await request('/api/products')
+  await check(['VNP-08'], async () => {
+    const before = await stock()
+    const timed = await vnpayOrder(), fresh = await vnpayOrder(), paid = await vnpayOrder()
+    const paidParams = await callback(paid)
+    assert.equal((await request('/api/payments/vnpay/ipn?' + signed(paidParams))).data.RspCode, '00')
+    const cod = await db.createOrder({ userId: customer.id, items: [{ productId: product.id, quantity: 2 }] })
+    await db.query("UPDATE orders SET created_at=NOW()-INTERVAL '20 minutes' WHERE id=ANY($1::text[])", [[timed.orderId, paid.orderId, cod.id]])
+    assert.equal((await request('/api/products')).status, 200)
     const order = await db.findOrderById(timed.orderId)
-    assert.equal(order.status, 'pending'); assert.equal(await stock(), before)
-    results.push({ ids: ['VNP-08'], result: 'confirmed-gap', detail: 'After ageing an unpaid VNPay order by 20 minutes, order remains pending and stock remains reserved; no cleanup route/job exists.' })
+    assert.equal(order.status, 'cancelled'); assert.equal(order.paymentStatus, 'failed')
+    assert.equal(await stock(), before - 4)
+    assert.equal((await db.findOrderById(fresh.orderId)).status, 'pending')
+    assert.equal((await db.findOrderById(paid.orderId)).paymentStatus, 'paid')
+    assert.equal((await db.findOrderById(cod.id)).status, 'pending')
+    assert.deepEqual(await Promise.all([db.expireUnpaidVnpayOrders(), db.expireUnpaidVnpayOrders()]), [0, 0])
+    await db.cancelUnpaidVnpayOrder({ orderId: timed.orderId })
+    await assert.rejects(db.confirmVnpayOrderPayment({ orderId: timed.orderId, amountTotal: order.total }), error => error.code === 'ORDER_CANCELLED')
+    assert.equal(await stock(), before - 4, 'Repeat sweeps, failure callbacks and late confirmations cannot release stock twice')
+
+    // One product may occupy several lines with different upgrade selections.
+    const variants = await db.createOrder({ userId: customer.id, paymentMethod: 'vnpay', items: [{ productId: product.id, quantity: 5 }] })
+    await db.query('UPDATE order_items SET quantity = 2 WHERE order_id = $1', [variants.id])
+    await db.query(`INSERT INTO order_items (order_id, line_number, product_id, product_id_snapshot, product_name, product_image, unit_price, quantity)
+      SELECT order_id, 2, product_id, product_id_snapshot, product_name || ' (upgrade)', product_image, unit_price, 3 FROM order_items WHERE order_id = $1`, [variants.id])
+    const reservedStock = await stock()
+    await db.query("UPDATE orders SET created_at=NOW()-INTERVAL '20 minutes' WHERE id=$1", [variants.id])
+    assert.equal((await Promise.all([db.expireUnpaidVnpayOrders(), db.expireUnpaidVnpayOrders()])).reduce((a, b) => a + b, 0), 1)
+    assert.equal(await stock(), reservedStock + 5)
+    assert.equal(await db.expireUnpaidVnpayOrders(), 0)
+
+    const delayed = await vnpayOrder(), delayedParams = await callback(delayed)
+    await db.query("UPDATE orders SET created_at=NOW()-INTERVAL '20 minutes' WHERE id=$1", [delayed.orderId])
+    const heldStock = await stock()
+    assert.equal((await request('/api/payments/vnpay/ipn?' + signed(delayedParams))).data.RspCode, '00', 'A valid delayed callback settles before the request sweep')
+    await request('/api/products')
+    assert.equal((await db.findOrderById(delayed.orderId)).paymentStatus, 'paid')
+    assert.equal(await stock(), heldStock)
+  })
+  await check(['AORD-08-observation'], async () => {
     await request(`/api/admin/users/${other.id}/status`, { cookie: adminCookie, method: 'PATCH', body: { status: 'blocked' } })
     assert.equal((await request('/api/auth/me', { cookie: otherCookie })).status, 401)
     await request(`/api/admin/users/${other.id}/status`, { cookie: adminCookie, method: 'PATCH', body: { status: 'active' } })
@@ -192,10 +230,13 @@ try {
     results.push({ ids: ['AORD-08'], result: 'test-update', detail: 'Unlock does not revive revoked sessions. A new login is required.' })
   })
   await check(['APRD-04', 'APRD-05', 'APRD-06', 'APRD-07', 'APRD-10', 'SEC-08'], async () => {
+    const firstStorefrontId = (await request('/api/products')).data[0].id
     const body = { name: 'Review product create', brand: 'asus', category: category.name, price: 8000000, oldPrice: 10000000, stock: 3 }
     for (const changes of [{ name: '' }, { name: '   ' }, { price: 0 }]) assert.equal((await request('/api/admin/products', { method: 'POST', cookie: adminCookie, body: { ...body, ...changes } })).status, 400)
     const added = await request('/api/admin/products', { method: 'POST', cookie: adminCookie, body })
     assert.equal(added.status, 201); assert.equal(added.data.brand, 'ASUS'); assert.equal(added.data.discount, 20)
+    assert.equal((await request('/api/admin/products', { cookie: adminCookie })).data[0].id, added.data.id)
+    assert.equal((await request('/api/products')).data[0].id, firstStorefrontId, 'Admin ordering does not reorder the storefront')
     const edit = await request(`/api/admin/products/${added.data.id}`, { method: 'PUT', cookie: adminCookie, body: { ...body, price: 12000000, stock: 4 } })
     assert.equal(edit.status, 200); assert.equal(edit.data.oldPrice, 12000000); assert.equal(edit.data.discount, 0)
     const ordered = await db.createOrder({ userId: customer.id, items: [{ productId: added.data.id, quantity: 1 }] })
@@ -215,5 +256,5 @@ try {
     await runFinalCaseUI({ base, admin, customer, password, product, out, one, results })
   }
   await writeFile(new URL('../../.tmp-review-executed.json', import.meta.url), JSON.stringify(results, null, 2))
-  if (results.some(item => item.result === 'failed-probe')) process.exitCode = 1
+  if (results.some(item => ['failed-probe', 'ui-observation'].includes(item.result))) process.exitCode = 1
 } finally { await new Promise(resolve => server.close(resolve)); await database.close() }

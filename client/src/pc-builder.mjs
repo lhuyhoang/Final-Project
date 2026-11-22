@@ -1,4 +1,5 @@
 import { calculatePcBuild, getPcBuildSlotScope, normalizeBuildText, pcBuildSlots } from '../../shared/pcBuild.mjs'
+import { cartItemKey } from './cart.mjs'
 
 export const PC_BUILDER_KEY = 'quadpro-pc-builder-v1'
 
@@ -44,7 +45,7 @@ export function mergePcBuildCart(cart, rows) {
   for (const { product, quantity } of rows) {
     const reserved = next.filter(item => Number(item.id) === Number(product.id)).reduce((sum, item) => sum + Number(item.quantity), 0)
     if (reserved + Number(quantity) > Number(product.stock)) throw new Error(`${product.name} chỉ còn ${product.stock} sản phẩm; giỏ hàng đã có ${reserved}.`)
-    const existing = next.find(item => (item.cartKey || String(item.id)) === String(product.id))
+    const existing = next.find(item => cartItemKey(item) === cartItemKey(product))
     if (existing) Object.assign(existing, product, { quantity: Number(existing.quantity) + Number(quantity) })
     else next.push({ ...product, quantity: Number(quantity) })
   }

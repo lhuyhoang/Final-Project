@@ -1,0 +1,1 @@
+DROP INDEX orders_unpaid_vnpay_expiry_idx;

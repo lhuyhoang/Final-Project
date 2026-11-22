@@ -76,6 +76,7 @@ import { StoreAppearanceProvider, useStoreAppearance } from "./components/StoreA
 import FlashSale from "./components/FlashSale";
 import useFlashSaleProducts from "./components/useFlashSaleProducts";
 import { repriceCart } from "./flash-sale-pricing.mjs";
+import { cartItemKey, normalizeCart } from "./cart.mjs";
 import { emptyFlashSale } from "../../shared/promotions.mjs";
 import { defaultShopContact } from "../../shared/shopContact.mjs";
 import PcBuilderPage from "./components/PcBuilderPage";
@@ -260,7 +261,7 @@ const orderCategoryTree = (categoryList) => {
 };
 const loadCart = () => {
   try {
-    return JSON.parse(localStorage.getItem("quadpro-cart") || "[]");
+    return normalizeCart(JSON.parse(localStorage.getItem("quadpro-cart") || "[]"));
   } catch {
     return [];
   }
@@ -1253,15 +1254,15 @@ function App() {
 
   function addToCart(product, quantity = 1) {
     const amount = Math.max(1, Math.floor(quantity));
-    const itemKey = product.cartKey || String(product.id);
+    const itemKey = cartItemKey(product);
     setCart((current) =>
-      current.some((item) => (item.cartKey || String(item.id)) === itemKey)
+      current.some((item) => cartItemKey(item) === itemKey)
         ? current.map((item) =>
-            (item.cartKey || String(item.id)) === itemKey
+            cartItemKey(item) === itemKey
               ? { ...item, quantity: item.quantity + amount }
               : item,
           )
-        : [...current, { ...product, quantity: amount }],
+        : [...current, { ...product, cartKey: itemKey, quantity: amount }],
     );
     setToast(
       amount > 1
@@ -1279,10 +1280,10 @@ function App() {
     setCart((current) => {
       const next = [...current];
       productsToAdd.forEach((product) => {
-        const productKey = product.cartKey || String(product.id);
-        const existingIndex = next.findIndex((item) => (item.cartKey || String(item.id)) === productKey);
+        const productKey = cartItemKey(product);
+        const existingIndex = next.findIndex((item) => cartItemKey(item) === productKey);
         if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
-        else next.push({ ...product, quantity: 1 });
+        else next.push({ ...product, cartKey: productKey, quantity: 1 });
       });
       return next;
     });
@@ -1294,7 +1295,7 @@ function App() {
     setCart((current) =>
       current
         .map((item) =>
-          (item.cartKey || String(item.id)) === itemKey ? { ...item, quantity: item.quantity + delta } : item,
+          cartItemKey(item) === itemKey ? { ...item, quantity: item.quantity + delta } : item,
         )
         .filter((item) => item.quantity > 0),
     );
@@ -2282,7 +2283,7 @@ function App() {
           <>
             <div className="cart-items">
               {cart.map((item) => {
-                const itemKey = item.cartKey || String(item.id);
+                const itemKey = cartItemKey(item);
                 return <div className="cart-item" key={itemKey}>
                   <img src={item.image} alt="" />
                   <div>
@@ -2301,7 +2302,7 @@ function App() {
                   <button
                     className="remove"
                     onClick={() =>
-                      setCart((c) => c.filter((x) => (x.cartKey || String(x.id)) !== itemKey))
+                      setCart((c) => c.filter((x) => cartItemKey(x) !== itemKey))
                     }
                   >
                     <Trash2 size={17} />

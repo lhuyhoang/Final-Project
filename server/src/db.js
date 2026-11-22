@@ -14,6 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const defaultMigrationsDirectory = path.resolve(__dirname, '../migrations')
 
 export const ORDER_STATUSES = ['pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled']
+export const VNPAY_PAYMENT_TTL_MS = 15 * 60 * 1000
 export const DEFAULT_PRODUCT_POLICY_TEXT = 'Trả góp 0% • Bảo hành 36 tháng'
 export const DEFAULT_PRODUCT_PROMOTIONS = [
   'Miễn phí giao hàng cho đơn từ 500.000₫',
@@ -724,7 +725,7 @@ export async function deleteCategories(ids) {
   }, { isolationLevel: 'SERIALIZABLE' })
 }
 
-export async function listProducts({ search, category, limit, offset = 0 } = {}) {
+export async function listProducts({ search, category, limit, offset = 0, newestFirst = false } = {}) {
   const conditions = []
   const values = []
   const normalizedSearch = String(search || '').trim()
@@ -750,7 +751,8 @@ export async function listProducts({ search, category, limit, offset = 0 } = {})
     pagination += ` OFFSET $${values.length}`
   }
 
-  const result = await query(`SELECT * FROM products ${where} ORDER BY id ASC${pagination}`, values)
+  const ordering = newestFirst ? 'created_at DESC, id DESC' : 'id ASC'
+  const result = await query(`SELECT * FROM products ${where} ORDER BY ${ordering}${pagination}`, values)
   return result.rows.map(mapProductRow)
 }
 
@@ -1458,6 +1460,32 @@ async function cancelUnpaidVnpayOrderWithClient(client, input) {
         updated_at = NOW()
     WHERE id = $1
   `, [input.orderId])
+}
+
+export async function expireUnpaidVnpayOrders() {
+  // Claim orders and restore aggregated quantities in one atomic statement.
+  // Concurrent sweeps/callbacks recheck the order predicate after row locking.
+  const result = await query(`
+    WITH expired AS (
+      UPDATE orders
+      SET status = 'cancelled', payment_status = 'failed', updated_at = NOW()
+      WHERE payment_method = 'vnpay' AND payment_status = 'unpaid'
+        AND status <> 'cancelled'
+        AND created_at <= NOW() - $1 * INTERVAL '1 millisecond'
+      RETURNING id
+    ), reserved AS (
+      SELECT item.product_id, SUM(item.quantity)::integer AS quantity
+      FROM order_items AS item JOIN expired ON expired.id = item.order_id
+      WHERE item.product_id IS NOT NULL
+      GROUP BY item.product_id
+    ), restored AS (
+      UPDATE products AS product
+      SET stock = product.stock + reserved.quantity, updated_at = NOW()
+      FROM reserved WHERE product.id = reserved.product_id
+    )
+    SELECT COUNT(*)::integer AS expired_count FROM expired
+  `, [VNPAY_PAYMENT_TTL_MS])
+  return result.rows[0].expired_count
 }
 
 export async function confirmVnpayOrderPayment(input) {

@@ -11,9 +11,11 @@ import {
   DEFAULT_PRODUCT_PROMOTIONS,
   DEFAULT_PRODUCT_POLICY_TEXT,
   ORDER_STATUSES,
+  VNPAY_PAYMENT_TTL_MS,
   attachStripeCheckoutSession,
   cancelUnpaidVnpayOrder,
   cancelUnpaidStripeOrder,
+  expireUnpaidVnpayOrders,
   confirmVnpayOrderPayment,
   confirmStripeOrderPayment,
   createShowroom,
@@ -356,6 +358,12 @@ app.use('/api', rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true,
 
 app.use('/api', asyncHandler(async (req, res, next) => {
   await ensureDatabaseReady()
+  // Await expiry before exposing stock/orders or accepting another reservation.
+  // Signed VNPay callbacks settle their own order first, even if delivered late.
+  if (/^\/(products|orders|admin|vouchers|payments)(\/|$)/.test(req.path)
+    && !['/payments/vnpay/return', '/payments/vnpay/ipn'].includes(req.path)) {
+    await expireUnpaidVnpayOrders()
+  }
   next()
 }))
 
@@ -1143,7 +1151,7 @@ app.post('/api/payments/vnpay/checkout', authenticate, asyncHandler(async (req, 
     expectedVoucherDiscount: req.body?.expectedVoucherDiscount
   })
   const appBaseUrl = getAppBaseUrl(req)
-  const createdAt = new Date()
+  const createdAt = new Date(order.createdAt)
   const parameters = {
     vnp_Version: '2.1.0',
     vnp_Command: 'pay',
@@ -1157,7 +1165,7 @@ app.post('/api/payments/vnpay/checkout', authenticate, asyncHandler(async (req, 
     vnp_ReturnUrl: `${appBaseUrl}/api/payments/vnpay/return`,
     vnp_IpAddr: getClientIp(req),
     vnp_CreateDate: formatVnpayDate(createdAt),
-    vnp_ExpireDate: formatVnpayDate(new Date(createdAt.getTime() + 15 * 60 * 1000))
+    vnp_ExpireDate: formatVnpayDate(new Date(createdAt.getTime() + VNPAY_PAYMENT_TTL_MS))
   }
   const secureHash = signVnpayParameters(parameters)
   res.status(201).json({
@@ -1308,7 +1316,7 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
   res.json(await getAdminStats())
 }))
 
-app.get('/api/admin/products', asyncHandler(async (req, res) => res.json(await listProducts())))
+app.get('/api/admin/products', asyncHandler(async (req, res) => res.json(await listProducts({ newestFirst: true }))))
 
 app.get('/api/admin/categories', asyncHandler(async (req, res) => res.json(await listCategories())))
 
